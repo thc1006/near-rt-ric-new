@@ -49,7 +49,7 @@ func (m *Manager) watchE2Nodes() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", m.topoHost, m.topoPort),
+	conn, err := grpc.NewClient(fmt.Sprintf("%s:%d", m.topoHost, m.topoPort),
 		grpc.WithTransportCredentials(credentials.NewTLS(clientCreds)))
 	if err != nil {
 		log.Fatal(err)
