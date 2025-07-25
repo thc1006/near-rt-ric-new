@@ -194,8 +194,6 @@ github.com/mitchellh/mapstructure v1.4.3 h1:OVowDSCllw/YjdLkam3/sm7wEtOy59d8ndGg
 github.com/mitchellh/mapstructure v1.4.3/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RRV2QTWOzhPopBRo=
 github.com/onosproject/onos-api/go v0.10.34 h1:Hqh3HSXPEE05bSnPipBr0FQcpeA8rC4GyXWpQ6NufwE=
 github.com/onosproject/onos-api/go v0.10.34/go.mod h1:pa/Pabejpm9MDQKp/a8OVLK6uAy2yrxkkQn+X9ht3W8=
-github.com/onosproject/onos-kpimon v0.4.11 h1:Om1CHtJOHtACC7tOFNMjuXadO1LwUu3fWYKhspz9YzI=
-github.com/onosproject/onos-kpimon v0.4.11/go.mod h1:nS/KWI3zBe6daphHqOfSnd0zo1UPEQCxBgD0+NgZRgE=
 github.com/onosproject/onos-lib-go v0.10.24 h1:CX/6a0U2ZAhHeYiZnmO+kOIoLv8V+aim0i+IOkKUD4E=
 github.com/onosproject/onos-lib-go v0.10.24/go.mod h1:xprZr/FtQ8YhDxA3WI7AqMUzK97QJvrsrrmY5KiX46I=
 github.com/onosproject/onos-ric-sdk-go v0.8.14 h1:zXqv3uFEs8fKq+UzV8U/9VqQA3AYEGUwnggebY4aFHQ=
@@ -222,8 +220,6 @@ github.com/rogpeppe/go-internal v1.8.1/go.mod h1:JeRgkft04UBgHMgCIwADu4Pn6Mtm5d4
 github.com/russross/blackfriday/v2 v2.0.1/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/shurcooL/sanitized_anchor_name v1.0.0/go.mod h1:1NzhyTcUVG4SuEtjjoZeVRXNmyL/1OwPU0+IJeTBvfc=
 github.com/sirupsen/logrus v1.8.1/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
-github.com/spf13/afero v1.8.2 h1:xehSyVa0YnHWsJ49JFljMpg1HX19V6NDZ1fkm1Xznbo=
-github.com/spf13/afero v1.8.2/go.mod h1:CtAatgMJh6bJEIs48Ay/FOnkljP3WeGUG0MC1RfAqwo=
 github.com/spf13/afero v1.9.2 h1:j49Hj62F0n+DaZ1dDCvhABaPNSGNkt32oRFxI33IEMw=
 github.com/spf13/afero v1.9.2/go.mod h1:iUV7ddyEEZPO5gA3zD4fJt6iStLlL+Lg4m2cihcDf8Y=
 github.com/spf13/cast v1.4.1 h1:s0hze+J0196ZfEMTs80N7UlFt0BDuQ7Q+JDnHiMWKdA=
