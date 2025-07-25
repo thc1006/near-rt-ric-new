@@ -1,0 +1,21 @@
+module xapp-hello-world {
+  yang-version 1.1;
+  namespace "urn:o-ran:xapp-hello-world:1.0";
+  prefix "xhw";
+
+  organization "O-RAN Alliance";
+  contact "o-ran.org";
+  description "YANG model for the Hello World xApp";
+
+  revision 2025-07-25 {
+    description "Initial revision";
+  }
+
+  container config {
+    leaf log-level {
+      type string;
+      default "info";
+      description "The log level for the xApp.";
+    }
+  }
+}

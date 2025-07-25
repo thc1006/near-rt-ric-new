@@ -1,0 +1,7 @@
+{
+  "policy_id": "1234",
+  "policy_type_id": "2",
+  "policy_data": {
+    "threshold": 100
+  }
+}

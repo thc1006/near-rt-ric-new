@@ -52,35 +52,41 @@ helm-lint-xapp-hello-world:
 	helm lint helm/xapp-hello-world
 
 # Setup development environment
+OS := $(shell go env GOOS)
+ARCH := $(shell go env GOARCH)
+
 setup-dev-env:
-	@echo "Setting up development environment..."
+	@echo "Setting up development environment for $(OS)-$(ARCH)..."
 	mkdir -p temp
 	cd temp && \
-	wget -q --show-progress https://get.helm.sh/helm-v3.11.2-linux-amd64.tar.gz && \
-	wget -q --show-progress https://get.helm.sh/chartmuseum-v0.13.1-linux-amd64.tar.gz && \
-	tar -xzf helm-v3.11.2-linux-amd64.tar.gz && \
-	tar -xzf chartmuseum-v0.13.1-linux-amd64.tar.gz && \
-	mv linux-amd64/helm /usr/local/bin/helm && \
-	mv linux-amd64/chartmuseum /usr/local/bin/chartmuseum && \
-	helm plugin install https://github.com/chartmuseum/helm-push && \
-	cd .. && rm -rf temp
+	curl -sSL https://get.helm.sh/helm-v3.11.2-$(OS)-$(ARCH).tar.gz -o helm.tar.gz && \
+	curl -sSL https://get.helm.sh/chartmuseum-v0.13.1-$(OS)-$(ARCH).tar.gz -o chartmuseum.tar.gz && \
+	tar -xzf helm.tar.gz && \
+	tar -xzf chartmuseum.tar.gz
+	mv temp/$(OS)-$(ARCH)/helm bin/helm
+	mv temp/$(OS)-$(ARCH)/chartmuseum bin/chartmuseum
+	chmod +x bin/helm
+	chmod +x bin/chartmuseum
+	bash ./bin/helm plugin install https://github.com/chartmuseum/helm-push
+	rm -rf temp
 	@echo "Starting chartmuseum..."
 	mkdir -p helm/chartmuseum
-	chartmuseum --debug --port=6873 --storage local --storage-local-rootdir=helm/chartmuseum &
+	bash ./bin/chartmuseum --debug --port=6873 --storage local --storage-local-rootdir=helm/chartmuseum &
+	sleep 5
 
 # Build RIC charts
 build-ric-charts:
 	@echo "Building and pushing RIC charts..."
-	helm repo add local http://localhost:6873 || true
+	bash ./bin/helm repo add local http://localhost:6873 || true
 	cd ric-dep/new-installer/helm/charts && make nearrtric
 
 # Deploy interactive dashboard
 deploy-interactive-dashboard:
 	@echo "Deploying interactive dashboard..."
-	helm install nearrtric -n ricplt local/nearrtric -f ric-dep/new-installer/helm-overrides/nearrtric/interactive-dashboard.yaml
+	bash ./bin/helm install nearrtric -n ricplt local/nearrtric -f ric-dep/new-installer/helm-overrides/nearrtric/interactive-dashboard.yaml
 
 # End-to-end test
-e2e: deploy-interactive-dashboard
+e2e: setup-dev-env build-ric-charts deploy-interactive-dashboard
 	@echo "Running end-to-end test..."
 	./scripts/health-check.sh
 	cd ui && npm install && npm start
