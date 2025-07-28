@@ -107,30 +107,30 @@ func (s *Server) setupRoutes() *mux.Router {
 	api := router.PathPrefix("/api/v1").Subrouter()
 
 	// Component discovery endpoints
-	api.HandleFunc("/components", s.handleGetComponents).Methods("GET")
-	api.HandleFunc("/components/{id}", s.handleGetComponent).Methods("GET")
+	api.HandleFunc("/components", s.handleGetComponents).Methods("GET", "OPTIONS")
+	api.HandleFunc("/components/{id}", s.handleGetComponent).Methods("GET", "OPTIONS")
 
 	// E2 Manager endpoints
-	api.HandleFunc("/e2nodes", s.handleGetE2Nodes).Methods("GET")
-	api.HandleFunc("/e2nodes/{id}", s.handleGetE2Node).Methods("GET")
+	api.HandleFunc("/e2nodes", s.handleGetE2Nodes).Methods("GET", "OPTIONS")
+	api.HandleFunc("/e2nodes/{id}", s.handleGetE2Node).Methods("GET", "OPTIONS")
 
 	// Subscription Manager endpoints
-	api.HandleFunc("/subscriptions", s.handleGetSubscriptions).Methods("GET")
-	api.HandleFunc("/subscriptions", s.handleCreateSubscription).Methods("POST")
-	api.HandleFunc("/subscriptions/{id}", s.handleGetSubscription).Methods("GET")
-	api.HandleFunc("/subscriptions/{id}", s.handleDeleteSubscription).Methods("DELETE")
+	api.HandleFunc("/subscriptions", s.handleGetSubscriptions).Methods("GET", "OPTIONS")
+	api.HandleFunc("/subscriptions", s.handleCreateSubscription).Methods("POST", "OPTIONS")
+	api.HandleFunc("/subscriptions/{id}", s.handleGetSubscription).Methods("GET", "OPTIONS")
+	api.HandleFunc("/subscriptions/{id}", s.handleDeleteSubscription).Methods("DELETE", "OPTIONS")
 
 	// App Manager endpoints
-	api.HandleFunc("/xapps", s.handleGetXApps).Methods("GET")
-	api.HandleFunc("/xapps", s.handleDeployXApp).Methods("POST")
-	api.HandleFunc("/xapps/{name}", s.handleGetXApp).Methods("GET")
-	api.HandleFunc("/xapps/{name}", s.handleUndeployXApp).Methods("DELETE")
+	api.HandleFunc("/xapps", s.handleGetXApps).Methods("GET", "OPTIONS")
+	api.HandleFunc("/xapps", s.handleDeployXApp).Methods("POST", "OPTIONS")
+	api.HandleFunc("/xapps/{name}", s.handleGetXApp).Methods("GET", "OPTIONS")
+	api.HandleFunc("/xapps/{name}", s.handleUndeployXApp).Methods("DELETE", "OPTIONS")
 
 	// WebSocket endpoint
 	router.HandleFunc("/ws", s.handleWebSocket)
 
 	// Health check endpoint
-	router.HandleFunc("/health", s.handleHealth).Methods("GET")
+	router.HandleFunc("/health", s.handleHealth).Methods("GET", "OPTIONS")
 
 	return router
 }

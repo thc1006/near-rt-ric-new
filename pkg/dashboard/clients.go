@@ -71,7 +71,7 @@ func (cm *ClientManager) initializeConnections() error {
 
 // createGRPCConnection creates a gRPC connection with appropriate credentials
 func (cm *ClientManager) createGRPCConnection(endpoint string) (*grpc.ClientConn, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
 	// Try secure connection first, fallback to insecure

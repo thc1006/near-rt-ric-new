@@ -3,6 +3,8 @@ module github.com/oran/near-rt-ric-new
 go 1.21
 
 require (
+	github.com/gorilla/mux v1.8.0
+	github.com/gorilla/websocket v1.5.0
 	github.com/onosproject/onos-api/go v0.10.34
 	github.com/onosproject/onos-lib-go v0.10.24
 	github.com/onosproject/onos-ric-sdk-go v0.8.14

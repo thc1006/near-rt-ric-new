@@ -7,6 +7,8 @@ This project provides a fully interactive, web-based operations console for O-RA
 ## Features
 
 - **Dynamic Dashboard:** A React-based UI that auto-discovers and displays all deployed network functions (near-RT RIC, O-CU/DU simulators, xApps, SMO micro-services).
+- **Dashboard API Gateway:** Go-based REST API service that abstracts O-RAN SC gRPC APIs and provides WebSocket support for real-time updates.
+- **O-RAN SC Integration:** Native integration with O-RAN Software Community components (E2 Manager, Subscription Manager, App Manager).
 - **Real-Time Observability:** Exposes real-time KPIs, alarms, and logs through an integrated observability stack, including Grafana, Prometheus, Loki, and Elasticsearch.
 - **Production-Grade SMO:** Based on the O-RAN SC SMO package derived from ONAP Frankfurt, deployed via Helm.
 - **End-to-End Automation:** Includes scripts for one-command setup and deployment in a micro-Kubernetes environment (KIND, K3s, etc.).
@@ -17,6 +19,46 @@ This project provides a fully interactive, web-based operations console for O-RA
 - a Kubernetes cluster (e.g., KIND, K3s, Minikube)
 - `kubectl`
 - `make`
+- Go 1.21+ (for building from source)
+- Node.js 16+ (for UI development)
+
+## Building
+
+### Build All Components
+```bash
+# Build all Go binaries
+make build
+
+# Build Docker images
+make docker-build-xapp-hello-world
+make docker-build-dashboard-api
+
+# Lint Helm charts
+make helm-lint
+```
+
+### Dashboard API Gateway
+```bash
+# Build dashboard API binary
+go build ./cmd/dashboard-api
+
+# Run dashboard API tests
+go test ./pkg/dashboard/...
+
+# Build dashboard API Docker image
+make docker-build-dashboard-api
+```
+
+### Frontend Dashboard
+```bash
+# Install dependencies and build UI
+cd ui
+npm install
+npm run build
+
+# Start development server
+npm start
+```
 
 ## One-Command Setup
 

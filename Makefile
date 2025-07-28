@@ -4,7 +4,7 @@
 GO_FILES := $(shell find . -name '*.go' -not -path './vendor/*')
 GO_PACKAGES := $(shell go list ./...)
 
-.PHONY: all build clean test test-coverage fmt lint helm-lint docker-build-xapp-hello-world helm-lint-xapp-hello-world setup-dev-env build-ric-charts deploy-interactive-dashboard
+.PHONY: all build clean test test-coverage fmt lint helm-lint docker-build-xapp-hello-world docker-build-dashboard-api helm-lint-xapp-hello-world helm-lint-dashboard-api setup-dev-env build-ric-charts deploy-interactive-dashboard
 
 all: build
 
@@ -17,6 +17,11 @@ build:
 docker-build-xapp-hello-world:
 	@echo "Building xapp-hello-world docker image..."
 	docker build -f build/xapp-hello-world/Dockerfile -t oran/xapp-hello-world:latest .
+
+# Build the dashboard-api docker image
+docker-build-dashboard-api:
+	@echo "Building dashboard-api docker image..."
+	docker build -f build/dashboard-api/Dockerfile -t oran/dashboard-api:latest .
 
 # Run tests
 test:
@@ -50,6 +55,11 @@ helm-lint:
 helm-lint-xapp-hello-world:
 	@echo "Linting xapp-hello-world Helm chart..."
 	helm lint helm/xapp-hello-world
+
+# Lint the dashboard-api Helm chart
+helm-lint-dashboard-api:
+	@echo "Linting dashboard-api Helm chart..."
+	helm lint helm/dashboard-api
 
 # Setup development environment
 setup-dev-env:
