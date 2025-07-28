@@ -74,22 +74,15 @@ build-ric-charts:
 	helm repo add local http://localhost:6873 || true
 	cd ric-dep/new-installer/helm/charts && make nearrtric
 
-# Deploy O-RAN SC platform
-deploy-oran-sc:
-	@echo "Deploying O-RAN SC Near-RT RIC platform..."
-	./scripts/deploy-oran-sc-local.sh
-
-# Deploy interactive dashboard (updated for O-RAN SC)
-deploy-interactive-dashboard: deploy-oran-sc
+# Deploy interactive dashboard
+deploy-interactive-dashboard:
 	@echo "Deploying interactive dashboard..."
-	cd ui && npm install && npm run build
-	@echo "Dashboard built successfully"
+	helm install nearrtric -n ricplt local/nearrtric -f ric-dep/new-installer/helm-overrides/nearrtric/interactive-dashboard.yaml
 
-# End-to-end test with O-RAN SC
-e2e: deploy-oran-sc
-	@echo "Running end-to-end test with O-RAN SC..."
+# End-to-end test
+e2e: deploy-interactive-dashboard
+	@echo "Running end-to-end test..."
 	./scripts/health-check.sh
-	@echo "Starting interactive dashboard..."
 	cd ui && npm install && npm start
 
 # Clean up build artifacts

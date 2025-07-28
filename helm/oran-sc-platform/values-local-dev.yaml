@@ -1,0 +1,164 @@
+# O-RAN SC Platform Configuration for Local Development
+# This file configures O-RAN SC components for local Kubernetes environments (KIND, K3s, Minikube)
+
+global:
+  # Local development settings
+  namespace: ricplt
+  pullPolicy: IfNotPresent
+  
+  # Resource limits for local development
+  resources:
+    small:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    medium:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 200m
+        memory: 256Mi
+
+# E2 Manager Configuration
+e2mgr:
+  enabled: true
+  imagePullPolicy: IfNotPresent
+  image:
+    name: ric-plt-e2mgr
+    tag: 3.0.1
+    registry: "nexus3.o-ran-sc.org:10002/o-ran-sc"
+  
+  replicaCount: 1
+  resources: small
+  
+  globalRicId:
+    plmnId: 131014
+    ricNearRtId: 556670
+
+  liveness:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  
+  readiness:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 5
+
+# Subscription Manager Configuration
+submgr:
+  enabled: true
+  imagePullPolicy: IfNotPresent
+  image:
+    name: ric-plt-submgr
+    tag: 0.10.7
+    registry: "nexus3.o-ran-sc.org:10002/o-ran-sc"
+  
+  replicaCount: 1
+  resources: small
+
+# App Manager Configuration
+appmgr:
+  enabled: true
+  imagePullPolicy: IfNotPresent
+  image:
+    appmgr:
+      registry: "nexus3.o-ran-sc.org:10002/o-ran-sc"
+      name: ric-plt-appmgr
+      tag: 0.2.0
+    init:
+      registry: "nexus3.o-ran-sc.org:10002/o-ran-sc"
+      name: it-dep-init
+      tag: 0.0.1
+  
+  replicaCount: 1
+  resources: medium
+  
+  # Local Helm repository configuration
+  reponame: "local-helm-repo"
+  tillerkey: "ricxapp"
+
+# Routing Manager Configuration
+rtmgr:
+  enabled: true
+  imagePullPolicy: IfNotPresent
+  image:
+    name: ric-plt-rtmgr
+    tag: 0.4.0
+    registry: "nexus3.o-ran-sc.org:10002/o-ran-sc"
+  
+  replicaCount: 1
+  resources: small
+
+# A1 Mediator Configuration
+a1mediator:
+  enabled: true
+  imagePullPolicy: IfNotPresent
+  image:
+    name: ric-plt-a1
+    tag: 2.1.0
+    registry: "nexus3.o-ran-sc.org:10002/o-ran-sc"
+  
+  replicaCount: 1
+  resources: small
+
+# Database as a Service (Redis)
+dbaas:
+  enabled: true
+  imagePullPolicy: IfNotPresent
+  image:
+    name: redis
+    tag: 6.0.8-alpine
+    registry: "docker.io"
+  
+  replicaCount: 1
+  resources: small
+  
+  # Local development persistence settings
+  persistence:
+    enabled: false  # Disable for local dev to avoid PV issues
+
+# E2 Termination
+e2term:
+  enabled: true
+  imagePullPolicy: IfNotPresent
+  image:
+    name: ric-plt-e2
+    tag: 3.0.1
+    registry: "nexus3.o-ran-sc.org:10002/o-ran-sc"
+  
+  replicaCount: 1
+  resources: medium
+
+# O1 Mediator Configuration
+o1mediator:
+  enabled: false  # Disable for initial setup, can be enabled later
+  
+# Alarm Manager Configuration
+alarmmanager:
+  enabled: false  # Disable for initial setup
+
+# VESPA Manager Configuration
+vespamgr:
+  enabled: false  # Disable for initial setup
+
+# xApp Onboarder Configuration
+xapponboarder:
+  enabled: true
+  imagePullPolicy: IfNotPresent
+  
+# Infrastructure components
+infrastructure:
+  enabled: true
+  
+  # Kong API Gateway for local development
+  kong:
+    enabled: false  # Disable for simplicity in local dev
+  
+  # Jaeger for tracing
+  jaeger:
+    enabled: false  # Disable for initial setup

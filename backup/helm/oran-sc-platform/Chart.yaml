@@ -1,0 +1,52 @@
+apiVersion: v2
+name: oran-sc-platform
+description: O-RAN SC Platform Foundation - Core Components Deployment
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+dependencies:
+  - name: dbaas
+    version: "3.0.0"
+    repository: "file://../../../ric-dep/helm/dbaas"
+    condition: dbaas.enabled
+  - name: e2term
+    version: "3.0.0"
+    repository: "file://../../../ric-dep/helm/e2term"
+    condition: e2term.enabled
+  - name: e2mgr
+    version: "3.0.0"
+    repository: "file://../../../ric-dep/helm/e2mgr"
+    condition: e2mgr.enabled
+  - name: submgr
+    version: "3.0.0"
+    repository: "file://../../../ric-dep/helm/submgr"
+    condition: submgr.enabled
+  - name: rtmgr
+    version: "3.0.0"
+    repository: "file://../../../ric-dep/helm/rtmgr"
+    condition: rtmgr.enabled
+  - name: a1mediator
+    version: "3.0.0"
+    repository: "file://../../../ric-dep/helm/a1mediator"
+    condition: a1mediator.enabled
+  - name: o1mediator
+    version: "3.0.0"
+    repository: "file://../../../ric-dep/helm/o1mediator"
+    condition: o1mediator.enabled
+  - name: appmgr
+    version: "3.0.0"
+    repository: "file://../../../ric-dep/helm/appmgr"
+    condition: appmgr.enabled
+
+maintainers:
+  - name: O-RAN SC Community
+    email: discuss@lists.o-ran-sc.org
+
+keywords:
+  - o-ran
+  - ric
+  - near-rt-ric
+  - e2
+  - a1
+  - o1
