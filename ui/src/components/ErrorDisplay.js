@@ -41,22 +41,51 @@ function LoadingDisplay({ message = 'Loading...', className = '' }) {
 }
 
 /**
- * Component for displaying connection status
+ * Component for displaying connection status with detailed state information
  */
-function ConnectionStatus({ connected, error }) {
-  if (connected) {
-    return (
-      <div className="connection-status connected">
-        <span className="status-indicator">●</span>
-        Connected
-      </div>
-    );
-  }
+function ConnectionStatus({ connected, connecting, error, connectionState, reconnectAttempts, onReconnect }) {
+  const getStatusText = () => {
+    if (connected) {
+      return 'Real-time Updates Active';
+    } else if (connecting) {
+      return 'Connecting...';
+    } else if (reconnectAttempts > 0) {
+      return `Reconnecting (${reconnectAttempts}/5)`;
+    } else if (error) {
+      return `Connection Error: ${formatAPIError(error)}`;
+    } else {
+      return 'Disconnected';
+    }
+  };
+
+  const getStatusClass = () => {
+    if (connected) return 'connected';
+    if (connecting) return 'connecting';
+    return 'disconnected';
+  };
+
+  const getStatusIndicator = () => {
+    if (connected) return '●';
+    if (connecting) return '◐';
+    return '○';
+  };
 
   return (
-    <div className="connection-status disconnected">
-      <span className="status-indicator">●</span>
-      {error ? `Connection Error: ${formatAPIError(error)}` : 'Disconnected'}
+    <div className={`connection-status ${getStatusClass()}`}>
+      <span className="status-indicator">{getStatusIndicator()}</span>
+      <span className="status-text">{getStatusText()}</span>
+      {connectionState && (
+        <span className="connection-state">({connectionState})</span>
+      )}
+      {!connected && !connecting && onReconnect && (
+        <button 
+          className="reconnect-button" 
+          onClick={onReconnect}
+          title="Manually reconnect WebSocket"
+        >
+          Reconnect
+        </button>
+      )}
     </div>
   );
 }

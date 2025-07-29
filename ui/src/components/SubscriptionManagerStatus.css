@@ -1,0 +1,241 @@
+/* Subscription Manager Status Styles */
+
+.subscription-manager-details {
+  margin-top: 16px;
+}
+
+.metrics-section,
+.performance-metrics,
+.subscriptions-section,
+.sdl-section {
+  margin-bottom: 20px;
+}
+
+.metrics-section h4,
+.performance-metrics h4,
+.subscriptions-section h4,
+.sdl-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 8px;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.metric-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  border-left: 3px solid #e0e0e0;
+}
+
+.metric-label {
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+.metric-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.metric-value.active {
+  color: #4caf50;
+}
+
+.metric-value.pending {
+  color: #ff9800;
+}
+
+.metric-value.failed {
+  color: #f44336;
+}
+
+/* Subscriptions List */
+.subscriptions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.subscription-item {
+  padding: 16px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  transition: all 0.2s ease;
+}
+
+.subscription-item:hover {
+  background-color: #f0f0f0;
+  border-color: #d0d0d0;
+}
+
+.subscription-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.subscription-id {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+  font-family: monospace;
+}
+
+.subscription-status {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.subscription-status.active,
+.subscription-status.running {
+  background-color: rgba(76, 175, 80, 0.1);
+  color: #4caf50;
+  border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.subscription-status.pending,
+.subscription-status.creating {
+  background-color: rgba(255, 152, 0, 0.1);
+  color: #ff9800;
+  border: 1px solid rgba(255, 152, 0, 0.3);
+}
+
+.subscription-status.failed,
+.subscription-status.error {
+  background-color: rgba(244, 67, 54, 0.1);
+  color: #f44336;
+  border: 1px solid rgba(244, 67, 54, 0.3);
+}
+
+.subscription-status.completed,
+.subscription-status.finished {
+  background-color: rgba(96, 125, 139, 0.1);
+  color: #607d8b;
+  border: 1px solid rgba(96, 125, 139, 0.3);
+}
+
+.subscription-status.unknown {
+  background-color: rgba(158, 158, 158, 0.1);
+  color: #9e9e9e;
+  border: 1px solid rgba(158, 158, 158, 0.3);
+}
+
+.subscription-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.detail-item {
+  display: flex;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.detail-label {
+  color: #666;
+  font-weight: 500;
+}
+
+.detail-value {
+  color: #333;
+  font-family: monospace;
+}
+
+.subscription-timestamp {
+  font-size: 12px;
+  color: #999;
+  font-style: italic;
+}
+
+.more-subscriptions {
+  text-align: center;
+  padding: 8px;
+  color: #666;
+  font-style: italic;
+  font-size: 14px;
+}
+
+/* SDL Section */
+.sdl-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sdl-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  border-left: 3px solid #2196f3;
+}
+
+.sdl-label {
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+.sdl-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.sdl-value.connected {
+  color: #4caf50;
+}
+
+.sdl-value.disconnected {
+  color: #f44336;
+}
+
+.sdl-value.unknown {
+  color: #9e9e9e;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .subscription-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .subscription-details {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .detail-item {
+    flex-direction: column;
+    gap: 2px;
+  }
+}

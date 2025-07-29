@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ErrorDisplay, LoadingDisplay, ConnectionStatus } from './components/ErrorDisplay';
+import ComponentDiscovery from './components/ComponentDiscovery';
+import E2ManagerStatus from './components/E2ManagerStatus';
+import SubscriptionManagerStatus from './components/SubscriptionManagerStatus';
+import AppManagerStatus from './components/AppManagerStatus';
+import XAppManagement from './components/XAppManagement';
 import { 
   useComponents, 
   useE2Nodes, 
@@ -20,26 +25,22 @@ function App() {
   const { error: healthError } = useHealth();
   
   // WebSocket for real-time updates
-  const { connected: wsConnected, messages: wsMessages, error: wsError } = useWebSocket();
+  const { 
+    connected: wsConnected, 
+    connecting: wsConnecting,
+    error: wsError,
+    connectionState: wsConnectionState,
+    lastMessage: wsLastMessage,
+    reconnectAttempts: wsReconnectAttempts,
+    connect: wsConnect
+  } = useWebSocket();
 
   // Local state for processed data
-  const [networkFunctions, setNetworkFunctions] = useState([]);
   const [kpis, setKpis] = useState({});
   const [alarms, setAlarms] = useState([]);
   const [logs, setLogs] = useState([]);
 
-  // Process components data into network functions
-  useEffect(() => {
-    if (componentsData?.components) {
-      const functions = componentsData.components.map(component => ({
-        id: component.name || component.id,
-        name: component.name || component.id,
-        type: component.type || 'Unknown',
-        status: component.status || 'unknown'
-      }));
-      setNetworkFunctions(functions);
-    }
-  }, [componentsData]);
+
 
   // Process E2 nodes and xApps data into KPIs
   useEffect(() => {
@@ -114,18 +115,112 @@ function App() {
     setAlarms(newAlarms);
   }, [healthError, componentsError, e2NodesError, wsConnected]);
 
-  // Process WebSocket messages into logs
+  // Process WebSocket messages for real-time updates
   useEffect(() => {
-    if (wsMessages.length > 0) {
-      const newLogs = wsMessages.map((msg, index) => ({
-        id: `ws-${index}`,
-        timestamp: new Date().toISOString(),
-        service: 'dashboard-api',
-        message: `${msg.type}: ${JSON.stringify(msg.data)}`
-      }));
-      setLogs(prev => [...prev, ...newLogs].slice(-50)); // Keep last 50 logs
+    if (wsLastMessage) {
+      const message = wsLastMessage;
+      const timestamp = new Date().toISOString();
+      
+      // Process different types of real-time messages
+      switch (message.type) {
+        case 'component_status_update':
+        case 'component_discovered':
+        case 'component_removed':
+          // Trigger component data refresh
+          refetchComponents();
+          setLogs(prev => [...prev, {
+            id: `ws-${Date.now()}`,
+            timestamp,
+            service: 'component-discovery',
+            message: `${message.type}: ${message.data?.name || 'unknown'} - ${message.data?.status || 'unknown'}`
+          }].slice(-50));
+          break;
+          
+        case 'e2node_connected':
+        case 'e2node_disconnected':
+          // Trigger E2 nodes data refresh
+          refetchE2Nodes();
+          setLogs(prev => [...prev, {
+            id: `ws-${Date.now()}`,
+            timestamp,
+            service: 'e2-manager',
+            message: `${message.type}: ${message.data?.nodeId || 'unknown'}`
+          }].slice(-50));
+          break;
+          
+        case 'subscription_created':
+        case 'subscription_deleted':
+        case 'subscription_failed':
+          // Trigger subscriptions data refresh
+          refetchSubscriptions();
+          setLogs(prev => [...prev, {
+            id: `ws-${Date.now()}`,
+            timestamp,
+            service: 'subscription-manager',
+            message: `${message.type}: ${message.data?.subscriptionId || message.data?.id || 'unknown'}`
+          }].slice(-50));
+          break;
+          
+        case 'xapp_deployed':
+        case 'xapp_undeployed':
+        case 'xapp_status_changed':
+          // Trigger xApps data refresh
+          refetchXApps();
+          setLogs(prev => [...prev, {
+            id: `ws-${Date.now()}`,
+            timestamp,
+            service: 'app-manager',
+            message: `${message.type}: ${message.data?.name || 'unknown'} - ${message.data?.status || ''}`
+          }].slice(-50));
+          break;
+          
+        case 'alarm_raised':
+        case 'alarm_cleared':
+          // Add alarm to the alarms list
+          const alarmSeverity = message.data?.severity || 'warning';
+          const alarmMessage = message.data?.message || 'Unknown alarm';
+          const alarmId = message.data?.id || `alarm-${Date.now()}`;
+          
+          if (message.type === 'alarm_raised') {
+            setAlarms(prev => [...prev, {
+              id: alarmId,
+              severity: alarmSeverity,
+              message: alarmMessage,
+              timestamp
+            }]);
+          } else {
+            setAlarms(prev => prev.filter(alarm => alarm.id !== alarmId));
+          }
+          
+          setLogs(prev => [...prev, {
+            id: `ws-${Date.now()}`,
+            timestamp,
+            service: 'alarm-manager',
+            message: `${message.type}: ${alarmMessage}`
+          }].slice(-50));
+          break;
+          
+        case 'system_event':
+          // Log system events
+          setLogs(prev => [...prev, {
+            id: `ws-${Date.now()}`,
+            timestamp,
+            service: 'system',
+            message: `${message.type}: ${message.data?.message || JSON.stringify(message.data)}`
+          }].slice(-50));
+          break;
+          
+        default:
+          // Log unknown message types
+          setLogs(prev => [...prev, {
+            id: `ws-${Date.now()}`,
+            timestamp,
+            service: 'websocket',
+            message: `${message.type}: ${JSON.stringify(message.data)}`
+          }].slice(-50));
+      }
     }
-  }, [wsMessages]);
+  }, [wsLastMessage, refetchComponents, refetchE2Nodes, refetchSubscriptions, refetchXApps]);
 
   // Auto-refresh data every 30 seconds
   useEffect(() => {
@@ -144,88 +239,133 @@ function App() {
       <div className="App">
         <header className="App-header">
           <h1>O-RAN Interactive Operations Console</h1>
-          <ConnectionStatus connected={wsConnected} error={wsError} />
+          <ConnectionStatus 
+            connected={wsConnected} 
+            connecting={wsConnecting}
+            error={wsError}
+            connectionState={wsConnectionState}
+            reconnectAttempts={wsReconnectAttempts}
+            onReconnect={wsConnect}
+          />
         </header>
         <main>
           <div className="dashboard-container">
-            <div className="panel network-functions">
-              <h2>Network Functions</h2>
-              {componentsLoading ? (
-                <LoadingDisplay message="Discovering components..." />
-              ) : componentsError ? (
-                <ErrorDisplay error={componentsError} onRetry={refetchComponents} />
-              ) : (
+            {/* Component Discovery Panel */}
+            <div className="panel full-width">
+              <ComponentDiscovery
+                components={componentsData?.components || []}
+                loading={componentsLoading}
+                error={componentsError}
+                onRefresh={refetchComponents}
+              />
+            </div>
+
+            {/* O-RAN SC Component Status Panels */}
+            <div className="component-status-grid">
+              <E2ManagerStatus
+                component={componentsData?.components?.find(c => c.type?.toLowerCase() === 'e2manager')}
+                e2Nodes={e2NodesData?.e2nodes || []}
+                loading={componentsLoading || e2NodesLoading}
+                error={componentsError || e2NodesError}
+                onRefresh={() => {
+                  refetchComponents();
+                  refetchE2Nodes();
+                }}
+              />
+
+              <SubscriptionManagerStatus
+                component={componentsData?.components?.find(c => c.type?.toLowerCase() === 'submgr')}
+                subscriptions={subscriptionsData?.subscriptions || []}
+                loading={componentsLoading || subscriptionsLoading}
+                error={componentsError || subscriptionsError}
+                onRefresh={() => {
+                  refetchComponents();
+                  refetchSubscriptions();
+                }}
+              />
+
+              <AppManagerStatus
+                component={componentsData?.components?.find(c => c.type?.toLowerCase() === 'appmgr')}
+                xApps={xAppsData?.xapps || []}
+                loading={componentsLoading || xAppsLoading}
+                error={componentsError || xAppsError}
+                onRefresh={() => {
+                  refetchComponents();
+                  refetchXApps();
+                }}
+              />
+            </div>
+
+            {/* xApp Management Interface */}
+            <div className="panel full-width">
+              <XAppManagement
+                xApps={xAppsData?.xapps || []}
+                loading={xAppsLoading}
+                error={xAppsError}
+                onRefresh={refetchXApps}
+              />
+            </div>
+            
+            {/* Legacy Panels for backward compatibility */}
+            <div className="legacy-panels">
+              <div className="panel kpis">
+                <h2>Real-Time KPIs</h2>
+                {(e2NodesLoading || xAppsLoading || subscriptionsLoading) ? (
+                  <LoadingDisplay message="Loading KPIs..." />
+                ) : (e2NodesError || xAppsError || subscriptionsError) ? (
+                  <div>
+                    {e2NodesError && <ErrorDisplay error={e2NodesError} onRetry={refetchE2Nodes} />}
+                    {xAppsError && <ErrorDisplay error={xAppsError} onRetry={refetchXApps} />}
+                    {subscriptionsError && <ErrorDisplay error={subscriptionsError} onRetry={refetchSubscriptions} />}
+                  </div>
+                ) : (
+                  <div>
+                    {Object.entries(kpis).map(([nf, data]) => (
+                      <div key={nf}>
+                        <h3>{nf}</h3>
+                        <ul>
+                          {Object.entries(data).map(([key, value]) => (
+                            <li key={key}>
+                              {key}: {typeof value === 'number' ? value.toFixed(2) : value}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                    {Object.keys(kpis).length === 0 && (
+                      <p>No KPI data available</p>
+                    )}
+                  </div>
+                )}
+              </div>
+              
+              <div className="panel alarms">
+                <h2>Alarms</h2>
                 <ul>
-                  {networkFunctions.map(nf => (
-                    <li key={nf.id}>
-                      <strong>{nf.name}</strong> ({nf.type})
-                      {nf.status && <span className={`status-${nf.status}`}> - {nf.status}</span>}
+                  {alarms.map(alarm => (
+                    <li key={alarm.id} className={`alarm-${alarm.severity}`}>
+                      <strong>{alarm.severity.toUpperCase()}:</strong> {alarm.message}
                     </li>
                   ))}
-                  {networkFunctions.length === 0 && (
-                    <li>No network functions discovered</li>
+                  {alarms.length === 0 && (
+                    <li className="alarm-info">No active alarms</li>
                   )}
                 </ul>
-              )}
-            </div>
-            
-            <div className="panel kpis">
-              <h2>Real-Time KPIs</h2>
-              {(e2NodesLoading || xAppsLoading || subscriptionsLoading) ? (
-                <LoadingDisplay message="Loading KPIs..." />
-              ) : (e2NodesError || xAppsError || subscriptionsError) ? (
-                <div>
-                  {e2NodesError && <ErrorDisplay error={e2NodesError} onRetry={refetchE2Nodes} />}
-                  {xAppsError && <ErrorDisplay error={xAppsError} onRetry={refetchXApps} />}
-                  {subscriptionsError && <ErrorDisplay error={subscriptionsError} onRetry={refetchSubscriptions} />}
-                </div>
-              ) : (
-                <div>
-                  {Object.entries(kpis).map(([nf, data]) => (
-                    <div key={nf}>
-                      <h3>{nf}</h3>
-                      <ul>
-                        {Object.entries(data).map(([key, value]) => (
-                          <li key={key}>
-                            {key}: {typeof value === 'number' ? value.toFixed(2) : value}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                  {Object.keys(kpis).length === 0 && (
-                    <p>No KPI data available</p>
+              </div>
+              
+              <div className="panel logs">
+                <h2>Real-Time Logs</h2>
+                <div className="logs-container">
+                  {logs.length > 0 ? (
+                    <pre>
+                      {logs.map(log => 
+                        `[${new Date(log.timestamp).toLocaleTimeString()}] [${log.service}] ${log.message}\n`
+                      ).join('')}
+                    </pre>
+                  ) : (
+                    <p>No real-time logs available</p>
                   )}
                 </div>
-              )}
-            </div>
-            
-            <div className="panel alarms">
-              <h2>Alarms</h2>
-              <ul>
-                {alarms.map(alarm => (
-                  <li key={alarm.id} className={`alarm-${alarm.severity}`}>
-                    <strong>{alarm.severity.toUpperCase()}:</strong> {alarm.message}
-                  </li>
-                ))}
-                {alarms.length === 0 && (
-                  <li className="alarm-info">No active alarms</li>
-                )}
-              </ul>
-            </div>
-            
-            <div className="panel logs">
-              <h2>Real-Time Logs</h2>
-              <div className="logs-container">
-                {logs.length > 0 ? (
-                  <pre>
-                    {logs.map(log => 
-                      `[${new Date(log.timestamp).toLocaleTimeString()}] [${log.service}] ${log.message}\n`
-                    ).join('')}
-                  </pre>
-                ) : (
-                  <p>No real-time logs available</p>
-                )}
               </div>
             </div>
           </div>

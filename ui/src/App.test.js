@@ -13,6 +13,8 @@ jest.mock('./services/api', () => ({
     connectWebSocket: jest.fn(),
     disconnectWebSocket: jest.fn(),
     isWebSocketConnected: jest.fn().mockReturnValue(true),
+    getWebSocketState: jest.fn().mockReturnValue('OPEN'),
+    sendWebSocketMessage: jest.fn().mockReturnValue(true),
   },
   APIError: class APIError extends Error {
     constructor(message, status) {
@@ -35,4 +37,11 @@ test('renders dashboard panels', () => {
   expect(screen.getByText('Real-Time KPIs')).toBeInTheDocument();
   expect(screen.getByText('Alarms')).toBeInTheDocument();
   expect(screen.getByText('Real-Time Logs')).toBeInTheDocument();
+});
+
+test('renders connection status', () => {
+  render(<App />);
+  
+  // Should show connection status in header
+  expect(screen.getByText(/Real-time Updates Active|Connecting|Disconnected/)).toBeInTheDocument();
 });

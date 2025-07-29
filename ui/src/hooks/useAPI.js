@@ -40,40 +40,124 @@ export function useAPI(apiCall, dependencies = []) {
  */
 export function useWebSocket() {
   const [connected, setConnected] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [messages, setMessages] = useState([]);
   const [error, setError] = useState(null);
+  const [connectionState, setConnectionState] = useState('CLOSED');
+  const [lastMessage, setLastMessage] = useState(null);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+
+  const processMessage = useCallback((message) => {
+    console.log('Processing WebSocket message:', message);
+    setLastMessage(message);
+    setMessages(prev => [...prev.slice(-99), message]); // Keep last 100 messages
+    
+    // Clear any connection errors when receiving messages
+    if (error) {
+      setError(null);
+    }
+  }, [error]);
+
+  const handleError = useCallback((error) => {
+    console.error('WebSocket error in hook:', error);
+    setError(error);
+    setConnected(false);
+    setConnecting(false);
+    setConnectionState('CLOSED');
+  }, []);
+
+  const handleClose = useCallback((event) => {
+    console.log('WebSocket closed in hook:', event);
+    setConnected(false);
+    setConnecting(false);
+    setConnectionState('CLOSED');
+    
+    if (event.code !== 1000) {
+      setError(new Error(`Connection lost: ${event.reason || `Code ${event.code}`}`));
+      setReconnectAttempts(prev => prev + 1);
+    } else {
+      setError(null);
+      setReconnectAttempts(0);
+    }
+  }, []);
+
+  const handleOpen = useCallback(() => {
+    console.log('WebSocket opened in hook');
+    setConnected(true);
+    setConnecting(false);
+    setConnectionState('OPEN');
+    setError(null);
+    setReconnectAttempts(0);
+  }, []);
 
   const connect = useCallback(() => {
-    dashboardAPI.connectWebSocket(
-      (message) => {
-        setMessages(prev => [...prev.slice(-99), message]); // Keep last 100 messages
-      },
-      (error) => {
-        setError(error);
-        setConnected(false);
-      },
-      (event) => {
-        setConnected(false);
-        if (event.code !== 1000) {
-          setError(new Error(`WebSocket closed unexpectedly: ${event.reason || event.code}`));
-        }
-      }
-    );
-    setConnected(true);
+    if (connected || connecting) {
+      console.log('WebSocket already connected or connecting');
+      return;
+    }
+
+    console.log('Initiating WebSocket connection');
+    setConnecting(true);
+    setConnectionState('CONNECTING');
     setError(null);
-  }, []);
+
+    dashboardAPI.connectWebSocket(
+      processMessage,
+      handleError,
+      handleClose,
+      handleOpen
+    );
+  }, [connected, connecting, processMessage, handleError, handleClose, handleOpen]);
 
   const disconnect = useCallback(() => {
+    console.log('Disconnecting WebSocket from hook');
     dashboardAPI.disconnectWebSocket();
     setConnected(false);
+    setConnecting(false);
+    setConnectionState('CLOSED');
+    setError(null);
+    setReconnectAttempts(0);
   }, []);
 
+  const sendMessage = useCallback((message) => {
+    return dashboardAPI.sendWebSocketMessage(message);
+  }, []);
+
+  // Monitor connection state
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const state = dashboardAPI.getWebSocketState();
+      setConnectionState(state);
+      
+      if (state === 'OPEN' && !connected) {
+        setConnected(true);
+        setConnecting(false);
+      } else if (state !== 'OPEN' && connected) {
+        setConnected(false);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [connected]);
+
+  // Auto-connect on mount
   useEffect(() => {
     connect();
     return () => disconnect();
   }, [connect, disconnect]);
 
-  return { connected, messages, error, connect, disconnect };
+  return { 
+    connected, 
+    connecting,
+    messages, 
+    error, 
+    connectionState,
+    lastMessage,
+    reconnectAttempts,
+    connect, 
+    disconnect,
+    sendMessage
+  };
 }
 
 /**

@@ -106,4 +106,141 @@ describe('DashboardAPI', () => {
       expect(result).toEqual(mockResponse);
     });
   });
+
+  describe('WebSocket functionality', () => {
+    let mockWebSocket;
+    
+    beforeEach(() => {
+      // Mock WebSocket
+      mockWebSocket = {
+        send: jest.fn(),
+        close: jest.fn(),
+        readyState: WebSocket.OPEN,
+        onopen: null,
+        onmessage: null,
+        onerror: null,
+        onclose: null
+      };
+      
+      global.WebSocket = jest.fn(() => mockWebSocket);
+      global.WebSocket.CONNECTING = 0;
+      global.WebSocket.OPEN = 1;
+      global.WebSocket.CLOSING = 2;
+      global.WebSocket.CLOSED = 3;
+    });
+
+    afterEach(() => {
+      dashboardAPI.disconnectWebSocket();
+    });
+
+    it('should connect to WebSocket and send subscription message', () => {
+      const onMessage = jest.fn();
+      const onError = jest.fn();
+      const onClose = jest.fn();
+      const onOpen = jest.fn();
+
+      dashboardAPI.connectWebSocket(onMessage, onError, onClose, onOpen);
+
+      expect(WebSocket).toHaveBeenCalledWith('ws://localhost:8080/ws');
+      
+      // Simulate connection open
+      mockWebSocket.onopen();
+      
+      expect(onOpen).toHaveBeenCalled();
+      expect(mockWebSocket.send).toHaveBeenCalledWith(
+        expect.stringContaining('"type":"subscribe"')
+      );
+    });
+
+    it('should handle WebSocket messages', () => {
+      const onMessage = jest.fn();
+      const onError = jest.fn();
+      const onClose = jest.fn();
+      const onOpen = jest.fn();
+
+      dashboardAPI.connectWebSocket(onMessage, onError, onClose, onOpen);
+
+      const testMessage = {
+        type: 'component_status_update',
+        data: { name: 'e2manager', status: 'running' }
+      };
+
+      // Simulate message received
+      mockWebSocket.onmessage({ data: JSON.stringify(testMessage) });
+
+      expect(onMessage).toHaveBeenCalledWith(testMessage);
+    });
+
+    it('should handle WebSocket errors', () => {
+      const onMessage = jest.fn();
+      const onError = jest.fn();
+      const onClose = jest.fn();
+      const onOpen = jest.fn();
+
+      dashboardAPI.connectWebSocket(onMessage, onError, onClose, onOpen);
+
+      const testError = new Error('Connection failed');
+      mockWebSocket.onerror(testError);
+
+      expect(onError).toHaveBeenCalledWith(expect.any(Error));
+    });
+
+    it('should handle WebSocket close and attempt reconnection', () => {
+      const onMessage = jest.fn();
+      const onError = jest.fn();
+      const onClose = jest.fn();
+      const onOpen = jest.fn();
+
+      dashboardAPI.connectWebSocket(onMessage, onError, onClose, onOpen);
+
+      // Simulate unexpected close
+      mockWebSocket.onclose({ code: 1006, reason: 'Connection lost' });
+
+      expect(onClose).toHaveBeenCalledWith({ code: 1006, reason: 'Connection lost' });
+    });
+
+    it('should send WebSocket messages when connected', () => {
+      dashboardAPI.connectWebSocket(jest.fn(), jest.fn(), jest.fn(), jest.fn());
+      
+      const testMessage = { type: 'test', data: 'hello' };
+      const result = dashboardAPI.sendWebSocketMessage(testMessage);
+
+      expect(result).toBe(true);
+      expect(mockWebSocket.send).toHaveBeenCalledWith(JSON.stringify(testMessage));
+    });
+
+    it('should not send messages when disconnected', () => {
+      mockWebSocket.readyState = WebSocket.CLOSED;
+      
+      const testMessage = { type: 'test', data: 'hello' };
+      const result = dashboardAPI.sendWebSocketMessage(testMessage);
+
+      expect(result).toBe(false);
+      expect(mockWebSocket.send).not.toHaveBeenCalled();
+    });
+
+    it('should return correct WebSocket state', () => {
+      dashboardAPI.ws = mockWebSocket;
+      
+      mockWebSocket.readyState = WebSocket.CONNECTING;
+      expect(dashboardAPI.getWebSocketState()).toBe('CONNECTING');
+
+      mockWebSocket.readyState = WebSocket.OPEN;
+      expect(dashboardAPI.getWebSocketState()).toBe('OPEN');
+
+      mockWebSocket.readyState = WebSocket.CLOSING;
+      expect(dashboardAPI.getWebSocketState()).toBe('CLOSING');
+
+      mockWebSocket.readyState = WebSocket.CLOSED;
+      expect(dashboardAPI.getWebSocketState()).toBe('CLOSED');
+    });
+
+    it('should disconnect WebSocket cleanly', () => {
+      dashboardAPI.connectWebSocket(jest.fn(), jest.fn(), jest.fn(), jest.fn());
+      
+      dashboardAPI.disconnectWebSocket();
+
+      expect(mockWebSocket.close).toHaveBeenCalledWith(1000, 'Client disconnect');
+    });
+  });
 });

@@ -134,6 +134,23 @@ class DashboardAPI {
     });
   }
 
+  async restartXApp(name) {
+    return this.request(`/xapps/${name}/restart`, {
+      method: 'POST'
+    });
+  }
+
+  async scaleXApp(name, instances) {
+    return this.request(`/xapps/${name}/scale`, {
+      method: 'POST',
+      body: JSON.stringify({ instances })
+    });
+  }
+
+  async getXAppLogs(name, lines = 100) {
+    return this.request(`/xapps/${name}/logs?lines=${lines}`);
+  }
+
   // Health check API
   async getHealth() {
     const response = await fetch(`${this.baseUrl.replace('/api/v1', '')}/health`);
@@ -144,48 +161,86 @@ class DashboardAPI {
   }
 
   // WebSocket connection management
-  connectWebSocket(onMessage, onError, onClose) {
+  connectWebSocket(onMessage, onError, onClose, onOpen) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       console.log('WebSocket already connected');
       return;
     }
 
+    // Close existing connection if any
+    if (this.ws) {
+      this.ws.close();
+    }
+
     try {
+      console.log(`Connecting to WebSocket at ${WS_URL}`);
       this.ws = new WebSocket(WS_URL);
       
       this.ws.onopen = () => {
-        console.log('WebSocket connected');
+        console.log('WebSocket connected successfully');
         this.wsReconnectAttempts = 0;
         this.reconnectDelay = 1000;
         
-        // Send subscription message for component updates
-        this.ws.send(JSON.stringify({
+        // Send subscription message for real-time updates
+        const subscriptionMessage = {
           type: 'subscribe',
-          data: ['component_update', 'subscription_created', 'subscription_deleted', 'xapp_deployed', 'xapp_undeployed']
-        }));
+          data: {
+            events: [
+              'component_status_update',
+              'component_discovered',
+              'component_removed',
+              'e2node_connected',
+              'e2node_disconnected',
+              'subscription_created',
+              'subscription_deleted',
+              'subscription_failed',
+              'xapp_deployed',
+              'xapp_undeployed',
+              'xapp_status_changed',
+              'alarm_raised',
+              'alarm_cleared',
+              'system_event'
+            ]
+          }
+        };
+        
+        this.ws.send(JSON.stringify(subscriptionMessage));
+        
+        if (onOpen) onOpen();
       };
 
       this.ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          if (onMessage) onMessage(message);
+          console.log('WebSocket message received:', message);
+          
+          // Validate message structure
+          if (message && typeof message === 'object' && message.type) {
+            if (onMessage) onMessage(message);
+          } else {
+            console.warn('Invalid WebSocket message format:', message);
+          }
         } catch (error) {
-          console.error('Failed to parse WebSocket message:', error);
+          console.error('Failed to parse WebSocket message:', error, event.data);
         }
       };
 
       this.ws.onerror = (error) => {
         console.error('WebSocket error:', error);
-        if (onError) onError(error);
+        if (onError) onError(new Error('WebSocket connection error'));
       };
 
       this.ws.onclose = (event) => {
-        console.log('WebSocket disconnected:', event.code, event.reason);
+        console.log(`WebSocket disconnected: code=${event.code}, reason=${event.reason || 'No reason provided'}`);
+        
         if (onClose) onClose(event);
         
-        // Attempt to reconnect if not a clean close
+        // Attempt to reconnect if not a clean close and within retry limits
         if (event.code !== 1000 && this.wsReconnectAttempts < this.maxReconnectAttempts) {
-          this.scheduleReconnect(onMessage, onError, onClose);
+          this.scheduleReconnect(onMessage, onError, onClose, onOpen);
+        } else if (this.wsReconnectAttempts >= this.maxReconnectAttempts) {
+          console.error('Max WebSocket reconnection attempts reached');
+          if (onError) onError(new Error('Max reconnection attempts reached'));
         }
       };
     } catch (error) {
@@ -194,26 +249,64 @@ class DashboardAPI {
     }
   }
 
-  scheduleReconnect(onMessage, onError, onClose) {
+  scheduleReconnect(onMessage, onError, onClose, onOpen) {
     this.wsReconnectAttempts++;
-    const delay = this.reconnectDelay * Math.pow(2, this.wsReconnectAttempts - 1); // Exponential backoff
+    const delay = Math.min(this.reconnectDelay * Math.pow(2, this.wsReconnectAttempts - 1), 30000); // Exponential backoff with max 30s
     
-    console.log(`Attempting WebSocket reconnection ${this.wsReconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
+    console.log(`Scheduling WebSocket reconnection ${this.wsReconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
     
     setTimeout(() => {
-      this.connectWebSocket(onMessage, onError, onClose);
+      if (this.wsReconnectAttempts <= this.maxReconnectAttempts) {
+        this.connectWebSocket(onMessage, onError, onClose, onOpen);
+      }
     }, delay);
   }
 
   disconnectWebSocket() {
     if (this.ws) {
+      console.log('Disconnecting WebSocket');
       this.ws.close(1000, 'Client disconnect');
       this.ws = null;
     }
+    // Reset reconnection state
+    this.wsReconnectAttempts = 0;
   }
 
   isWebSocketConnected() {
     return this.ws && this.ws.readyState === WebSocket.OPEN;
+  }
+
+  getWebSocketState() {
+    if (!this.ws) return 'CLOSED';
+    
+    switch (this.ws.readyState) {
+      case WebSocket.CONNECTING:
+        return 'CONNECTING';
+      case WebSocket.OPEN:
+        return 'OPEN';
+      case WebSocket.CLOSING:
+        return 'CLOSING';
+      case WebSocket.CLOSED:
+        return 'CLOSED';
+      default:
+        return 'UNKNOWN';
+    }
+  }
+
+  sendWebSocketMessage(message) {
+    if (this.isWebSocketConnected()) {
+      try {
+        this.ws.send(JSON.stringify(message));
+        console.log('WebSocket message sent:', message);
+        return true;
+      } catch (error) {
+        console.error('Failed to send WebSocket message:', error);
+        return false;
+      }
+    } else {
+      console.warn('Cannot send WebSocket message: connection not open');
+      return false;
+    }
   }
 }
 
