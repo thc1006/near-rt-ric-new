@@ -387,6 +387,13 @@ func TestIntegrationHTTPEndpoints(t *testing.T) {
 	go server.wsHub.Run()
 	defer server.wsHub.Stop()
 
+	// Start discovery service and run initial discovery
+	server.discovery.Start(server.wsHub)
+	defer server.discovery.Stop()
+
+	// Give time for initial discovery
+	time.Sleep(100 * time.Millisecond)
+
 	// Create test HTTP server
 	testServer := httptest.NewServer(server.setupRoutes())
 	defer testServer.Close()

@@ -105,8 +105,17 @@ func (h *WebSocketHub) Run() {
 				select {
 				case client.send <- message:
 				default:
-					close(client.send)
+					// Client send channel is full or closed, remove client
 					delete(h.clients, client)
+					// Close channel safely - only if it's still in our clients map
+					go func(c *WebSocketClient) {
+						defer func() {
+							if r := recover(); r != nil {
+								// Channel was already closed, ignore
+							}
+						}()
+						close(c.send)
+					}(client)
 				}
 			}
 

@@ -91,11 +91,10 @@ func TestWebSocketHubClientCleanupOnBroadcast(t *testing.T) {
 	// Drain welcome message
 	<-client.send
 
-	// Manually add client to hub and close its send channel to simulate disconnection
-	hub.clients[client] = true
-	close(client.send)
+	// Fill the send channel to simulate a blocked client
+	client.send <- []byte("blocking message")
 
-	// Try to broadcast a message
+	// Try to broadcast a message - this should cause cleanup due to full send channel
 	hub.BroadcastMessage("test_cleanup", map[string]string{"test": "message"})
 
 	// Give time for processing
