@@ -10,24 +10,17 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 )
 
 func TestHandleGetE2Nodes(t *testing.T) {
 	// Create a test server
-	config := &Config{
-		Port:           8080,
-		E2MgrEndpoint:  "localhost:3800",
-		SubmgrEndpoint: "localhost:3801",
-		AppmgrEndpoint: "localhost:8080",
-	}
-
-	server, err := NewServer(config)
-	if err != nil {
-		t.Fatalf("Failed to create server: %v", err)
-	}
+	server := createTestServer(t)
 
 	// Create a request to the E2 nodes endpoint
 	req, err := http.NewRequest("GET", "/api/v1/e2nodes", nil)
@@ -94,17 +87,7 @@ func TestHandleGetE2Nodes(t *testing.T) {
 
 func TestHandleGetE2Node(t *testing.T) {
 	// Create a test server
-	config := &Config{
-		Port:           8080,
-		E2MgrEndpoint:  "localhost:3800",
-		SubmgrEndpoint: "localhost:3801",
-		AppmgrEndpoint: "localhost:8080",
-	}
-
-	server, err := NewServer(config)
-	if err != nil {
-		t.Fatalf("Failed to create server: %v", err)
-	}
+	server := createTestServer(t)
 
 	// Create a request to get a specific E2 node
 	req, err := http.NewRequest("GET", "/api/v1/e2nodes/001", nil)
@@ -146,17 +129,7 @@ func TestHandleGetE2Node(t *testing.T) {
 
 func TestHandleGetSubscriptions(t *testing.T) {
 	// Create a test server
-	config := &Config{
-		Port:           8080,
-		E2MgrEndpoint:  "localhost:3800",
-		SubmgrEndpoint: "localhost:3801",
-		AppmgrEndpoint: "localhost:8080",
-	}
-
-	server, err := NewServer(config)
-	if err != nil {
-		t.Fatalf("Failed to create server: %v", err)
-	}
+	server := createTestServer(t)
 
 	// Create a request to the subscriptions endpoint
 	req, err := http.NewRequest("GET", "/api/v1/subscriptions", nil)
@@ -198,17 +171,11 @@ func TestHandleGetSubscriptions(t *testing.T) {
 
 func TestHandleCreateSubscription(t *testing.T) {
 	// Create a test server
-	config := &Config{
-		Port:           8080,
-		E2MgrEndpoint:  "localhost:3800",
-		SubmgrEndpoint: "localhost:3801",
-		AppmgrEndpoint: "localhost:8080",
-	}
+	server := createTestServer(t)
 
-	server, err := NewServer(config)
-	if err != nil {
-		t.Fatalf("Failed to create server: %v", err)
-	}
+	// Start WebSocket hub to prevent blocking
+	cleanup := startTestWebSocketHub(server)
+	defer cleanup()
 
 	// Create subscription request
 	subscriptionReq := map[string]interface{}{
@@ -259,24 +226,19 @@ func TestHandleCreateSubscription(t *testing.T) {
 		t.Errorf("Expected e2nodeId to be %v, got %v", subscriptionReq["e2nodeId"], response["e2nodeId"])
 	}
 
-	if response["ranFunctionId"] != subscriptionReq["ranFunctionId"] {
-		t.Errorf("Expected ranFunctionId to be %v, got %v", subscriptionReq["ranFunctionId"], response["ranFunctionId"])
+	// Handle float64 conversion for JSON numbers
+	if ranFunctionId, ok := response["ranFunctionId"].(float64); ok {
+		if int(ranFunctionId) != subscriptionReq["ranFunctionId"].(int) {
+			t.Errorf("Expected ranFunctionId to be %v, got %v", subscriptionReq["ranFunctionId"], int(ranFunctionId))
+		}
+	} else {
+		t.Errorf("Expected ranFunctionId to be a number, got %T", response["ranFunctionId"])
 	}
 }
 
 func TestHandleCreateSubscriptionInvalidJSON(t *testing.T) {
 	// Create a test server
-	config := &Config{
-		Port:           8080,
-		E2MgrEndpoint:  "localhost:3800",
-		SubmgrEndpoint: "localhost:3801",
-		AppmgrEndpoint: "localhost:8080",
-	}
-
-	server, err := NewServer(config)
-	if err != nil {
-		t.Fatalf("Failed to create server: %v", err)
-	}
+	server := createTestServer(t)
 
 	// Create a request with invalid JSON
 	req, err := http.NewRequest("POST", "/api/v1/subscriptions", bytes.NewBuffer([]byte("invalid json")))
@@ -300,17 +262,7 @@ func TestHandleCreateSubscriptionInvalidJSON(t *testing.T) {
 
 func TestHandleGetSubscription(t *testing.T) {
 	// Create a test server
-	config := &Config{
-		Port:           8080,
-		E2MgrEndpoint:  "localhost:3800",
-		SubmgrEndpoint: "localhost:3801",
-		AppmgrEndpoint: "localhost:8080",
-	}
-
-	server, err := NewServer(config)
-	if err != nil {
-		t.Fatalf("Failed to create server: %v", err)
-	}
+	server := createTestServer(t)
 
 	// Create a request to get a specific subscription
 	req, err := http.NewRequest("GET", "/api/v1/subscriptions/sub-001", nil)
@@ -352,17 +304,11 @@ func TestHandleGetSubscription(t *testing.T) {
 
 func TestHandleDeleteSubscription(t *testing.T) {
 	// Create a test server
-	config := &Config{
-		Port:           8080,
-		E2MgrEndpoint:  "localhost:3800",
-		SubmgrEndpoint: "localhost:3801",
-		AppmgrEndpoint: "localhost:8080",
-	}
+	server := createTestServer(t)
 
-	server, err := NewServer(config)
-	if err != nil {
-		t.Fatalf("Failed to create server: %v", err)
-	}
+	// Start WebSocket hub to prevent blocking
+	cleanup := startTestWebSocketHub(server)
+	defer cleanup()
 
 	// Create a request to delete a subscription
 	req, err := http.NewRequest("DELETE", "/api/v1/subscriptions/sub-001", nil)
@@ -385,17 +331,7 @@ func TestHandleDeleteSubscription(t *testing.T) {
 
 func TestHandleGetXApps(t *testing.T) {
 	// Create a test server
-	config := &Config{
-		Port:           8080,
-		E2MgrEndpoint:  "localhost:3800",
-		SubmgrEndpoint: "localhost:3801",
-		AppmgrEndpoint: "localhost:8080",
-	}
-
-	server, err := NewServer(config)
-	if err != nil {
-		t.Fatalf("Failed to create server: %v", err)
-	}
+	server := createTestServer(t)
 
 	// Create a request to the xApps endpoint
 	req, err := http.NewRequest("GET", "/api/v1/xapps", nil)
@@ -437,17 +373,11 @@ func TestHandleGetXApps(t *testing.T) {
 
 func TestHandleDeployXApp(t *testing.T) {
 	// Create a test server
-	config := &Config{
-		Port:           8080,
-		E2MgrEndpoint:  "localhost:3800",
-		SubmgrEndpoint: "localhost:3801",
-		AppmgrEndpoint: "localhost:8080",
-	}
+	server := createTestServer(t)
 
-	server, err := NewServer(config)
-	if err != nil {
-		t.Fatalf("Failed to create server: %v", err)
-	}
+	// Start WebSocket hub to prevent blocking
+	cleanup := startTestWebSocketHub(server)
+	defer cleanup()
 
 	// Create xApp deployment request
 	xappReq := map[string]interface{}{
@@ -503,19 +433,33 @@ func TestHandleDeployXApp(t *testing.T) {
 	}
 }
 
+func TestHandleDeployXAppInvalidJSON(t *testing.T) {
+	// Create a test server
+	server := createTestServer(t)
+
+	// Create a request with invalid JSON
+	req, err := http.NewRequest("POST", "/api/v1/xapps", bytes.NewBuffer([]byte("invalid json")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	// Create a ResponseRecorder to record the response
+	rr := httptest.NewRecorder()
+	router := server.setupRoutes()
+
+	// Serve the HTTP request
+	router.ServeHTTP(rr, req)
+
+	// Check the status code
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusBadRequest)
+	}
+}
+
 func TestHandleGetXApp(t *testing.T) {
 	// Create a test server
-	config := &Config{
-		Port:           8080,
-		E2MgrEndpoint:  "localhost:3800",
-		SubmgrEndpoint: "localhost:3801",
-		AppmgrEndpoint: "localhost:8080",
-	}
-
-	server, err := NewServer(config)
-	if err != nil {
-		t.Fatalf("Failed to create server: %v", err)
-	}
+	server := createTestServer(t)
 
 	// Create a request to get a specific xApp
 	req, err := http.NewRequest("GET", "/api/v1/xapps/hello-world", nil)
@@ -557,17 +501,11 @@ func TestHandleGetXApp(t *testing.T) {
 
 func TestHandleUndeployXApp(t *testing.T) {
 	// Create a test server
-	config := &Config{
-		Port:           8080,
-		E2MgrEndpoint:  "localhost:3800",
-		SubmgrEndpoint: "localhost:3801",
-		AppmgrEndpoint: "localhost:8080",
-	}
+	server := createTestServer(t)
 
-	server, err := NewServer(config)
-	if err != nil {
-		t.Fatalf("Failed to create server: %v", err)
-	}
+	// Start WebSocket hub to prevent blocking
+	cleanup := startTestWebSocketHub(server)
+	defer cleanup()
 
 	// Create a request to undeploy an xApp
 	req, err := http.NewRequest("DELETE", "/api/v1/xapps/hello-world", nil)
@@ -588,19 +526,107 @@ func TestHandleUndeployXApp(t *testing.T) {
 	}
 }
 
-func TestHandleGetComponentNotFound(t *testing.T) {
+func TestHandleGetComponents(t *testing.T) {
 	// Create a test server
-	config := &Config{
-		Port:           8080,
-		E2MgrEndpoint:  "localhost:3800",
-		SubmgrEndpoint: "localhost:3801",
-		AppmgrEndpoint: "localhost:8080",
+	server := createTestServer(t)
+
+	// Create a request to the components endpoint
+	req, err := http.NewRequest("GET", "/api/v1/components", nil)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	server, err := NewServer(config)
-	if err != nil {
-		t.Fatalf("Failed to create server: %v", err)
+	// Create a ResponseRecorder to record the response
+	rr := httptest.NewRecorder()
+	router := server.setupRoutes()
+
+	// Serve the HTTP request
+	router.ServeHTTP(rr, req)
+
+	// Check the status code
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
 	}
+
+	// Check the response body
+	var response map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Errorf("Failed to unmarshal response: %v", err)
+	}
+
+	// Verify response structure
+	if _, ok := response["components"]; !ok {
+		t.Error("Expected components in response")
+	}
+
+	if _, ok := response["count"]; !ok {
+		t.Error("Expected count in response")
+	}
+
+	if _, ok := response["timestamp"]; !ok {
+		t.Error("Expected timestamp in response")
+	}
+
+	// Check that we have the expected components
+	components, ok := response["components"].(map[string]interface{})
+	if !ok {
+		t.Error("Expected components to be an object")
+	}
+
+	// Should have at least the basic components
+	expectedComponents := []string{"e2manager", "submgr", "appmgr"}
+	for _, expectedID := range expectedComponents {
+		if _, exists := components[expectedID]; !exists {
+			t.Errorf("Expected component %s to be present", expectedID)
+		}
+	}
+}
+
+func TestHandleGetComponent(t *testing.T) {
+	// Create a test server
+	server := createTestServer(t)
+
+	// Create a request to get a specific component
+	req, err := http.NewRequest("GET", "/api/v1/components/e2manager", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a ResponseRecorder to record the response
+	rr := httptest.NewRecorder()
+	router := server.setupRoutes()
+
+	// Serve the HTTP request
+	router.ServeHTTP(rr, req)
+
+	// Check the status code
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+
+	// Check the response body
+	var response map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Errorf("Failed to unmarshal response: %v", err)
+	}
+
+	// Verify response structure
+	expectedFields := []string{"id", "name", "type", "status", "endpoint", "lastUpdated"}
+	for _, field := range expectedFields {
+		if _, exists := response[field]; !exists {
+			t.Errorf("Expected field %s in component response", field)
+		}
+	}
+
+	// Verify the ID matches the requested one
+	if response["id"] != "e2manager" {
+		t.Errorf("Expected component ID to be 'e2manager', got %v", response["id"])
+	}
+}
+
+func TestHandleGetComponentNotFound(t *testing.T) {
+	// Create a test server
+	server := createTestServer(t)
 
 	// Create a request to get a non-existent component
 	req, err := http.NewRequest("GET", "/api/v1/components/nonexistent", nil)
@@ -630,17 +656,7 @@ func createTestRouter(handler http.HandlerFunc, path string) *mux.Router {
 
 // Benchmark tests for performance
 func BenchmarkHandleGetE2Nodes(b *testing.B) {
-	config := &Config{
-		Port:           8080,
-		E2MgrEndpoint:  "localhost:3800",
-		SubmgrEndpoint: "localhost:3801",
-		AppmgrEndpoint: "localhost:8080",
-	}
-
-	server, err := NewServer(config)
-	if err != nil {
-		b.Fatalf("Failed to create server: %v", err)
-	}
+	server := createTestServer(&testing.T{})
 
 	router := server.setupRoutes()
 
@@ -652,25 +668,188 @@ func BenchmarkHandleGetE2Nodes(b *testing.B) {
 	}
 }
 
-func BenchmarkHandleGetSubscriptions(b *testing.B) {
-	config := &Config{
-		Port:           8080,
-		E2MgrEndpoint:  "localhost:3800",
-		SubmgrEndpoint: "localhost:3801",
-		AppmgrEndpoint: "localhost:8080",
-	}
+func TestHandleHealth(t *testing.T) {
+	// Create a test server
+	server := createTestServer(t)
 
-	server, err := NewServer(config)
+	// Create a request to the health endpoint
+	req, err := http.NewRequest("GET", "/health", nil)
 	if err != nil {
-		b.Fatalf("Failed to create server: %v", err)
+		t.Fatal(err)
 	}
 
+	// Create a ResponseRecorder to record the response
+	rr := httptest.NewRecorder()
 	router := server.setupRoutes()
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		req, _ := http.NewRequest("GET", "/api/v1/subscriptions", nil)
-		rr := httptest.NewRecorder()
-		router.ServeHTTP(rr, req)
+	// Serve the HTTP request
+	router.ServeHTTP(rr, req)
+
+	// Check the status code
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+
+	// Check the response body
+	var response map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Errorf("Failed to unmarshal response: %v", err)
+	}
+
+	// Verify response structure
+	if response["status"] != "healthy" {
+		t.Errorf("Expected status to be 'healthy', got %v", response["status"])
+	}
+
+	if _, ok := response["timestamp"]; !ok {
+		t.Error("Expected timestamp in response")
+	}
+
+	if _, ok := response["components"]; !ok {
+		t.Error("Expected components in response")
+	}
+}
+
+func TestHandleWebSocketUpgrade(t *testing.T) {
+	// Create a test server
+	server := createTestServer(t)
+
+	// Start WebSocket hub
+	go server.wsHub.Run()
+	defer server.wsHub.Stop()
+
+	// Create test HTTP server
+	testServer := httptest.NewServer(server.setupRoutes())
+	defer testServer.Close()
+
+	// Convert HTTP URL to WebSocket URL
+	wsURL := "ws" + strings.TrimPrefix(testServer.URL, "http") + "/ws"
+
+	// Connect to WebSocket
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("Failed to connect to WebSocket: %v", err)
+	}
+	defer conn.Close()
+
+	// Give time for connection to be established
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify we can read the welcome message
+	_, welcomeMsg, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("Failed to read welcome message: %v", err)
+	}
+
+	var welcome map[string]interface{}
+	if err := json.Unmarshal(welcomeMsg, &welcome); err != nil {
+		t.Errorf("Failed to unmarshal welcome message: %v", err)
+	}
+
+	if welcome["type"] != "welcome" {
+		t.Errorf("Expected welcome message, got %v", welcome["type"])
+	}
+}
+
+// Additional error handling tests
+func TestHandleGetE2NodeNotFound(t *testing.T) {
+	// Create a test server
+	server := createTestServer(t)
+
+	// Create a request to get a non-existent E2 node
+	req, err := http.NewRequest("GET", "/api/v1/e2nodes/nonexistent", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a ResponseRecorder to record the response
+	rr := httptest.NewRecorder()
+	router := server.setupRoutes()
+
+	// Serve the HTTP request
+	router.ServeHTTP(rr, req)
+
+	// Check the status code - should still return 200 with mock data
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+
+	// Check the response body
+	var response map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Errorf("Failed to unmarshal response: %v", err)
+	}
+
+	// Verify the ID matches the requested one (mock returns the requested ID)
+	if response["id"] != "nonexistent" {
+		t.Errorf("Expected node ID to be 'nonexistent', got %v", response["id"])
+	}
+}
+
+func TestHandleGetSubscriptionNotFound(t *testing.T) {
+	// Create a test server
+	server := createTestServer(t)
+
+	// Create a request to get a non-existent subscription
+	req, err := http.NewRequest("GET", "/api/v1/subscriptions/nonexistent", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a ResponseRecorder to record the response
+	rr := httptest.NewRecorder()
+	router := server.setupRoutes()
+
+	// Serve the HTTP request
+	router.ServeHTTP(rr, req)
+
+	// Check the status code - should still return 200 with mock data
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+
+	// Check the response body
+	var response map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Errorf("Failed to unmarshal response: %v", err)
+	}
+
+	// Verify the ID matches the requested one (mock returns the requested ID)
+	if response["id"] != "nonexistent" {
+		t.Errorf("Expected subscription ID to be 'nonexistent', got %v", response["id"])
+	}
+}
+
+func TestHandleGetXAppNotFound(t *testing.T) {
+	// Create a test server
+	server := createTestServer(t)
+
+	// Create a request to get a non-existent xApp
+	req, err := http.NewRequest("GET", "/api/v1/xapps/nonexistent", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a ResponseRecorder to record the response
+	rr := httptest.NewRecorder()
+	router := server.setupRoutes()
+
+	// Serve the HTTP request
+	router.ServeHTTP(rr, req)
+
+	// Check the status code - should still return 200 with mock data
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+
+	// Check the response body
+	var response map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Errorf("Failed to unmarshal response: %v", err)
+	}
+
+	// Verify the name matches the requested one (mock returns the requested name)
+	if response["name"] != "nonexistent" {
+		t.Errorf("Expected xApp name to be 'nonexistent', got %v", response["name"])
 	}
 }
