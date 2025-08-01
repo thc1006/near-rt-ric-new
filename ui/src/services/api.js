@@ -151,6 +151,247 @@ class DashboardAPI {
     return this.request(`/xapps/${name}/logs?lines=${lines}`);
   }
 
+  // A1 Policy Management API
+  async getA1Health() {
+    return this.request('/a1/health');
+  }
+
+  async getPolicyTypes() {
+    return this.request('/a1/policytypes');
+  }
+
+  async getPolicyType(policyTypeId) {
+    return this.request(`/a1/policytypes/${policyTypeId}`);
+  }
+
+  async createPolicyType(policyTypeId, policyTypeData) {
+    return this.request(`/a1/policytypes/${policyTypeId}`, {
+      method: 'POST',
+      body: JSON.stringify(policyTypeData)
+    });
+  }
+
+  async deletePolicyType(policyTypeId) {
+    return this.request(`/a1/policytypes/${policyTypeId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async getPolicyInstances(policyTypeId) {
+    return this.request(`/a1/policytypes/${policyTypeId}/policies`);
+  }
+
+  async getPolicyInstance(policyTypeId, policyInstanceId) {
+    return this.request(`/a1/policytypes/${policyTypeId}/policies/${policyInstanceId}`);
+  }
+
+  async createPolicyInstance(policyTypeId, policyInstanceId, policyData) {
+    return this.request(`/a1/policytypes/${policyTypeId}/policies/${policyInstanceId}`, {
+      method: 'PUT',
+      body: JSON.stringify(policyData)
+    });
+  }
+
+  async deletePolicyInstance(policyTypeId, policyInstanceId) {
+    return this.request(`/a1/policytypes/${policyTypeId}/policies/${policyInstanceId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async getPolicyInstanceStatus(policyTypeId, policyInstanceId) {
+    return this.request(`/a1/policytypes/${policyTypeId}/policies/${policyInstanceId}/status`);
+  }
+
+  async validatePolicy(policyTypeId, policyData) {
+    return this.request(`/a1/policytypes/${policyTypeId}/validate`, {
+      method: 'POST',
+      body: JSON.stringify(policyData)
+    });
+  }
+
+  async getA1Stats() {
+    return this.request('/a1/stats');
+  }
+
+  // O1 Management API
+  async getO1Health() {
+    return this.request('/o1/health');
+  }
+
+  async getManagedObjects(filter = {}) {
+    const params = new URLSearchParams();
+    if (filter.type) params.append('type', filter.type);
+    if (filter.status) params.append('status', filter.status);
+    
+    const queryString = params.toString();
+    return this.request(`/o1/managed-objects${queryString ? '?' + queryString : ''}`);
+  }
+
+  async getManagedObject(objectId) {
+    return this.request(`/o1/managed-objects/${objectId}`);
+  }
+
+  async getConfigurations(filter = {}) {
+    const params = new URLSearchParams();
+    if (filter.status) params.append('status', filter.status);
+    
+    const queryString = params.toString();
+    return this.request(`/o1/configurations${queryString ? '?' + queryString : ''}`);
+  }
+
+  async createConfiguration(configId, configData) {
+    return this.request(`/o1/configurations/${configId}`, {
+      method: 'POST',
+      body: JSON.stringify(configData)
+    });
+  }
+
+  async updateConfiguration(configId, configData) {
+    return this.request(`/o1/configurations/${configId}`, {
+      method: 'PUT',
+      body: JSON.stringify(configData)
+    });
+  }
+
+  async validateConfiguration(configData) {
+    return this.request('/o1/validate', {
+      method: 'POST',
+      body: JSON.stringify(configData)
+    });
+  }
+
+  async getAlarms(filter = {}) {
+    const params = new URLSearchParams();
+    if (filter.severity) params.append('severity', filter.severity);
+    
+    const queryString = params.toString();
+    return this.request(`/o1/alarms${queryString ? '?' + queryString : ''}`);
+  }
+
+  async acknowledgeAlarm(alarmId, acknowledgment) {
+    return this.request(`/o1/alarms/${alarmId}`, {
+      method: 'POST',
+      body: JSON.stringify(acknowledgment)
+    });
+  }
+
+  async clearAlarm(alarmId, clearRequest) {
+    return this.request(`/o1/alarms/${alarmId}/clear`, {
+      method: 'POST',
+      body: JSON.stringify(clearRequest)
+    });
+  }
+
+  async generateAlarm(alarmData) {
+    return this.request('/o1/alarms/generate', {
+      method: 'POST',
+      body: JSON.stringify(alarmData)
+    });
+  }
+
+  async correlateAlarms(correlationData) {
+    return this.request('/o1/alarms/correlate', {
+      method: 'POST',
+      body: JSON.stringify(correlationData)
+    });
+  }
+
+  async getKPIs(filter = {}) {
+    const params = new URLSearchParams();
+    if (filter.type) params.append('type', filter.type);
+    
+    const queryString = params.toString();
+    return this.request(`/o1/kpis${queryString ? '?' + queryString : ''}`);
+  }
+
+  async createKPI(kpiData) {
+    return this.request('/o1/kpis', {
+      method: 'POST',
+      body: JSON.stringify(kpiData)
+    });
+  }
+
+  async updateKPI(kpiId, kpiData) {
+    return this.request(`/o1/kpis/${kpiId}`, {
+      method: 'PUT',
+      body: JSON.stringify(kpiData)
+    });
+  }
+
+  async collectKPIData(collectionRequest) {
+    return this.request('/o1/kpis/collect', {
+      method: 'POST',
+      body: JSON.stringify(collectionRequest)
+    });
+  }
+
+  async getO1Stats() {
+    return this.request('/o1/stats');
+  }
+
+  async getBackups(filter = {}) {
+    const params = new URLSearchParams();
+    if (filter.status) params.append('status', filter.status);
+    
+    const queryString = params.toString();
+    return this.request(`/o1/backups${queryString ? '?' + queryString : ''}`);
+  }
+
+  async createBackup(backupData) {
+    return this.request('/o1/backup', {
+      method: 'POST',
+      body: JSON.stringify(backupData)
+    });
+  }
+
+  async restoreConfiguration(restoreData) {
+    return this.request('/o1/restore', {
+      method: 'POST',
+      body: JSON.stringify(restoreData)
+    });
+  }
+
+  async deleteBackup(backupId) {
+    return this.request(`/o1/backups/${backupId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async getCertificates() {
+    return this.request('/o1/certificates');
+  }
+
+  async createCertificate(certData) {
+    return this.request('/o1/certificates', {
+      method: 'POST',
+      body: JSON.stringify(certData)
+    });
+  }
+
+  async getAccessControlPolicies() {
+    return this.request('/o1/access-control/policies');
+  }
+
+  async createAccessControlPolicy(policyData) {
+    return this.request('/o1/access-control/policies', {
+      method: 'POST',
+      body: JSON.stringify(policyData)
+    });
+  }
+
+  async updateAccessControlPolicy(policyId, policyData) {
+    return this.request(`/o1/access-control/policies/${policyId}`, {
+      method: 'PUT',
+      body: JSON.stringify(policyData)
+    });
+  }
+
+  async deleteAccessControlPolicy(policyId) {
+    return this.request(`/o1/access-control/policies/${policyId}`, {
+      method: 'DELETE'
+    });
+  }
+
   // Health check API
   async getHealth() {
     const response = await fetch(`${this.baseUrl.replace('/api/v1', '')}/health`);

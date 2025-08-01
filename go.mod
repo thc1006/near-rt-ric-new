@@ -9,6 +9,8 @@ require (
 	google.golang.org/protobuf v1.33.0
 	github.com/ishidawataru/sctp v0.0.0-20230406120618-7ff4192f6ff2
 	github.com/davecgh/go-spew v1.1.1
+	github.com/xeipuuv/gojsonschema v1.2.0
+	golang.org/x/crypto v0.21.0
 )
 
 require (

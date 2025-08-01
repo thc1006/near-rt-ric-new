@@ -38,6 +38,7 @@ type Server struct {
 	discovery            *DiscoveryService
 	wsHub                *WebSocketHub
 	serviceModelRegistry *ServiceModelRegistry
+	policyManager        *PolicyManager
 }
 
 // NewServer creates a new dashboard server instance
@@ -57,12 +58,19 @@ func NewServer(config *Config) (*Server, error) {
 	// Initialize service model registry
 	serviceModelRegistry := NewServiceModelRegistry()
 
+	// Initialize policy manager
+	var policyManager *PolicyManager
+	if a1Client := clients.GetA1MediatorClient(); a1Client != nil {
+		policyManager = NewPolicyManager(a1Client)
+	}
+
 	server := &Server{
 		config:               config,
 		clients:              clients,
 		discovery:            discovery,
 		wsHub:                wsHub,
 		serviceModelRegistry: serviceModelRegistry,
+		policyManager:        policyManager,
 	}
 
 	// Setup HTTP router
@@ -102,6 +110,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 
 	// Stop WebSocket hub
 	s.wsHub.Stop()
+
+	// Stop policy manager
+	if s.policyManager != nil {
+		s.policyManager.Stop()
+	}
 
 	// Close gRPC clients
 	s.clients.Close()
@@ -152,11 +165,61 @@ func (s *Server) setupRoutes() *mux.Router {
 	api.HandleFunc("/e2t/stats", s.E2TStatsHandler).Methods("GET", "OPTIONS")
 	api.HandleFunc("/e2t/messages", s.E2APMessagesHandler).Methods("GET", "OPTIONS")
 
+	// A1 Mediator endpoints
+	api.HandleFunc("/a1/health", s.A1HealthHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/a1/stats", s.A1StatsHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/a1/policytypes", s.A1PolicyTypesHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/a1/policytypes/{policyTypeId}", s.A1PolicyTypeHandler).Methods("GET", "POST", "DELETE", "OPTIONS")
+	api.HandleFunc("/a1/policytypes/{policyTypeId}/policies", s.A1PolicyInstancesHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/a1/policytypes/{policyTypeId}/policies/{policyInstanceId}", s.EnhancedA1PolicyInstanceHandler).Methods("GET", "PUT", "DELETE", "OPTIONS")
+	api.HandleFunc("/a1/policytypes/{policyTypeId}/policies/{policyInstanceId}/status", s.A1PolicyInstanceStatusHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/a1/policytypes/{policyTypeId}/validate", s.PolicyValidationHandler).Methods("POST", "OPTIONS")
+	api.HandleFunc("/a1/policytypes/{policyTypeId}/validate-schema", s.PolicyTypeValidationHandler).Methods("POST", "OPTIONS")
+
+	// Policy Management Framework endpoints
+	api.HandleFunc("/policies/conflicts", s.PolicyConflictsHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/policies/conflicts/{conflictId}/resolve", s.PolicyConflictResolutionHandler).Methods("POST", "OPTIONS")
+	api.HandleFunc("/policies/{policyInstanceId}/distribution", s.PolicyDistributionStatusHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/policies/{policyInstanceId}/compliance", s.PolicyComplianceReportsHandler).Methods("GET", "OPTIONS")
+	
+	// xApp Management endpoints for policy distribution
+	api.HandleFunc("/xapps/registration", s.XAppRegistrationHandler).Methods("GET", "POST", "OPTIONS")
+	api.HandleFunc("/xapps/registration/{xappId}", s.XAppUnregistrationHandler).Methods("DELETE", "OPTIONS")
+
 	// App Manager endpoints
 	api.HandleFunc("/xapps", s.handleGetXApps).Methods("GET", "OPTIONS")
 	api.HandleFunc("/xapps", s.handleDeployXApp).Methods("POST", "OPTIONS")
 	api.HandleFunc("/xapps/{name}", s.handleGetXApp).Methods("GET", "OPTIONS")
 	api.HandleFunc("/xapps/{name}", s.handleUndeployXApp).Methods("DELETE", "OPTIONS")
+
+	// O1 Mediator endpoints
+	api.HandleFunc("/o1/health", s.O1HealthHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/o1/stats", s.O1StatsHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/o1/managed-objects", s.O1ManagedObjectsHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/o1/managed-objects/{objectId}", s.O1ManagedObjectHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/o1/configurations", s.O1ConfigurationsHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/o1/configurations/{configId}", s.O1ConfigurationHandler).Methods("POST", "PUT", "OPTIONS")
+	api.HandleFunc("/o1/alarms", s.O1AlarmsHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/o1/alarms/{alarmId}/acknowledge", s.O1AlarmHandler).Methods("POST", "OPTIONS")
+	api.HandleFunc("/o1/kpis", s.O1KPIsHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/o1/backup", s.O1BackupHandler).Methods("POST", "OPTIONS")
+	api.HandleFunc("/o1/restore", s.O1RestoreHandler).Methods("POST", "OPTIONS")
+	api.HandleFunc("/o1/validate", s.O1ValidationHandler).Methods("POST", "OPTIONS")
+
+	// O1 Management Operations endpoints
+	api.HandleFunc("/o1/backups", s.O1BackupsHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/o1/backups/{backupId}", s.O1BackupHandler).Methods("DELETE", "OPTIONS")
+	api.HandleFunc("/o1/alarms/generate", s.O1AlarmGenerationHandler).Methods("POST", "OPTIONS")
+	api.HandleFunc("/o1/alarms/{alarmId}/clear", s.O1AlarmClearHandler).Methods("POST", "OPTIONS")
+	api.HandleFunc("/o1/alarms/correlate", s.O1AlarmCorrelationHandler).Methods("POST", "OPTIONS")
+	api.HandleFunc("/o1/kpis/manage", s.O1KPIManagementHandler).Methods("POST", "OPTIONS")
+	api.HandleFunc("/o1/kpis/{kpiId}", s.O1KPIHandler).Methods("PUT", "OPTIONS")
+	api.HandleFunc("/o1/kpis/collect", s.O1KPICollectionHandler).Methods("POST", "OPTIONS")
+	api.HandleFunc("/o1/certificates", s.O1CertificatesHandler).Methods("GET", "POST", "OPTIONS")
+	api.HandleFunc("/o1/certificates/{certId}/revoke", s.O1CertificateHandler).Methods("POST", "OPTIONS")
+	api.HandleFunc("/o1/resource-usage", s.O1ResourceUsageHandler).Methods("GET", "POST", "OPTIONS")
+	api.HandleFunc("/o1/access-control/policies", s.O1AccessControlHandler).Methods("GET", "POST", "OPTIONS")
+	api.HandleFunc("/o1/access-control/policies/{policyId}", s.O1AccessControlPolicyHandler).Methods("GET", "PUT", "DELETE", "OPTIONS")
 
 	// WebSocket endpoint
 	router.HandleFunc("/ws", s.handleWebSocket)

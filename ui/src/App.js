@@ -10,6 +10,7 @@ import XAppManagement from './components/XAppManagement';
 import E2NodesPanel from './components/E2NodesPanel';
 import SubscriptionPanel from './components/SubscriptionPanel';
 import ServiceModelPanel from './components/ServiceModelPanel';
+import A1PolicyManagement from './components/A1PolicyManagement';
 import { 
   useComponents, 
   useE2Nodes, 
@@ -312,6 +313,11 @@ function App() {
             {/* Service Model Framework Interface */}
             <div className="panel full-width">
               <ServiceModelPanel />
+            </div>
+
+            {/* A1 Policy Management Interface */}
+            <div className="panel full-width">
+              <A1PolicyManagement />
             </div>
 
             {/* xApp Management Interface */}

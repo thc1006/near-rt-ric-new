@@ -33,6 +33,8 @@ type ClientManager struct {
 	subscriptionMgrClient *SubscriptionManagerClient
 	routingMgrClient      *RoutingManagerClient
 	e2tClient             *E2TClient
+	a1MediatorClient      *A1MediatorClient
+	o1MediatorClient      *O1MediatorClient
 	sctpManager           *SCTPConnectionManager
 }
 
@@ -153,6 +155,12 @@ func (cm *ClientManager) initializeHighLevelClients() {
 	
 	// Initialize E2 Termination client
 	cm.e2tClient = NewE2TClient(cm.e2tConn, cm.httpClient, cm.config.E2TermEndpoint, cm.sctpManager)
+	
+	// Initialize A1 Mediator client
+	cm.a1MediatorClient = NewA1MediatorClient(cm.httpClient, cm.config.A1MediatorEndpoint)
+	
+	// Initialize O1 Mediator client
+	cm.o1MediatorClient = NewO1MediatorClient(cm.httpClient, cm.config.O1MediatorEndpoint)
 }
 
 // createGRPCConnection creates a gRPC connection with appropriate credentials
@@ -237,6 +245,16 @@ func (cm *ClientManager) GetE2TClient() *E2TClient {
 	return cm.e2tClient
 }
 
+// GetA1MediatorClient returns the A1 Mediator client
+func (cm *ClientManager) GetA1MediatorClient() *A1MediatorClient {
+	return cm.a1MediatorClient
+}
+
+// GetO1MediatorClient returns the O1 Mediator client
+func (cm *ClientManager) GetO1MediatorClient() *O1MediatorClient {
+	return cm.o1MediatorClient
+}
+
 // GetSCTPManager returns the SCTP connection manager
 func (cm *ClientManager) GetSCTPManager() *SCTPConnectionManager {
 	return cm.sctpManager
@@ -277,25 +295,10 @@ func (cm *ClientManager) IsA1MediatorConnected() bool {
 
 // IsO1MediatorConnected checks if O1 Mediator is available via HTTP
 func (cm *ClientManager) IsO1MediatorConnected() bool {
-	if cm.config.O1MediatorEndpoint == "" {
+	if cm.o1MediatorClient == nil {
 		return false
 	}
-	
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	
-	req, err := http.NewRequestWithContext(ctx, "GET", cm.config.O1MediatorEndpoint+"/health", nil)
-	if err != nil {
-		return false
-	}
-	
-	resp, err := cm.httpClient.Do(req)
-	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-	
-	return resp.StatusCode == http.StatusOK
+	return cm.o1MediatorClient.IsConnected()
 }
 
 // IsRtmgrConnected checks if Routing Manager connection is available
