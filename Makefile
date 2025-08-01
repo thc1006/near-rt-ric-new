@@ -46,6 +46,16 @@ lint:
 	# Assuming golangci-lint is installed
 	golangci-lint run
 
+# Generate protobuf files
+generate-proto:
+	@echo "Generating protobuf files..."
+	@bash scripts/generate-proto.sh
+
+# Verify protobuf definitions
+verify-proto: generate-proto
+	@echo "Verifying protobuf definitions..."
+	@go run verify_proto.go
+
 # Lint Helm charts
 helm-lint:
 	@echo "Linting all Helm charts..."

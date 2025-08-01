@@ -1,0 +1,112 @@
+{{- if .Values.a1mediator.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-a1mediator
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: a1mediator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "oran-sc-platform.selectorLabels" . | nindent 6 }}
+      component: a1mediator
+  template:
+    metadata:
+      labels:
+        {{- include "oran-sc-platform.selectorLabels" . | nindent 8 }}
+        component: a1mediator
+    spec:
+      containers:
+      - name: a1mediator
+        image: "{{ .Values.a1mediator.image.registry }}/{{ .Values.a1mediator.image.name }}:{{ .Values.a1mediator.image.tag }}"
+        imagePullPolicy: {{ .Values.global.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.a1mediator.service.ports.http }}
+          protocol: TCP
+        - name: rmr-data
+          containerPort: {{ .Values.a1mediator.service.ports.rmr_data }}
+          protocol: TCP
+        - name: rmr-route
+          containerPort: {{ .Values.a1mediator.service.ports.rmr_route }}
+          protocol: TCP
+        env:
+        - name: RMR_SEED_RT
+          value: "/opt/a1/router.txt"
+        - name: RMR_RTG_SVC
+          value: "{{ include "oran-sc-platform.fullname" . }}-rtmgr:{{ .Values.rtmgr.service.ports.rmr_route }}"
+        - name: DBAAS_SERVICE_HOST
+          value: "{{ include "oran-sc-platform.fullname" . }}-dbaas"
+        - name: DBAAS_SERVICE_PORT
+          value: "{{ .Values.dbaas.service.ports.redis }}"
+        - name: A1_VERSION
+          value: "{{ .Values.a1mediator.a1.version }}"
+        - name: A1_AUTH_ENABLED
+          value: "{{ .Values.a1mediator.a1.auth.enabled }}"
+        - name: A1_JWT_ALGORITHM
+          value: "{{ .Values.a1mediator.a1.auth.jwt.algorithm }}"
+        - name: HTTP_PORT
+          value: "{{ .Values.a1mediator.service.ports.http }}"
+        volumeMounts:
+        - name: rmr-config
+          mountPath: /opt/a1/router.txt
+          subPath: router.txt
+        {{- if .Values.security.tls.enabled }}
+        - name: tls-certs
+          mountPath: /opt/a1/certs
+          readOnly: true
+        {{- end }}
+        resources:
+          {{- toYaml .Values.a1mediator.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /a1-p/healthcheck
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /a1-p/healthcheck
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: rmr-config
+        configMap:
+          name: {{ include "oran-sc-platform.fullname" . }}-rmr-config
+      {{- if .Values.security.tls.enabled }}
+      - name: tls-certs
+        secret:
+          secretName: {{ .Values.security.tls.certificates.server.secret }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-a1mediator
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: a1mediator
+spec:
+  type: {{ .Values.a1mediator.service.type }}
+  ports:
+  - port: {{ .Values.a1mediator.service.ports.http }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  - port: {{ .Values.a1mediator.service.ports.rmr_data }}
+    targetPort: rmr-data
+    protocol: TCP
+    name: rmr-data
+  - port: {{ .Values.a1mediator.service.ports.rmr_route }}
+    targetPort: rmr-route
+    protocol: TCP
+    name: rmr-route
+  selector:
+    {{- include "oran-sc-platform.selectorLabels" . | nindent 4 }}
+    component: a1mediator
+{{- end }}

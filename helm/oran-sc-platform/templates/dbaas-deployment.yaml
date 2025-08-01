@@ -1,0 +1,97 @@
+{{- if .Values.dbaas.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-dbaas
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: dbaas
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "oran-sc-platform.selectorLabels" . | nindent 6 }}
+      component: dbaas
+  template:
+    metadata:
+      labels:
+        {{- include "oran-sc-platform.selectorLabels" . | nindent 8 }}
+        component: dbaas
+    spec:
+      containers:
+      - name: dbaas
+        image: "{{ .Values.dbaas.image.registry }}/{{ .Values.dbaas.image.name }}:{{ .Values.dbaas.image.tag }}"
+        imagePullPolicy: {{ .Values.global.pullPolicy }}
+        ports:
+        - name: redis
+          containerPort: {{ .Values.dbaas.service.ports.redis }}
+          protocol: TCP
+        env:
+        - name: DBAAS_SERVICE_HOST
+          value: "0.0.0.0"
+        - name: DBAAS_SERVICE_PORT
+          value: "{{ .Values.dbaas.service.ports.redis }}"
+        {{- if .Values.dbaas.persistence.enabled }}
+        volumeMounts:
+        - name: dbaas-data
+          mountPath: /data
+        {{- end }}
+        resources:
+          {{- toYaml .Values.dbaas.resources | nindent 10 }}
+        livenessProbe:
+          tcpSocket:
+            port: redis
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: redis
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      {{- if .Values.dbaas.persistence.enabled }}
+      volumes:
+      - name: dbaas-data
+        persistentVolumeClaim:
+          claimName: {{ include "oran-sc-platform.fullname" . }}-dbaas-pvc
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-dbaas
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: dbaas
+spec:
+  type: {{ .Values.dbaas.service.type }}
+  ports:
+  - port: {{ .Values.dbaas.service.ports.redis }}
+    targetPort: redis
+    protocol: TCP
+    name: redis
+  selector:
+    {{- include "oran-sc-platform.selectorLabels" . | nindent 4 }}
+    component: dbaas
+{{- if .Values.dbaas.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-dbaas-pvc
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: dbaas
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.dbaas.persistence.size }}
+  {{- if .Values.dbaas.persistence.storageClass }}
+  storageClassName: {{ .Values.dbaas.persistence.storageClass }}
+  {{- end }}
+{{- end }}
+{{- end }}

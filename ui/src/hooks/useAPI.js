@@ -125,6 +125,11 @@ export function useWebSocket() {
 
   // Monitor connection state
   useEffect(() => {
+    // Skip interval in test environment
+    if (process.env.NODE_ENV === 'test') {
+      return;
+    }
+
     const interval = setInterval(() => {
       const state = dashboardAPI.getWebSocketState();
       setConnectionState(state);

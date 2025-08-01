@@ -8,6 +8,7 @@ package dashboard
 import (
 	"bytes"
 	"encoding/json"
+	"log"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -70,13 +71,13 @@ func NewWebSocketHub() *WebSocketHub {
 
 // Run starts the WebSocket hub
 func (h *WebSocketHub) Run() {
-	log.Info("Starting WebSocket hub")
+	log.Println("Starting WebSocket hub")
 
 	for {
 		select {
 		case client := <-h.register:
 			h.clients[client] = true
-			log.Infof("WebSocket client connected. Total clients: %d", len(h.clients))
+			log.Printf("WebSocket client connected. Total clients: %d", len(h.clients))
 
 			// Send welcome message
 			welcome := map[string]interface{}{
@@ -97,7 +98,7 @@ func (h *WebSocketHub) Run() {
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
 				close(client.send)
-				log.Infof("WebSocket client disconnected. Total clients: %d", len(h.clients))
+				log.Printf("WebSocket client disconnected. Total clients: %d", len(h.clients))
 			}
 
 		case message := <-h.broadcast:
@@ -120,7 +121,7 @@ func (h *WebSocketHub) Run() {
 			}
 
 		case <-h.stop:
-			log.Info("Stopping WebSocket hub")
+			log.Println("Stopping WebSocket hub")
 			for client := range h.clients {
 				close(client.send)
 				delete(h.clients, client)
@@ -146,7 +147,7 @@ func (h *WebSocketHub) BroadcastMessage(messageType string, data interface{}) {
 	if jsonData, err := json.Marshal(message); err == nil {
 		h.broadcast <- jsonData
 	} else {
-		log.Errorf("Failed to marshal WebSocket message: %v", err)
+		log.Printf("Failed to marshal WebSocket message: %v", err)
 	}
 }
 
@@ -168,7 +169,7 @@ func (c *WebSocketClient) readPump() {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Errorf("WebSocket error: %v", err)
+				log.Printf("WebSocket error: %v", err)
 			}
 			break
 		}
@@ -227,13 +228,13 @@ func (c *WebSocketClient) writePump() {
 func (c *WebSocketClient) handleClientMessage(message []byte) {
 	var msg map[string]interface{}
 	if err := json.Unmarshal(message, &msg); err != nil {
-		log.Errorf("Failed to unmarshal client message: %v", err)
+		log.Printf("Failed to unmarshal client message: %v", err)
 		return
 	}
 
 	msgType, ok := msg["type"].(string)
 	if !ok {
-		log.Warn("Received message without type field")
+		log.Println("Received message without type field")
 		return
 	}
 
@@ -255,9 +256,9 @@ func (c *WebSocketClient) handleClientMessage(message []byte) {
 
 	case "subscribe":
 		// Handle subscription requests for specific data types
-		log.Infof("Client subscribed to updates: %v", msg["data"])
+		log.Printf("Client subscribed to updates: %v", msg["data"])
 
 	default:
-		log.Warnf("Unknown message type received: %s", msgType)
+		log.Printf("Unknown message type received: %s", msgType)
 	}
 }

@@ -1,0 +1,110 @@
+{{- if .Values.submgr.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-submgr
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: submgr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "oran-sc-platform.selectorLabels" . | nindent 6 }}
+      component: submgr
+  template:
+    metadata:
+      labels:
+        {{- include "oran-sc-platform.selectorLabels" . | nindent 8 }}
+        component: submgr
+    spec:
+      containers:
+      - name: submgr
+        image: "{{ .Values.submgr.image.registry }}/{{ .Values.submgr.image.name }}:{{ .Values.submgr.image.tag }}"
+        imagePullPolicy: {{ .Values.global.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.submgr.service.ports.http }}
+          protocol: TCP
+        - name: rmr-data
+          containerPort: {{ .Values.submgr.service.ports.rmr_data }}
+          protocol: TCP
+        - name: rmr-route
+          containerPort: {{ .Values.submgr.service.ports.rmr_route }}
+          protocol: TCP
+        env:
+        - name: RMR_SEED_RT
+          value: "/opt/submgr/router.txt"
+        - name: RMR_RTG_SVC
+          value: "{{ include "oran-sc-platform.fullname" . }}-rtmgr:{{ .Values.rtmgr.service.ports.rmr_route }}"
+        - name: DBAAS_SERVICE_HOST
+          value: "{{ include "oran-sc-platform.fullname" . }}-dbaas"
+        - name: DBAAS_SERVICE_PORT
+          value: "{{ .Values.dbaas.service.ports.redis }}"
+        - name: E2T_SERVICE_HOST
+          value: "{{ include "oran-sc-platform.fullname" . }}-e2term"
+        - name: E2T_SERVICE_PORT
+          value: "{{ .Values.e2term.service.ports.rmr_data }}"
+        - name: E2MGR_SERVICE_HOST
+          value: "{{ include "oran-sc-platform.fullname" . }}-e2mgr"
+        - name: E2MGR_SERVICE_PORT
+          value: "{{ .Values.e2mgr.service.ports.http }}"
+        - name: SUBSCRIPTION_TIMEOUT
+          value: "{{ .Values.submgr.subscription.timeout }}"
+        - name: SUBSCRIPTION_RETRIES
+          value: "{{ .Values.submgr.subscription.retries }}"
+        - name: MAX_CONCURRENT_SUBSCRIPTIONS
+          value: "{{ .Values.submgr.subscription.maxConcurrent }}"
+        - name: HTTP_PORT
+          value: "{{ .Values.submgr.service.ports.http }}"
+        volumeMounts:
+        - name: rmr-config
+          mountPath: /opt/submgr/router.txt
+          subPath: router.txt
+        resources:
+          {{- toYaml .Values.submgr.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: rmr-config
+        configMap:
+          name: {{ include "oran-sc-platform.fullname" . }}-rmr-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-submgr
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: submgr
+spec:
+  type: {{ .Values.submgr.service.type }}
+  ports:
+  - port: {{ .Values.submgr.service.ports.http }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  - port: {{ .Values.submgr.service.ports.rmr_data }}
+    targetPort: rmr-data
+    protocol: TCP
+    name: rmr-data
+  - port: {{ .Values.submgr.service.ports.rmr_route }}
+    targetPort: rmr-route
+    protocol: TCP
+    name: rmr-route
+  selector:
+    {{- include "oran-sc-platform.selectorLabels" . | nindent 4 }}
+    component: submgr
+{{- end }}

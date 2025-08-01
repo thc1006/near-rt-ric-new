@@ -185,18 +185,21 @@ describe('DashboardAPI', () => {
       expect(onError).toHaveBeenCalledWith(expect.any(Error));
     });
 
-    it('should handle WebSocket close and attempt reconnection', () => {
+    it('should handle WebSocket close and attempt reconnection', (done) => {
       const onMessage = jest.fn();
       const onError = jest.fn();
-      const onClose = jest.fn();
+      const onClose = jest.fn((event) => {
+        expect(event).toEqual({ code: 1006, reason: 'Connection lost' });
+        done();
+      });
       const onOpen = jest.fn();
 
       dashboardAPI.connectWebSocket(onMessage, onError, onClose, onOpen);
 
       // Simulate unexpected close
-      mockWebSocket.onclose({ code: 1006, reason: 'Connection lost' });
-
-      expect(onClose).toHaveBeenCalledWith({ code: 1006, reason: 'Connection lost' });
+      setTimeout(() => {
+        mockWebSocket.onclose({ code: 1006, reason: 'Connection lost' });
+      }, 100);
     });
 
     it('should send WebSocket messages when connected', () => {

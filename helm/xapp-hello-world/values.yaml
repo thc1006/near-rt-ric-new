@@ -2,6 +2,19 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+# Global configuration
+global:
+  namespace: ricplt
+  repository: nexus3.o-ran-sc.org:10002/o-ran-sc
+  pullPolicy: IfNotPresent
+
+# xApp configuration
+xapp:
+  name: hello-world
+  version: "1.0.0"
+  description: "Hello World xApp for O-RAN SC"
+
+# Deployment configuration
 replicaCount: 1
 
 image:
@@ -13,21 +26,75 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
+# Service configuration
+service:
+  type: ClusterIP
+  ports:
+    http: 8080
+    rmr_data: 4560
+    rmr_route: 4561
+
+# O-RAN SC component endpoints
+oransc:
+  e2mgr:
+    endpoint: "oran-sc-platform-e2mgr:3800"
+  submgr:
+    endpoint: "oran-sc-platform-submgr:8088"
+  rtmgr:
+    endpoint: "oran-sc-platform-rtmgr:3800"
+  dbaas:
+    endpoint: "oran-sc-platform-dbaas:6379"
+
+# RMR configuration
+rmr:
+  port: 4560
+  data_port: 4561
+  seed_rt: "/opt/xapp/router.txt"
+
+# Environment variables
+env:
+  XAPP_NAME: "hello-world"
+  XAPP_VERSION: "1.0.0"
+  HTTP_PORT: "8080"
+  RMR_PORT: "4560"
+  RMR_DATA_PORT: "4561"
+  LOG_LEVEL: "INFO"
+
+# Service account configuration
 serviceAccount:
   create: true
   annotations: {}
   name: ""
 
+# Pod configuration
 podAnnotations: {}
-
 podSecurityContext: {}
-
 securityContext: {}
 
-resources: {}
+# Resource configuration
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
 
+# Health checks
+healthCheck:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Monitoring
+monitoring:
+  enabled: true
+  port: 8080
+  path: /metrics
+
+# Node selection
 nodeSelector: {}
-
 tolerations: []
-
 affinity: {}

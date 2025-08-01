@@ -1,0 +1,132 @@
+{{- if .Values.o1mediator.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-o1mediator
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: o1mediator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "oran-sc-platform.selectorLabels" . | nindent 6 }}
+      component: o1mediator
+  template:
+    metadata:
+      labels:
+        {{- include "oran-sc-platform.selectorLabels" . | nindent 8 }}
+        component: o1mediator
+    spec:
+      containers:
+      - name: o1mediator
+        image: "{{ .Values.o1mediator.image.registry }}/{{ .Values.o1mediator.image.name }}:{{ .Values.o1mediator.image.tag }}"
+        imagePullPolicy: {{ .Values.global.pullPolicy }}
+        ports:
+        - name: netconf-ssh
+          containerPort: {{ .Values.o1mediator.service.ports.netconf_ssh }}
+          protocol: TCP
+        - name: netconf-tls
+          containerPort: {{ .Values.o1mediator.service.ports.netconf_tls }}
+          protocol: TCP
+        - name: http
+          containerPort: {{ .Values.o1mediator.service.ports.http }}
+          protocol: TCP
+        env:
+        - name: DBAAS_SERVICE_HOST
+          value: "{{ include "oran-sc-platform.fullname" . }}-dbaas"
+        - name: DBAAS_SERVICE_PORT
+          value: "{{ .Values.dbaas.service.ports.redis }}"
+        - name: E2MGR_SERVICE_HOST
+          value: "{{ include "oran-sc-platform.fullname" . }}-e2mgr"
+        - name: E2MGR_SERVICE_PORT
+          value: "{{ .Values.e2mgr.service.ports.http }}"
+        - name: APPMGR_SERVICE_HOST
+          value: "{{ include "oran-sc-platform.fullname" . }}-appmgr"
+        - name: APPMGR_SERVICE_PORT
+          value: "{{ .Values.appmgr.service.ports.http }}"
+        - name: NETCONF_VERSION
+          value: "{{ .Values.o1mediator.netconf.version }}"
+        - name: NETCONF_SSH_PORT
+          value: "{{ .Values.o1mediator.service.ports.netconf_ssh }}"
+        - name: NETCONF_TLS_PORT
+          value: "{{ .Values.o1mediator.service.ports.netconf_tls }}"
+        - name: HTTP_PORT
+          value: "{{ .Values.o1mediator.service.ports.http }}"
+        - name: YANG_MODELS
+          value: "{{ join "," .Values.o1mediator.yang.models }}"
+        volumeMounts:
+        - name: yang-models
+          mountPath: /opt/o1/yang
+          readOnly: true
+        {{- if .Values.security.tls.enabled }}
+        - name: tls-certs
+          mountPath: /opt/o1/certs
+          readOnly: true
+        {{- end }}
+        resources:
+          {{- toYaml .Values.o1mediator.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: yang-models
+        configMap:
+          name: {{ include "oran-sc-platform.fullname" . }}-yang-models
+      {{- if .Values.security.tls.enabled }}
+      - name: tls-certs
+        secret:
+          secretName: {{ .Values.security.tls.certificates.server.secret }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-o1mediator
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: o1mediator
+spec:
+  type: {{ .Values.o1mediator.service.type }}
+  ports:
+  - port: {{ .Values.o1mediator.service.ports.netconf_ssh }}
+    targetPort: netconf-ssh
+    protocol: TCP
+    name: netconf-ssh
+  - port: {{ .Values.o1mediator.service.ports.netconf_tls }}
+    targetPort: netconf-tls
+    protocol: TCP
+    name: netconf-tls
+  - port: {{ .Values.o1mediator.service.ports.http }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "oran-sc-platform.selectorLabels" . | nindent 4 }}
+    component: o1mediator
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-yang-models
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: o1mediator
+data:
+  yang-models.txt: |
+    {{- range .Values.o1mediator.yang.models }}
+    {{ . }}
+    {{- end }}
+{{- end }}

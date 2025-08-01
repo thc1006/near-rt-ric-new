@@ -73,7 +73,7 @@ data:
           {{- if .Values.e2term.enabled }}
           {
             "name": "e2term",
-            "host": "service-ricplt-e2term-rmr-alpha.{{ .Values.global.namespace }}.svc.cluster.local",
+            "host": "{{ include "oran-sc-platform.fullname" . }}-e2term.{{ .Values.global.namespace }}.svc.cluster.local",
             "port": {{ .Values.global.rmr.data_port }},
             "policies": ["round_robin"]
           },
@@ -81,7 +81,7 @@ data:
           {{- if .Values.e2mgr.enabled }}
           {
             "name": "e2mgr",
-            "host": "service-ricplt-e2mgr-rmr.{{ .Values.global.namespace }}.svc.cluster.local",
+            "host": "{{ include "oran-sc-platform.fullname" . }}-e2mgr.{{ .Values.global.namespace }}.svc.cluster.local",
             "port": {{ .Values.global.rmr.data_port }},
             "policies": ["round_robin"]
           },
@@ -89,7 +89,7 @@ data:
           {{- if .Values.submgr.enabled }}
           {
             "name": "submgr",
-            "host": "service-ricplt-submgr-rmr.{{ .Values.global.namespace }}.svc.cluster.local",
+            "host": "{{ include "oran-sc-platform.fullname" . }}-submgr.{{ .Values.global.namespace }}.svc.cluster.local",
             "port": {{ .Values.global.rmr.data_port }},
             "policies": ["round_robin"]
           },
@@ -97,7 +97,7 @@ data:
           {{- if .Values.a1mediator.enabled }}
           {
             "name": "a1mediator",
-            "host": "service-ricplt-a1mediator-rmr.{{ .Values.global.namespace }}.svc.cluster.local",
+            "host": "{{ include "oran-sc-platform.fullname" . }}-a1mediator.{{ .Values.global.namespace }}.svc.cluster.local",
             "port": {{ .Values.global.rmr.data_port }},
             "policies": ["round_robin"]
           },
@@ -105,7 +105,7 @@ data:
           {{- if .Values.o1mediator.enabled }}
           {
             "name": "o1mediator",
-            "host": "service-ricplt-o1mediator.{{ .Values.global.namespace }}.svc.cluster.local",
+            "host": "{{ include "oran-sc-platform.fullname" . }}-o1mediator.{{ .Values.global.namespace }}.svc.cluster.local",
             "port": {{ .Values.global.rmr.data_port }},
             "policies": ["round_robin"]
           }
@@ -197,6 +197,35 @@ data:
       ]
     }
   
+  # RMR Router Configuration
+  router.txt: |
+    # RMR Routing Table for O-RAN SC Components
+    # Format: message_type,sender_endpoint,target_endpoint,group_id
+    
+    # E2AP Messages
+    12001,*,{{ include "oran-sc-platform.fullname" . }}-e2mgr:{{ .Values.global.rmr.data_port }},0  # E2_SETUP_REQUEST
+    12002,*,{{ include "oran-sc-platform.fullname" . }}-e2term:{{ .Values.global.rmr.data_port }},0  # E2_SETUP_RESPONSE
+    12003,*,{{ include "oran-sc-platform.fullname" . }}-e2term:{{ .Values.global.rmr.data_port }},0  # E2_SETUP_FAILURE
+    12010,*,{{ include "oran-sc-platform.fullname" . }}-submgr:{{ .Values.global.rmr.data_port }},0  # RIC_SUB_REQ
+    12011,*,{{ include "oran-sc-platform.fullname" . }}-submgr:{{ .Values.global.rmr.data_port }},0  # RIC_SUB_RESP
+    12012,*,{{ include "oran-sc-platform.fullname" . }}-submgr:{{ .Values.global.rmr.data_port }},0  # RIC_SUB_FAILURE
+    12020,*,{{ include "oran-sc-platform.fullname" . }}-submgr:{{ .Values.global.rmr.data_port }},0  # RIC_INDICATION
+    12021,*,{{ include "oran-sc-platform.fullname" . }}-e2term:{{ .Values.global.rmr.data_port }},0  # RIC_CONTROL_REQ
+    12022,*,{{ include "oran-sc-platform.fullname" . }}-submgr:{{ .Values.global.rmr.data_port }},0  # RIC_CONTROL_ACK
+    12023,*,{{ include "oran-sc-platform.fullname" . }}-submgr:{{ .Values.global.rmr.data_port }},0  # RIC_CONTROL_FAILURE
+    
+    # A1 Messages
+    20010,*,{{ include "oran-sc-platform.fullname" . }}-a1mediator:{{ .Values.global.rmr.data_port }},0  # A1_POLICY_REQ
+    20011,*,{{ include "oran-sc-platform.fullname" . }}-a1mediator:{{ .Values.global.rmr.data_port }},0  # A1_POLICY_RESP
+    
+    # O1 Messages
+    30010,*,{{ include "oran-sc-platform.fullname" . }}-o1mediator:{{ .Values.global.rmr.data_port }},0  # O1_CONFIG_REQ
+    30011,*,{{ include "oran-sc-platform.fullname" . }}-o1mediator:{{ .Values.global.rmr.data_port }},0  # O1_CONFIG_RESP
+    
+    # xApp Messages (dynamic routing through RTMGR)
+    60000,*,{{ include "oran-sc-platform.fullname" . }}-rtmgr:{{ .Values.global.rmr.data_port }},0  # XAPP_REGISTER
+    60001,*,{{ include "oran-sc-platform.fullname" . }}-rtmgr:{{ .Values.global.rmr.data_port }},0  # XAPP_DEREGISTER
+
   # Health Check Configuration
   health-check.sh: |
     #!/bin/bash
@@ -210,29 +239,33 @@ data:
     case $COMPONENT in
         "e2term")
             # Check E2 SCTP port
-            nc -z -w5 service-ricplt-e2term-sctp-alpha.${NAMESPACE}.svc.cluster.local {{ .Values.e2term.service.ports.sctp }}
+            nc -z -w5 {{ include "oran-sc-platform.fullname" . }}-e2term.${NAMESPACE}.svc.cluster.local {{ .Values.e2term.service.ports.sctp }}
             # Check RMR connectivity
-            nc -z -w5 service-ricplt-e2term-rmr-alpha.${NAMESPACE}.svc.cluster.local {{ .Values.global.rmr.data_port }}
+            nc -z -w5 {{ include "oran-sc-platform.fullname" . }}-e2term.${NAMESPACE}.svc.cluster.local {{ .Values.global.rmr.data_port }}
             ;;
         "e2mgr")
             # Check HTTP API
-            curl -f -s http://service-ricplt-e2mgr-http.${NAMESPACE}.svc.cluster.local:{{ .Values.e2mgr.service.ports.http }}/health || exit 1
+            curl -f -s http://{{ include "oran-sc-platform.fullname" . }}-e2mgr.${NAMESPACE}.svc.cluster.local:{{ .Values.e2mgr.service.ports.http }}/health || exit 1
             ;;
         "submgr")
             # Check HTTP API
-            curl -f -s http://service-ricplt-submgr-http.${NAMESPACE}.svc.cluster.local:{{ .Values.submgr.service.ports.http }}/health || exit 1
+            curl -f -s http://{{ include "oran-sc-platform.fullname" . }}-submgr.${NAMESPACE}.svc.cluster.local:{{ .Values.submgr.service.ports.http }}/health || exit 1
             ;;
         "rtmgr")
             # Check HTTP API
-            curl -f -s http://service-ricplt-rtmgr-http.${NAMESPACE}.svc.cluster.local:{{ .Values.rtmgr.service.ports.http }}/health || exit 1
+            curl -f -s http://{{ include "oran-sc-platform.fullname" . }}-rtmgr.${NAMESPACE}.svc.cluster.local:{{ .Values.rtmgr.service.ports.http }}/health || exit 1
             ;;
         "a1mediator")
             # Check A1 API
-            curl -f -s http://service-ricplt-a1mediator-http.${NAMESPACE}.svc.cluster.local:{{ .Values.a1mediator.service.ports.http }}/a1-p/healthcheck || exit 1
+            curl -f -s http://{{ include "oran-sc-platform.fullname" . }}-a1mediator.${NAMESPACE}.svc.cluster.local:{{ .Values.a1mediator.service.ports.http }}/a1-p/healthcheck || exit 1
+            ;;
+        "o1mediator")
+            # Check O1 API
+            curl -f -s http://{{ include "oran-sc-platform.fullname" . }}-o1mediator.${NAMESPACE}.svc.cluster.local:{{ .Values.o1mediator.service.ports.http }}/health || exit 1
             ;;
         "dbaas")
             # Check Redis connectivity
-            redis-cli -h service-ricplt-dbaas-tcp.${NAMESPACE}.svc.cluster.local -p {{ .Values.dbaas.service.ports.redis }} ping | grep -q PONG || exit 1
+            redis-cli -h {{ include "oran-sc-platform.fullname" . }}-dbaas.${NAMESPACE}.svc.cluster.local -p {{ .Values.dbaas.service.ports.redis }} ping | grep -q PONG || exit 1
             ;;
         *)
             echo "Unknown component: $COMPONENT"

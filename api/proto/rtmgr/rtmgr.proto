@@ -1,0 +1,200 @@
+syntax = "proto3";
+
+package rtmgr;
+
+option go_package = "github.com/oran/near-rt-ric-new/api/proto/rtmgr";
+
+import "google/protobuf/timestamp.proto";
+
+// Routing Manager service definition
+service RoutingManager {
+    // Route management operations
+    rpc CreateRoute(CreateRouteRequest) returns (CreateRouteResponse);
+    rpc GetRoutes(GetRoutesRequest) returns (GetRoutesResponse);
+    rpc GetRoute(GetRouteRequest) returns (GetRouteResponse);
+    rpc UpdateRoute(UpdateRouteRequest) returns (UpdateRouteResponse);
+    rpc DeleteRoute(DeleteRouteRequest) returns (DeleteRouteResponse);
+    
+    // Routing table operations
+    rpc GetRoutingTable(GetRoutingTableRequest) returns (GetRoutingTableResponse);
+    rpc UpdateRoutingTable(UpdateRoutingTableRequest) returns (UpdateRoutingTableResponse);
+    
+    // xApp registration and discovery
+    rpc RegisterXApp(RegisterXAppRequest) returns (RegisterXAppResponse);
+    rpc UnregisterXApp(UnregisterXAppRequest) returns (UnregisterXAppResponse);
+    rpc GetXApps(GetXAppsRequest) returns (GetXAppsResponse);
+    
+    // Health and statistics
+    rpc GetStats(GetStatsRequest) returns (GetStatsResponse);
+    rpc GetHealth(GetHealthRequest) returns (GetHealthResponse);
+}
+
+// Request/Response messages for route operations
+message CreateRouteRequest {
+    Route route = 1;
+}
+
+message CreateRouteResponse {
+    string route_id = 1;
+    bool success = 2;
+    string message = 3;
+}
+
+message GetRoutesRequest {
+    optional string source_xapp = 1;
+    optional string target_xapp = 2;
+    optional uint32 message_type = 3;
+    optional uint32 limit = 4;
+    optional uint32 offset = 5;
+}
+
+message GetRoutesResponse {
+    repeated Route routes = 1;
+    uint32 total = 2;
+}
+
+message GetRouteRequest {
+    string route_id = 1;
+}
+
+message GetRouteResponse {
+    Route route = 1;
+}
+
+message UpdateRouteRequest {
+    string route_id = 1;
+    Route route = 2;
+}
+
+message UpdateRouteResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message DeleteRouteRequest {
+    string route_id = 1;
+}
+
+message DeleteRouteResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+// Routing table operations
+message GetRoutingTableRequest {
+}
+
+message GetRoutingTableResponse {
+    RoutingTable routing_table = 1;
+}
+
+message UpdateRoutingTableRequest {
+    RoutingTable routing_table = 1;
+}
+
+message UpdateRoutingTableResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+// xApp registration operations
+message RegisterXAppRequest {
+    XAppInfo xapp_info = 1;
+}
+
+message RegisterXAppResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message UnregisterXAppRequest {
+    string xapp_name = 1;
+}
+
+message UnregisterXAppResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message GetXAppsRequest {
+    optional string status = 1;
+}
+
+message GetXAppsResponse {
+    repeated XAppInfo xapps = 1;
+    uint32 total = 2;
+}
+
+// Health and statistics
+message GetStatsRequest {
+}
+
+message GetStatsResponse {
+    RoutingStats stats = 1;
+}
+
+message GetHealthRequest {
+}
+
+message GetHealthResponse {
+    RoutingHealth health = 1;
+}
+
+// Data models
+message Route {
+    string id = 1;
+    string source_xapp = 2;
+    string target_xapp = 3;
+    uint32 message_type = 4;
+    string subscription_id = 5;
+    RoutePolicy policy = 6;
+    google.protobuf.Timestamp created_at = 7;
+    google.protobuf.Timestamp updated_at = 8;
+}
+
+message RoutePolicy {
+    string type = 1; // "round_robin", "priority", "load_balanced"
+    map<string, string> parameters = 2;
+}
+
+message RoutingTable {
+    repeated RouteEntry entries = 1;
+    uint32 version = 2;
+    google.protobuf.Timestamp last_updated = 3;
+}
+
+message RouteEntry {
+    uint32 message_type = 1;
+    string source_endpoint = 2;
+    repeated string target_endpoints = 3;
+    RoutePolicy policy = 4;
+}
+
+message XAppInfo {
+    string name = 1;
+    string version = 2;
+    string namespace = 3;
+    repeated string endpoints = 4;
+    map<string, string> config = 5;
+    string status = 6;
+    google.protobuf.Timestamp registered_at = 7;
+    google.protobuf.Timestamp last_heartbeat = 8;
+}
+
+message RoutingStats {
+    uint32 total_routes = 1;
+    uint32 active_xapps = 2;
+    map<string, uint32> routes_by_message_type = 3;
+    map<string, uint32> xapps_by_status = 4;
+    uint64 messages_routed = 5;
+    uint64 routing_errors = 6;
+    google.protobuf.Timestamp last_updated = 7;
+}
+
+message RoutingHealth {
+    bool is_healthy = 1;
+    string status_message = 2;
+    uint32 active_connections = 3;
+    uint32 failed_routes = 4;
+    google.protobuf.Timestamp last_health_check = 5;
+}

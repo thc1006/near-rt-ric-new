@@ -7,6 +7,9 @@ import E2ManagerStatus from './components/E2ManagerStatus';
 import SubscriptionManagerStatus from './components/SubscriptionManagerStatus';
 import AppManagerStatus from './components/AppManagerStatus';
 import XAppManagement from './components/XAppManagement';
+import E2NodesPanel from './components/E2NodesPanel';
+import SubscriptionPanel from './components/SubscriptionPanel';
+import ServiceModelPanel from './components/ServiceModelPanel';
 import { 
   useComponents, 
   useE2Nodes, 
@@ -294,6 +297,21 @@ function App() {
                   refetchXApps();
                 }}
               />
+            </div>
+
+            {/* E2 Nodes Management Interface */}
+            <div className="panel full-width">
+              <E2NodesPanel />
+            </div>
+
+            {/* Subscription Management Interface */}
+            <div className="panel full-width">
+              <SubscriptionPanel />
+            </div>
+
+            {/* Service Model Framework Interface */}
+            <div className="panel full-width">
+              <ServiceModelPanel />
             </div>
 
             {/* xApp Management Interface */}

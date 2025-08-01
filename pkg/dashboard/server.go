@@ -9,31 +9,35 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"github.com/onosproject/onos-lib-go/pkg/logging"
 )
-
-var log = logging.GetLogger("dashboard-server")
 
 // Config holds the configuration for the dashboard server
 type Config struct {
-	Port           int
-	E2MgrEndpoint  string
-	SubmgrEndpoint string
-	AppmgrEndpoint string
+	Port             int
+	E2MgrEndpoint    string
+	E2TermEndpoint   string
+	SubmgrEndpoint   string
+	AppmgrEndpoint   string
+	A1MediatorEndpoint string
+	O1MediatorEndpoint string
+	DbaasEndpoint    string
+	RtmgrEndpoint    string
 }
 
 // Server represents the dashboard API gateway server
 type Server struct {
-	config     *Config
-	httpServer *http.Server
-	clients    *ClientManager
-	discovery  *DiscoveryService
-	wsHub      *WebSocketHub
+	config               *Config
+	httpServer           *http.Server
+	clients              *ClientManager
+	discovery            *DiscoveryService
+	wsHub                *WebSocketHub
+	serviceModelRegistry *ServiceModelRegistry
 }
 
 // NewServer creates a new dashboard server instance
@@ -50,11 +54,15 @@ func NewServer(config *Config) (*Server, error) {
 	// Initialize WebSocket hub
 	wsHub := NewWebSocketHub()
 
+	// Initialize service model registry
+	serviceModelRegistry := NewServiceModelRegistry()
+
 	server := &Server{
-		config:    config,
-		clients:   clients,
-		discovery: discovery,
-		wsHub:     wsHub,
+		config:               config,
+		clients:              clients,
+		discovery:            discovery,
+		wsHub:                wsHub,
+		serviceModelRegistry: serviceModelRegistry,
 	}
 
 	// Setup HTTP router
@@ -76,6 +84,12 @@ func (s *Server) Start() error {
 
 	// Start discovery service
 	go s.discovery.Start(s.wsHub)
+
+	// Start SCTP connection manager
+	ctx := context.Background()
+	if err := s.clients.StartSCTPManager(ctx); err != nil {
+		log.Printf("Failed to start SCTP manager: %v", err)
+	}
 
 	// Start HTTP server
 	return s.httpServer.ListenAndServe()
@@ -111,14 +125,32 @@ func (s *Server) setupRoutes() *mux.Router {
 	api.HandleFunc("/components/{id}", s.handleGetComponent).Methods("GET", "OPTIONS")
 
 	// E2 Manager endpoints
-	api.HandleFunc("/e2nodes", s.handleGetE2Nodes).Methods("GET", "OPTIONS")
-	api.HandleFunc("/e2nodes/{id}", s.handleGetE2Node).Methods("GET", "OPTIONS")
+	api.HandleFunc("/e2nodes", s.E2NodesHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/e2nodes/{nodeId}", s.E2NodeHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/e2nodes/{nodeId}/health", s.E2NodeHealthHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/e2nodes/{nodeId}/configuration", s.E2NodeConfigurationHandler).Methods("PUT", "OPTIONS")
 
 	// Subscription Manager endpoints
-	api.HandleFunc("/subscriptions", s.handleGetSubscriptions).Methods("GET", "OPTIONS")
-	api.HandleFunc("/subscriptions", s.handleCreateSubscription).Methods("POST", "OPTIONS")
-	api.HandleFunc("/subscriptions/{id}", s.handleGetSubscription).Methods("GET", "OPTIONS")
-	api.HandleFunc("/subscriptions/{id}", s.handleDeleteSubscription).Methods("DELETE", "OPTIONS")
+	api.HandleFunc("/subscriptions", s.SubscriptionsHandler).Methods("GET", "POST", "OPTIONS")
+	api.HandleFunc("/subscriptions/{subscriptionId}", s.SubscriptionHandler).Methods("GET", "PUT", "DELETE", "OPTIONS")
+	api.HandleFunc("/subscriptions/{subscriptionId}/indications", s.SubscriptionIndicationsHandler).Methods("GET", "OPTIONS")
+
+	// Service Model endpoints
+	api.HandleFunc("/servicemodels", s.ServiceModelHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/servicemodels/{oid}", s.ServiceModelByOIDHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/servicemodels/capabilities", s.ServiceModelCapabilitiesHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/servicemodels/stats", s.ServiceModelStatsHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/servicemodels/process/indication", s.ProcessIndicationHandler).Methods("POST", "OPTIONS")
+	api.HandleFunc("/servicemodels/process/control", s.ProcessControlHandler).Methods("POST", "OPTIONS")
+
+	// SCTP Connection endpoints
+	api.HandleFunc("/sctp/connections", s.SCTPConnectionsHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/sctp/connections/{associationId}", s.SCTPConnectionHandler).Methods("GET", "DELETE", "OPTIONS")
+	api.HandleFunc("/sctp/stats", s.SCTPStatsHandler).Methods("GET", "OPTIONS")
+
+	// E2 Termination endpoints
+	api.HandleFunc("/e2t/stats", s.E2TStatsHandler).Methods("GET", "OPTIONS")
+	api.HandleFunc("/e2t/messages", s.E2APMessagesHandler).Methods("GET", "OPTIONS")
 
 	// App Manager endpoints
 	api.HandleFunc("/xapps", s.handleGetXApps).Methods("GET", "OPTIONS")
@@ -174,7 +206,7 @@ var upgrader = websocket.Upgrader{
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Errorf("Failed to upgrade WebSocket connection: %v", err)
+		log.Printf("Failed to upgrade WebSocket connection: %v", err)
 		return
 	}
 

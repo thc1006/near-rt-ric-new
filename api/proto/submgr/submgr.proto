@@ -1,0 +1,178 @@
+syntax = "proto3";
+
+package submgr;
+
+option go_package = "github.com/oran/near-rt-ric-new/api/proto/submgr";
+
+import "google/protobuf/timestamp.proto";
+
+// Subscription Manager service definition
+service SubscriptionManager {
+    // Subscription lifecycle operations
+    rpc CreateSubscription(CreateSubscriptionRequest) returns (CreateSubscriptionResponse);
+    rpc GetSubscriptions(GetSubscriptionsRequest) returns (GetSubscriptionsResponse);
+    rpc GetSubscription(GetSubscriptionRequest) returns (GetSubscriptionResponse);
+    rpc UpdateSubscription(UpdateSubscriptionRequest) returns (UpdateSubscriptionResponse);
+    rpc DeleteSubscription(DeleteSubscriptionRequest) returns (DeleteSubscriptionResponse);
+    
+    // Indication handling
+    rpc GetIndications(GetIndicationsRequest) returns (GetIndicationsResponse);
+    rpc StreamIndications(StreamIndicationsRequest) returns (stream IndicationMessage);
+    
+    // Statistics and monitoring
+    rpc GetStats(GetStatsRequest) returns (GetStatsResponse);
+    rpc GetSubscriptionHealth(GetSubscriptionHealthRequest) returns (GetSubscriptionHealthResponse);
+}
+
+// Request/Response messages for subscription operations
+message CreateSubscriptionRequest {
+    string e2_node_id = 1;
+    string xapp_id = 2;
+    uint32 ran_function_id = 3;
+    EventTrigger event_trigger = 4;
+    repeated Action actions = 5;
+    uint32 timeout_ms = 6;
+}
+
+message CreateSubscriptionResponse {
+    string subscription_id = 1;
+    bool success = 2;
+    string message = 3;
+}
+
+message GetSubscriptionsRequest {
+    optional string e2_node_id = 1;
+    optional string xapp_id = 2;
+    optional uint32 ran_function_id = 3;
+    optional string status = 4;
+    optional uint32 limit = 5;
+    optional uint32 offset = 6;
+}
+
+message GetSubscriptionsResponse {
+    repeated Subscription subscriptions = 1;
+    uint32 total = 2;
+}
+
+message GetSubscriptionRequest {
+    string subscription_id = 1;
+}
+
+message GetSubscriptionResponse {
+    Subscription subscription = 1;
+}
+
+message UpdateSubscriptionRequest {
+    string subscription_id = 1;
+    EventTrigger event_trigger = 2;
+    repeated Action actions = 3;
+}
+
+message UpdateSubscriptionResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message DeleteSubscriptionRequest {
+    string subscription_id = 1;
+}
+
+message DeleteSubscriptionResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message GetIndicationsRequest {
+    string subscription_id = 1;
+    optional uint32 limit = 2;
+    optional google.protobuf.Timestamp since = 3;
+}
+
+message GetIndicationsResponse {
+    repeated Indication indications = 1;
+    uint32 total = 2;
+}
+
+message StreamIndicationsRequest {
+    string subscription_id = 1;
+}
+
+message IndicationMessage {
+    Indication indication = 1;
+}
+
+message GetStatsRequest {
+}
+
+message GetStatsResponse {
+    SubscriptionStats stats = 1;
+}
+
+message GetSubscriptionHealthRequest {
+    string subscription_id = 1;
+}
+
+message GetSubscriptionHealthResponse {
+    SubscriptionHealth health = 1;
+}
+
+// Data models
+message Subscription {
+    string id = 1;
+    string e2_node_id = 2;
+    string xapp_id = 3;
+    uint32 ran_function_id = 4;
+    EventTrigger event_trigger = 5;
+    repeated Action actions = 6;
+    string status = 7;
+    string error_message = 8;
+    google.protobuf.Timestamp created_at = 9;
+    google.protobuf.Timestamp updated_at = 10;
+}
+
+message EventTrigger {
+    string type = 1;
+    bytes definition = 2;
+    optional uint32 period_ms = 3;
+}
+
+message Action {
+    uint32 id = 1;
+    string type = 2;
+    bytes definition = 3;
+    optional SubsequentAction subsequent_action = 4;
+}
+
+message SubsequentAction {
+    string type = 1;
+    uint32 time_to_wait = 2;
+}
+
+message Indication {
+    string subscription_id = 1;
+    string e2_node_id = 2;
+    uint32 ran_function_id = 3;
+    uint32 action_id = 4;
+    uint32 indication_sn = 5;
+    bytes indication_header = 6;
+    bytes indication_message = 7;
+    bytes call_process_id = 8;
+    google.protobuf.Timestamp timestamp = 9;
+}
+
+message SubscriptionStats {
+    map<string, uint32> subscriptions_by_status = 1;
+    map<string, uint32> subscriptions_by_xapp = 2;
+    map<string, uint32> subscriptions_by_ran_function = 3;
+    uint32 total_subscriptions = 4;
+    uint32 active_indications_per_second = 5;
+    google.protobuf.Timestamp last_updated = 6;
+}
+
+message SubscriptionHealth {
+    string subscription_id = 1;
+    bool is_healthy = 2;
+    uint32 indication_count = 3;
+    google.protobuf.Timestamp last_indication = 4;
+    string status_message = 5;
+}

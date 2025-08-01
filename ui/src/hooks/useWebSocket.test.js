@@ -22,6 +22,12 @@ describe('useWebSocket hook', () => {
     jest.clearAllMocks();
     mockCallbacks = {};
     
+    // Use fake timers to control intervals
+    jest.useFakeTimers();
+    
+    // Set test timeout
+    jest.setTimeout(5000);
+    
     // Mock connectWebSocket to capture callbacks
     dashboardAPI.connectWebSocket.mockImplementation((onMessage, onError, onClose, onOpen) => {
       mockCallbacks.onMessage = onMessage;
@@ -32,6 +38,12 @@ describe('useWebSocket hook', () => {
     
     dashboardAPI.getWebSocketState.mockReturnValue('CLOSED');
     dashboardAPI.sendWebSocketMessage.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    // Clean up timers
+    jest.clearAllTimers();
+    jest.useRealTimers();
   });
 
   it('should initialize with default state', () => {

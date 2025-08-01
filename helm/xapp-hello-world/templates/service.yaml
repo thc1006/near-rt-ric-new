@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2020-present Open Networking Foundation <info@opennetworking.org>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "xapp-hello-world.fullname" . }}
+  labels:
+    {{- include "xapp-hello-world.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.ports.http }}
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: {{ .Values.service.ports.rmr_data }}
+      targetPort: rmr-data
+      protocol: TCP
+      name: rmr-data
+    - port: {{ .Values.service.ports.rmr_route }}
+      targetPort: rmr-route
+      protocol: TCP
+      name: rmr-route
+  selector:
+    {{- include "xapp-hello-world.selectorLabels" . | nindent 4 }}

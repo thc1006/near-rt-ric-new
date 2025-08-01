@@ -1,0 +1,204 @@
+syntax = "proto3";
+
+package e2mgr;
+
+option go_package = "github.com/oran/near-rt-ric-new/api/proto/e2mgr";
+
+import "google/protobuf/timestamp.proto";
+
+// E2 Manager service definition
+service E2Manager {
+    // Node management operations
+    rpc GetNodes(GetNodesRequest) returns (GetNodesResponse);
+    rpc GetNode(GetNodeRequest) returns (GetNodeResponse);
+    rpc UpdateNodeConfiguration(UpdateNodeConfigurationRequest) returns (UpdateNodeConfigurationResponse);
+    rpc DeleteNode(DeleteNodeRequest) returns (DeleteNodeResponse);
+    
+    // Health and statistics
+    rpc GetNodeHealth(GetNodeHealthRequest) returns (GetNodeHealthResponse);
+    rpc GetStats(GetStatsRequest) returns (GetStatsResponse);
+    
+    // Setup procedures
+    rpc HandleE2Setup(E2SetupRequest) returns (E2SetupResponse);
+    rpc HandleConfigurationUpdate(ConfigurationUpdateRequest) returns (ConfigurationUpdateResponse);
+    rpc HandleReset(ResetRequest) returns (ResetResponse);
+}
+
+// Request/Response messages for node operations
+message GetNodesRequest {
+    optional string node_type = 1;
+    optional string connection_status = 2;
+    optional uint32 limit = 3;
+    optional uint32 offset = 4;
+}
+
+message GetNodesResponse {
+    repeated E2Node nodes = 1;
+    uint32 total = 2;
+}
+
+message GetNodeRequest {
+    string node_id = 1;
+}
+
+message GetNodeResponse {
+    E2Node node = 1;
+}
+
+message UpdateNodeConfigurationRequest {
+    string node_id = 1;
+    NodeConfiguration configuration = 2;
+}
+
+message UpdateNodeConfigurationResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message DeleteNodeRequest {
+    string node_id = 1;
+}
+
+message DeleteNodeResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message GetNodeHealthRequest {
+    string node_id = 1;
+}
+
+message GetNodeHealthResponse {
+    NodeHealth health = 1;
+}
+
+message GetStatsRequest {
+}
+
+message GetStatsResponse {
+    E2ManagerStats stats = 1;
+}
+
+// E2 Setup procedure messages
+message E2SetupRequest {
+    uint32 transaction_id = 1;
+    GlobalE2NodeID global_e2_node_id = 2;
+    repeated RANFunction ran_functions = 3;
+    repeated E2NodeComponentConfig e2_node_component_config_add_list = 4;
+}
+
+message E2SetupResponse {
+    uint32 transaction_id = 1;
+    bool success = 2;
+    string cause = 3;
+    repeated RANFunctionAccepted ran_functions_accepted = 4;
+    repeated RANFunctionRejected ran_functions_rejected = 5;
+}
+
+message ConfigurationUpdateRequest {
+    uint32 transaction_id = 1;
+    string node_id = 2;
+    repeated E2NodeComponentConfig config_update_list = 3;
+}
+
+message ConfigurationUpdateResponse {
+    uint32 transaction_id = 1;
+    bool success = 2;
+    string cause = 3;
+}
+
+message ResetRequest {
+    uint32 transaction_id = 1;
+    string node_id = 2;
+    string cause = 3;
+}
+
+message ResetResponse {
+    uint32 transaction_id = 1;
+    bool success = 2;
+}
+
+// Data models
+message E2Node {
+    string id = 1;
+    GlobalE2NodeID global_e2_node_id = 2;
+    string connection_status = 3;
+    string ip_address = 4;
+    uint32 port = 5;
+    repeated ServiceModel service_models = 6;
+    repeated RANFunction ran_functions = 7;
+    google.protobuf.Timestamp last_update = 8;
+    repeated SubscriptionInfo subscriptions = 9;
+    E2SetupRequestData setup_request = 10;
+}
+
+message GlobalE2NodeID {
+    string plmn_id = 1;
+    string node_id = 2;
+    string type = 3;
+}
+
+message ServiceModel {
+    string oid = 1;
+    string name = 2;
+    string version = 3;
+    repeated RANFunction functions = 4;
+}
+
+message RANFunction {
+    uint32 id = 1;
+    string oid = 2;
+    bytes definition = 3;
+    uint32 revision = 4;
+    string description = 5;
+}
+
+message RANFunctionAccepted {
+    uint32 ran_function_id = 1;
+    uint32 ran_function_revision = 2;
+}
+
+message RANFunctionRejected {
+    uint32 ran_function_id = 1;
+    string cause = 2;
+}
+
+message E2NodeComponentConfig {
+    string interface_type = 1;
+    uint32 interface_id = 2;
+    bytes configuration = 3;
+}
+
+message SubscriptionInfo {
+    string subscription_id = 1;
+    string xapp_id = 2;
+    uint32 ran_function_id = 3;
+    string status = 4;
+}
+
+message E2SetupRequestData {
+    uint32 transaction_id = 1;
+    GlobalE2NodeID global_e2_node_id = 2;
+    repeated RANFunction ran_functions = 3;
+    repeated E2NodeComponentConfig e2_node_component_config_add_list = 4;
+}
+
+message NodeConfiguration {
+    map<string, string> parameters = 1;
+    repeated E2NodeComponentConfig component_configs = 2;
+}
+
+message NodeHealth {
+    string node_id = 1;
+    bool is_healthy = 2;
+    google.protobuf.Timestamp last_health_check = 3;
+    string status_message = 4;
+}
+
+message E2ManagerStats {
+    map<string, uint32> nodes_by_type = 1;
+    map<string, uint32> nodes_by_status = 2;
+    uint32 total_nodes = 3;
+    uint32 active_subscriptions = 4;
+    google.protobuf.Timestamp last_updated = 5;
+}

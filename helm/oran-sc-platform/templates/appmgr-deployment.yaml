@@ -1,0 +1,144 @@
+{{- if .Values.appmgr.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-appmgr
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: appmgr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "oran-sc-platform.selectorLabels" . | nindent 6 }}
+      component: appmgr
+  template:
+    metadata:
+      labels:
+        {{- include "oran-sc-platform.selectorLabels" . | nindent 8 }}
+        component: appmgr
+    spec:
+      serviceAccountName: {{ include "oran-sc-platform.fullname" . }}-appmgr
+      containers:
+      - name: appmgr
+        image: "{{ .Values.appmgr.image.registry }}/{{ .Values.appmgr.image.name }}:{{ .Values.appmgr.image.tag }}"
+        imagePullPolicy: {{ .Values.global.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.appmgr.service.ports.http }}
+          protocol: TCP
+        - name: rmr-data
+          containerPort: {{ .Values.appmgr.service.ports.rmr_data }}
+          protocol: TCP
+        - name: rmr-route
+          containerPort: {{ .Values.appmgr.service.ports.rmr_route }}
+          protocol: TCP
+        env:
+        - name: RMR_SEED_RT
+          value: "/opt/appmgr/router.txt"
+        - name: RMR_RTG_SVC
+          value: "{{ include "oran-sc-platform.fullname" . }}-rtmgr:{{ .Values.rtmgr.service.ports.rmr_route }}"
+        - name: DBAAS_SERVICE_HOST
+          value: "{{ include "oran-sc-platform.fullname" . }}-dbaas"
+        - name: DBAAS_SERVICE_PORT
+          value: "{{ .Values.dbaas.service.ports.redis }}"
+        - name: HELM_HOST
+          value: "tiller-deploy.kube-system:44134"
+        - name: XAPP_NAMESPACE
+          value: "{{ .Values.global.namespace }}"
+        - name: HTTP_PORT
+          value: "{{ .Values.appmgr.service.ports.http }}"
+        volumeMounts:
+        - name: rmr-config
+          mountPath: /opt/appmgr/router.txt
+          subPath: router.txt
+        resources:
+          {{- toYaml .Values.appmgr.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: rmr-config
+        configMap:
+          name: {{ include "oran-sc-platform.fullname" . }}-rmr-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-appmgr
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: appmgr
+spec:
+  type: {{ .Values.appmgr.service.type }}
+  ports:
+  - port: {{ .Values.appmgr.service.ports.http }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  - port: {{ .Values.appmgr.service.ports.rmr_data }}
+    targetPort: rmr-data
+    protocol: TCP
+    name: rmr-data
+  - port: {{ .Values.appmgr.service.ports.rmr_route }}
+    targetPort: rmr-route
+    protocol: TCP
+    name: rmr-route
+  selector:
+    {{- include "oran-sc-platform.selectorLabels" . | nindent 4 }}
+    component: appmgr
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-appmgr
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: appmgr
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-appmgr
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: appmgr
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps", "secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["extensions"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-appmgr
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: appmgr
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "oran-sc-platform.fullname" . }}-appmgr
+subjects:
+- kind: ServiceAccount
+  name: {{ include "oran-sc-platform.fullname" . }}-appmgr
+  namespace: {{ .Values.global.namespace }}
+{{- end }}

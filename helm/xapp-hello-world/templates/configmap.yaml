@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2020-present Open Networking Foundation <info@opennetworking.org>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "xapp-hello-world.fullname" . }}-rmr-config
+  labels:
+    {{- include "xapp-hello-world.labels" . | nindent 4 }}
+data:
+  router.txt: |
+    # RMR Routing Table for Hello World xApp
+    # Format: message_type,sender_endpoint,target_endpoint,group_id
+    
+    # E2AP Messages - route to appropriate components
+    12001,*,{{ .Values.oransc.e2mgr.endpoint }},0  # E2_SETUP_REQUEST
+    12010,*,{{ .Values.oransc.submgr.endpoint }},0  # RIC_SUB_REQ
+    12020,*,{{ include "xapp-hello-world.fullname" . }}:{{ .Values.service.ports.rmr_data }},0  # RIC_INDICATION
+    12021,*,{{ .Values.oransc.e2mgr.endpoint }},0  # RIC_CONTROL_REQ
+    
+    # xApp-specific messages
+    60000,*,{{ .Values.oransc.rtmgr.endpoint }},0  # XAPP_REGISTER
+    60001,*,{{ .Values.oransc.rtmgr.endpoint }},0  # XAPP_DEREGISTER
+    
+  rmr-env.conf: |
+    # RMR Environment Configuration for Hello World xApp
+    export RMR_SEED_RT={{ .Values.rmr.seed_rt }}
+    export RMR_RTG_SVC={{ .Values.oransc.rtmgr.endpoint }}
+    export RMR_VCTL_FILE=/tmp/rmr.verbose
+    export RMR_LOG_VLEVEL=2
+    
+    # xApp-specific RMR settings
+    export XAPP_RMR_DATA_PORT={{ .Values.rmr.data_port }}
+    export XAPP_RMR_ROUTE_PORT={{ .Values.rmr.port }}

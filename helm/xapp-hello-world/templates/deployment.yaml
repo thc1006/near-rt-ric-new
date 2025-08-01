@@ -37,10 +37,65 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: 80
+              containerPort: {{ .Values.service.ports.http }}
               protocol: TCP
+            - name: rmr-data
+              containerPort: {{ .Values.service.ports.rmr_data }}
+              protocol: TCP
+            - name: rmr-route
+              containerPort: {{ .Values.service.ports.rmr_route }}
+              protocol: TCP
+          env:
+            - name: XAPP_NAME
+              value: "{{ .Values.xapp.name }}"
+            - name: XAPP_VERSION
+              value: "{{ .Values.xapp.version }}"
+            - name: HTTP_PORT
+              value: "{{ .Values.service.ports.http }}"
+            - name: RMR_PORT
+              value: "{{ .Values.rmr.port }}"
+            - name: RMR_DATA_PORT
+              value: "{{ .Values.rmr.data_port }}"
+            - name: E2MGR_ENDPOINT
+              value: "{{ .Values.oransc.e2mgr.endpoint }}"
+            - name: SUBMGR_ENDPOINT
+              value: "{{ .Values.oransc.submgr.endpoint }}"
+            - name: RTMGR_ENDPOINT
+              value: "{{ .Values.oransc.rtmgr.endpoint }}"
+            - name: DBAAS_ENDPOINT
+              value: "{{ .Values.oransc.dbaas.endpoint }}"
+            - name: RMR_SEED_RT
+              value: "{{ .Values.rmr.seed_rt }}"
+            {{- range $key, $value := .Values.env }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+            {{- end }}
+          volumeMounts:
+            - name: rmr-config
+              mountPath: /opt/xapp/router.txt
+              subPath: router.txt
+          {{- if .Values.healthCheck.enabled }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: {{ .Values.healthCheck.initialDelaySeconds }}
+            periodSeconds: {{ .Values.healthCheck.periodSeconds }}
+            timeoutSeconds: {{ .Values.healthCheck.timeoutSeconds }}
+            failureThreshold: {{ .Values.healthCheck.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: rmr-config
+          configMap:
+            name: {{ include "xapp-hello-world.fullname" . }}-rmr-config
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

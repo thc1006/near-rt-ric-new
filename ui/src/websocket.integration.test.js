@@ -18,6 +18,9 @@ describe('WebSocket Integration Tests', () => {
     jest.clearAllMocks();
     mockWebSocketCallbacks = {};
     
+    // Set test timeout to prevent hanging
+    jest.setTimeout(10000);
+    
     // Setup default mock responses
     dashboardAPI.getComponents.mockResolvedValue({
       components: [
@@ -62,6 +65,12 @@ describe('WebSocket Integration Tests', () => {
     dashboardAPI.isWebSocketConnected.mockReturnValue(true);
     dashboardAPI.getWebSocketState.mockReturnValue('OPEN');
     dashboardAPI.sendWebSocketMessage.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    // Clean up any timers
+    jest.clearAllTimers();
+    jest.useRealTimers();
   });
 
   test('should connect to WebSocket on mount', () => {

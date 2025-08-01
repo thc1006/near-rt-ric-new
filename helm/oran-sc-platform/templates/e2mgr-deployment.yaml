@@ -1,0 +1,104 @@
+{{- if .Values.e2mgr.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-e2mgr
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: e2mgr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "oran-sc-platform.selectorLabels" . | nindent 6 }}
+      component: e2mgr
+  template:
+    metadata:
+      labels:
+        {{- include "oran-sc-platform.selectorLabels" . | nindent 8 }}
+        component: e2mgr
+    spec:
+      containers:
+      - name: e2mgr
+        image: "{{ .Values.e2mgr.image.registry }}/{{ .Values.e2mgr.image.name }}:{{ .Values.e2mgr.image.tag }}"
+        imagePullPolicy: {{ .Values.global.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.e2mgr.service.ports.http }}
+          protocol: TCP
+        - name: rmr-data
+          containerPort: {{ .Values.e2mgr.service.ports.rmr_data }}
+          protocol: TCP
+        - name: rmr-route
+          containerPort: {{ .Values.e2mgr.service.ports.rmr_route }}
+          protocol: TCP
+        env:
+        - name: RMR_SEED_RT
+          value: "/opt/e2mgr/router.txt"
+        - name: RMR_RTG_SVC
+          value: "{{ include "oran-sc-platform.fullname" . }}-rtmgr:{{ .Values.rtmgr.service.ports.rmr_route }}"
+        - name: DBAAS_SERVICE_HOST
+          value: "{{ include "oran-sc-platform.fullname" . }}-dbaas"
+        - name: DBAAS_SERVICE_PORT
+          value: "{{ .Values.dbaas.service.ports.redis }}"
+        - name: E2T_SERVICE_HOST
+          value: "{{ include "oran-sc-platform.fullname" . }}-e2term"
+        - name: E2T_SERVICE_PORT
+          value: "{{ .Values.e2term.service.ports.rmr_data }}"
+        - name: E2_SETUP_TIMEOUT
+          value: "{{ .Values.e2mgr.e2setup.timeout }}"
+        - name: E2_SETUP_RETRIES
+          value: "{{ .Values.e2mgr.e2setup.retries }}"
+        - name: HTTP_PORT
+          value: "{{ .Values.e2mgr.service.ports.http }}"
+        volumeMounts:
+        - name: rmr-config
+          mountPath: /opt/e2mgr/router.txt
+          subPath: router.txt
+        resources:
+          {{- toYaml .Values.e2mgr.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: rmr-config
+        configMap:
+          name: {{ include "oran-sc-platform.fullname" . }}-rmr-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-e2mgr
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: e2mgr
+spec:
+  type: {{ .Values.e2mgr.service.type }}
+  ports:
+  - port: {{ .Values.e2mgr.service.ports.http }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  - port: {{ .Values.e2mgr.service.ports.rmr_data }}
+    targetPort: rmr-data
+    protocol: TCP
+    name: rmr-data
+  - port: {{ .Values.e2mgr.service.ports.rmr_route }}
+    targetPort: rmr-route
+    protocol: TCP
+    name: rmr-route
+  selector:
+    {{- include "oran-sc-platform.selectorLabels" . | nindent 4 }}
+    component: e2mgr
+{{- end }}

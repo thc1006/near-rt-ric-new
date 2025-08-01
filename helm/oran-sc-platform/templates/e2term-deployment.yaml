@@ -1,0 +1,110 @@
+{{- if .Values.e2term.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-e2term
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: e2term
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "oran-sc-platform.selectorLabels" . | nindent 6 }}
+      component: e2term
+  template:
+    metadata:
+      labels:
+        {{- include "oran-sc-platform.selectorLabels" . | nindent 8 }}
+        component: e2term
+    spec:
+      containers:
+      - name: e2term
+        image: "{{ .Values.e2term.image.registry }}/{{ .Values.e2term.image.name }}:{{ .Values.e2term.image.tag }}"
+        imagePullPolicy: {{ .Values.global.pullPolicy }}
+        ports:
+        - name: sctp
+          containerPort: {{ .Values.e2term.service.ports.sctp }}
+          protocol: SCTP
+        - name: rmr-data
+          containerPort: {{ .Values.e2term.service.ports.rmr_data }}
+          protocol: TCP
+        - name: rmr-route
+          containerPort: {{ .Values.e2term.service.ports.rmr_route }}
+          protocol: TCP
+        - name: prometheus
+          containerPort: {{ .Values.e2term.service.ports.prometheus }}
+          protocol: TCP
+        env:
+        - name: RMR_SEED_RT
+          value: "/opt/e2/router.txt"
+        - name: RMR_RTG_SVC
+          value: "{{ include "oran-sc-platform.fullname" . }}-rtmgr:{{ .Values.rtmgr.service.ports.rmr_route }}"
+        - name: DBAAS_SERVICE_HOST
+          value: "{{ include "oran-sc-platform.fullname" . }}-dbaas"
+        - name: DBAAS_SERVICE_PORT
+          value: "{{ .Values.dbaas.service.ports.redis }}"
+        - name: E2AP_VERSION
+          value: "{{ .Values.e2term.e2ap.version }}"
+        - name: E2AP_ENCODING
+          value: "{{ .Values.e2term.e2ap.encoding }}"
+        - name: SCTP_PORT
+          value: "{{ .Values.e2term.service.ports.sctp }}"
+        volumeMounts:
+        - name: rmr-config
+          mountPath: /opt/e2/router.txt
+          subPath: router.txt
+        resources:
+          {{- toYaml .Values.e2term.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: prometheus
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: prometheus
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: rmr-config
+        configMap:
+          name: {{ include "oran-sc-platform.fullname" . }}-rmr-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-e2term
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: e2term
+spec:
+  type: {{ .Values.e2term.service.type }}
+  ports:
+  - port: {{ .Values.e2term.service.ports.sctp }}
+    targetPort: sctp
+    protocol: SCTP
+    name: sctp
+    {{- if eq .Values.e2term.service.type "NodePort" }}
+    nodePort: {{ .Values.e2term.sctp.nodePort }}
+    {{- end }}
+  - port: {{ .Values.e2term.service.ports.rmr_data }}
+    targetPort: rmr-data
+    protocol: TCP
+    name: rmr-data
+  - port: {{ .Values.e2term.service.ports.rmr_route }}
+    targetPort: rmr-route
+    protocol: TCP
+    name: rmr-route
+  - port: {{ .Values.e2term.service.ports.prometheus }}
+    targetPort: prometheus
+    protocol: TCP
+    name: prometheus
+  selector:
+    {{- include "oran-sc-platform.selectorLabels" . | nindent 4 }}
+    component: e2term
+{{- end }}

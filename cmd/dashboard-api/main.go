@@ -8,17 +8,15 @@ package main
 import (
 	"context"
 	"flag"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"github.com/oran/near-rt-ric-new/pkg/dashboard"
 )
-
-var log = logging.GetLogger("dashboard-api")
 
 func main() {
 	var (
@@ -29,9 +27,7 @@ func main() {
 	)
 	flag.Parse()
 
-	// Setup logging
-	logging.SetLevel(logging.InfoLevel)
-	log.Info("Starting Dashboard API Gateway")
+	log.Println("Starting Dashboard API Gateway")
 
 	// Create dashboard server
 	config := &dashboard.Config{
@@ -48,7 +44,7 @@ func main() {
 
 	// Start server in a goroutine
 	go func() {
-		log.Infof("Dashboard API server starting on port %d", *port)
+		log.Printf("Dashboard API server starting on port %d", *port)
 		if err := server.Start(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Failed to start server: %v", err)
 		}
@@ -58,15 +54,15 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Info("Shutting down Dashboard API server...")
+	log.Println("Shutting down Dashboard API server...")
 
 	// Give outstanding requests a deadline for completion
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		log.Errorf("Server forced to shutdown: %v", err)
+		log.Printf("Server forced to shutdown: %v", err)
 	}
 
-	log.Info("Dashboard API server exited")
+	log.Println("Dashboard API server exited")
 }
