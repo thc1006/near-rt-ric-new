@@ -184,6 +184,7 @@ func NewServer(config *Config) (*Server, error) {
 		loadBalancer:           NewLoadBalancer(RoundRobin),
 		horizontalScaler:       NewHorizontalScaler(nil), // TODO: Add Kubernetes client
 		productionHardening:    productionHardening,
+		productionHardeningHandlers: NewProductionHardeningHandlers(productionHardening),
 	}
 
 	// Setup HTTP router with observability middleware
