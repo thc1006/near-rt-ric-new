@@ -11,6 +11,8 @@ import E2NodesPanel from './components/E2NodesPanel';
 import SubscriptionPanel from './components/SubscriptionPanel';
 import ServiceModelPanel from './components/ServiceModelPanel';
 import A1PolicyManagement from './components/A1PolicyManagement';
+import O1Management from './components/O1Management';
+import MetricsDashboard from './components/MetricsDashboard';
 import { 
   useComponents, 
   useE2Nodes, 
@@ -21,6 +23,9 @@ import {
 } from './hooks/useAPI';
 
 function App() {
+  // Navigation state
+  const [activeView, setActiveView] = useState('dashboard');
+  
   // API hooks for data fetching
   const { data: componentsData, loading: componentsLoading, error: componentsError, refetch: refetchComponents } = useComponents();
   const { data: e2NodesData, loading: e2NodesLoading, error: e2NodesError, refetch: refetchE2Nodes } = useE2Nodes();
@@ -238,21 +243,64 @@ function App() {
     return () => clearInterval(interval);
   }, [refetchComponents, refetchE2Nodes, refetchSubscriptions, refetchXApps]);
 
-  return (
-    <ErrorBoundary>
-      <div className="App">
-        <header className="App-header">
-          <h1>O-RAN Interactive Operations Console</h1>
-          <ConnectionStatus 
-            connected={wsConnected} 
-            connecting={wsConnecting}
-            error={wsError}
-            connectionState={wsConnectionState}
-            reconnectAttempts={wsReconnectAttempts}
-            onReconnect={wsConnect}
-          />
-        </header>
-        <main>
+  const renderActiveView = () => {
+    switch (activeView) {
+      case 'metrics':
+        return <MetricsDashboard />;
+      case 'components':
+        return (
+          <div className="panel full-width">
+            <ComponentDiscovery
+              components={componentsData?.components || []}
+              loading={componentsLoading}
+              error={componentsError}
+              onRefresh={refetchComponents}
+            />
+          </div>
+        );
+      case 'e2nodes':
+        return (
+          <div className="panel full-width">
+            <E2NodesPanel />
+          </div>
+        );
+      case 'subscriptions':
+        return (
+          <div className="panel full-width">
+            <SubscriptionPanel />
+          </div>
+        );
+      case 'servicemodels':
+        return (
+          <div className="panel full-width">
+            <ServiceModelPanel />
+          </div>
+        );
+      case 'a1policies':
+        return (
+          <div className="panel full-width">
+            <A1PolicyManagement />
+          </div>
+        );
+      case 'o1management':
+        return (
+          <div className="panel full-width">
+            <O1Management />
+          </div>
+        );
+      case 'xapps':
+        return (
+          <div className="panel full-width">
+            <XAppManagement
+              xApps={xAppsData?.xapps || []}
+              loading={xAppsLoading}
+              error={xAppsError}
+              onRefresh={refetchXApps}
+            />
+          </div>
+        );
+      default:
+        return (
           <div className="dashboard-container">
             {/* Component Discovery Panel */}
             <div className="panel full-width">
@@ -297,36 +345,6 @@ function App() {
                   refetchComponents();
                   refetchXApps();
                 }}
-              />
-            </div>
-
-            {/* E2 Nodes Management Interface */}
-            <div className="panel full-width">
-              <E2NodesPanel />
-            </div>
-
-            {/* Subscription Management Interface */}
-            <div className="panel full-width">
-              <SubscriptionPanel />
-            </div>
-
-            {/* Service Model Framework Interface */}
-            <div className="panel full-width">
-              <ServiceModelPanel />
-            </div>
-
-            {/* A1 Policy Management Interface */}
-            <div className="panel full-width">
-              <A1PolicyManagement />
-            </div>
-
-            {/* xApp Management Interface */}
-            <div className="panel full-width">
-              <XAppManagement
-                xApps={xAppsData?.xapps || []}
-                loading={xAppsLoading}
-                error={xAppsError}
-                onRefresh={refetchXApps}
               />
             </div>
             
@@ -393,6 +411,76 @@ function App() {
               </div>
             </div>
           </div>
+        );
+    }
+  };
+
+  return (
+    <ErrorBoundary>
+      <div className="App">
+        <header className="App-header">
+          <h1>O-RAN Interactive Operations Console</h1>
+          <nav className="main-navigation">
+            <button 
+              className={activeView === 'dashboard' ? 'active' : ''}
+              onClick={() => setActiveView('dashboard')}
+            >
+              Dashboard
+            </button>
+            <button 
+              className={activeView === 'metrics' ? 'active' : ''}
+              onClick={() => setActiveView('metrics')}
+            >
+              Metrics
+            </button>
+            <button 
+              className={activeView === 'components' ? 'active' : ''}
+              onClick={() => setActiveView('components')}
+            >
+              Components
+            </button>
+            <button 
+              className={activeView === 'e2nodes' ? 'active' : ''}
+              onClick={() => setActiveView('e2nodes')}
+            >
+              E2 Nodes
+            </button>
+            <button 
+              className={activeView === 'subscriptions' ? 'active' : ''}
+              onClick={() => setActiveView('subscriptions')}
+            >
+              Subscriptions
+            </button>
+            <button 
+              className={activeView === 'a1policies' ? 'active' : ''}
+              onClick={() => setActiveView('a1policies')}
+            >
+              A1 Policies
+            </button>
+            <button 
+              className={activeView === 'o1management' ? 'active' : ''}
+              onClick={() => setActiveView('o1management')}
+            >
+              O1 Management
+            </button>
+            <button 
+              className={activeView === 'xapps' ? 'active' : ''}
+              onClick={() => setActiveView('xapps')}
+            >
+              xApps
+            </button>
+          </nav>
+          <ConnectionStatus 
+            connected={wsConnected} 
+            connecting={wsConnecting}
+            error={wsError}
+            connectionState={wsConnectionState}
+            reconnectAttempts={wsReconnectAttempts}
+            onReconnect={wsConnect}
+          />
+        </header>
+        <main>
+          {renderActiveView()}
         </main>
       </div>
     </ErrorBoundary>

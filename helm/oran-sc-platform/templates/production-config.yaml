@@ -1,0 +1,337 @@
+{{- if .Values.production.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: production-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: production-config
+data:
+  # Production logging configuration
+  logging.yaml: |
+    level: {{ .Values.production.logging.level | default "info" }}
+    format: json
+    output: stdout
+    correlation_id: true
+    structured: true
+    fields:
+      service: "{{ "{{" }}.service{{ "}}" }}"
+      version: "{{ "{{" }}.version{{ "}}" }}"
+      environment: "production"
+    
+  # Production security configuration
+  security.yaml: |
+    tls:
+      enabled: true
+      min_version: "1.3"
+      cipher_suites:
+        - "TLS_AES_256_GCM_SHA384"
+        - "TLS_CHACHA20_POLY1305_SHA256"
+        - "TLS_AES_128_GCM_SHA256"
+      cert_rotation_days: {{ .Values.production.security.certRotationDays | default 30 }}
+    
+    authentication:
+      jwt:
+        algorithm: "RS256"
+        expiry: "{{ .Values.production.security.jwtExpiry | default "1h" }}"
+        refresh_expiry: "{{ .Values.production.security.jwtRefreshExpiry | default "24h" }}"
+      
+      rate_limiting:
+        enabled: true
+        requests_per_minute: {{ .Values.production.security.rateLimitRpm | default 1000 }}
+        burst_size: {{ .Values.production.security.rateLimitBurst | default 100 }}
+    
+    rbac:
+      enabled: true
+      strict_mode: true
+      audit_logging: true
+  
+  # Production performance configuration
+  performance.yaml: |
+    connection_pools:
+      database:
+        max_connections: {{ .Values.production.performance.dbMaxConnections | default 100 }}
+        idle_timeout: "{{ .Values.production.performance.dbIdleTimeout | default "5m" }}"
+        max_lifetime: "{{ .Values.production.performance.dbMaxLifetime | default "1h" }}"
+      
+      http:
+        max_idle_conns: {{ .Values.production.performance.httpMaxIdleConns | default 100 }}
+        idle_conn_timeout: "{{ .Values.production.performance.httpIdleTimeout | default "90s" }}"
+        response_header_timeout: "{{ .Values.production.performance.httpResponseTimeout | default "30s" }}"
+    
+    caching:
+      enabled: true
+      ttl: "{{ .Values.production.performance.cacheTtl | default "5m" }}"
+      max_size: {{ .Values.production.performance.cacheMaxSize | default "100MB" }}
+    
+    metrics:
+      enabled: true
+      interval: "{{ .Values.production.performance.metricsInterval | default "30s" }}"
+      detailed: {{ .Values.production.performance.detailedMetrics | default false }}
+
+  # Production monitoring configuration
+  monitoring.yaml: |
+    health_checks:
+      enabled: true
+      interval: "{{ .Values.production.monitoring.healthCheckInterval | default "30s" }}"
+      timeout: "{{ .Values.production.monitoring.healthCheckTimeout | default "10s" }}"
+      failure_threshold: {{ .Values.production.monitoring.healthCheckFailureThreshold | default 3 }}
+    
+    alerts:
+      enabled: true
+      webhook_url: "{{ .Values.production.monitoring.alertWebhook }}"
+      severity_levels:
+        - "critical"
+        - "warning"
+        - "info"
+    
+    tracing:
+      enabled: {{ .Values.production.monitoring.tracingEnabled | default true }}
+      sampling_rate: {{ .Values.production.monitoring.tracingSamplingRate | default 0.1 }}
+      jaeger_endpoint: "{{ .Values.production.monitoring.jaegerEndpoint | default "http://jaeger-collector:14268/api/traces" }}"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: production-scripts
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: production-scripts
+data:
+  health-check.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    # Component health check script
+    COMPONENT=${1:-"unknown"}
+    PORT=${2:-8080}
+    ENDPOINT=${3:-"/health"}
+    
+    # Check if component is ready
+    if curl -sf "localhost:$PORT$ENDPOINT" >/dev/null 2>&1; then
+        echo "OK: $COMPONENT is healthy"
+        exit 0
+    else
+        echo "FAIL: $COMPONENT health check failed"
+        exit 1
+    fi
+  
+  startup.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    # Production startup script
+    echo "Starting component in production mode..."
+    
+    # Wait for dependencies
+    echo "Waiting for dependencies..."
+    while ! nc -z dbaas 6379; do
+        echo "Waiting for database..."
+        sleep 2
+    done
+    
+    # Load production configuration
+    export CONFIG_FILE="/etc/config/production.yaml"
+    export LOG_LEVEL="{{ .Values.production.logging.level | default "info" }}"
+    export ENVIRONMENT="production"
+    
+    # Start the application
+    exec "$@"
+  
+  graceful-shutdown.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    # Graceful shutdown script
+    echo "Initiating graceful shutdown..."
+    
+    # Send SIGTERM to main process
+    PID=$(pgrep -f "main" || echo "")
+    if [ -n "$PID" ]; then
+        echo "Sending SIGTERM to PID $PID"
+        kill -TERM "$PID"
+        
+        # Wait for graceful shutdown
+        for i in {1..30}; do
+            if ! kill -0 "$PID" 2>/dev/null; then
+                echo "Process shutdown gracefully"
+                exit 0
+            fi
+            sleep 1
+        done
+        
+        # Force kill if still running
+        echo "Force killing process"
+        kill -KILL "$PID" 2>/dev/null || true
+    fi
+    
+    echo "Shutdown complete"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: production-secrets
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: production-secrets
+type: Opaque
+data:
+  # JWT signing key (base64 encoded)
+  jwt-private-key: {{ .Values.production.secrets.jwtPrivateKey | b64enc }}
+  jwt-public-key: {{ .Values.production.secrets.jwtPublicKey | b64enc }}
+  
+  # Database credentials
+  database-password: {{ .Values.production.secrets.databasePassword | b64enc }}
+  
+  # API keys
+  monitoring-api-key: {{ .Values.production.secrets.monitoringApiKey | b64enc }}
+  
+  # Encryption keys
+  encryption-key: {{ .Values.production.secrets.encryptionKey | b64enc }}
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: production-network-policy
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  
+  ingress:
+  # Allow ingress from ingress controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8443
+  
+  # Allow inter-component communication
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: oran-ric
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 6379
+    - protocol: TCP
+      port: 36422
+  
+  # Allow monitoring
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+  
+  egress:
+  # Allow DNS
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  
+  # Allow inter-component communication
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: oran-ric
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 6379
+    - protocol: TCP
+      port: 36422
+  
+  # Allow external E2 connections
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 36422
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: production-pdb
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: pdb
+spec:
+  minAvailable: {{ .Values.production.podDisruptionBudget.minAvailable | default "50%" }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: oran-ric
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: production-limits
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: limits
+spec:
+  limits:
+  - default:
+      cpu: "{{ .Values.production.resources.defaultCpuLimit | default "1000m" }}"
+      memory: "{{ .Values.production.resources.defaultMemoryLimit | default "2Gi" }}"
+    defaultRequest:
+      cpu: "{{ .Values.production.resources.defaultCpuRequest | default "100m" }}"
+      memory: "{{ .Values.production.resources.defaultMemoryRequest | default "256Mi" }}"
+    type: Container
+  
+  - max:
+      cpu: "{{ .Values.production.resources.maxCpuLimit | default "4000m" }}"
+      memory: "{{ .Values.production.resources.maxMemoryLimit | default "8Gi" }}"
+    type: Container
+
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: production-quota
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: quota
+spec:
+  hard:
+    requests.cpu: "{{ .Values.production.resourceQuota.requestsCpu | default "10" }}"
+    requests.memory: "{{ .Values.production.resourceQuota.requestsMemory | default "20Gi" }}"
+    limits.cpu: "{{ .Values.production.resourceQuota.limitsCpu | default "20" }}"
+    limits.memory: "{{ .Values.production.resourceQuota.limitsMemory | default "40Gi" }}"
+    persistentvolumeclaims: "{{ .Values.production.resourceQuota.pvcCount | default "10" }}"
+    requests.storage: "{{ .Values.production.resourceQuota.requestsStorage | default "100Gi" }}"
+
+{{- end }}

@@ -1,0 +1,177 @@
+{{- if .Values.observability.jaeger.enabled }}
+{{- if .Values.observability.jaeger.allInOne.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: jaeger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "oran-sc-platform.selectorLabels" . | nindent 6 }}
+      component: jaeger
+  template:
+    metadata:
+      labels:
+        {{- include "oran-sc-platform.selectorLabels" . | nindent 8 }}
+        component: jaeger
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "16686"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+        - name: jaeger
+          image: "{{ .Values.observability.jaeger.allInOne.image.registry }}/{{ .Values.observability.jaeger.allInOne.image.name }}:{{ .Values.observability.jaeger.allInOne.image.tag }}"
+          imagePullPolicy: {{ .Values.global.pullPolicy }}
+          ports:
+            - name: query-http
+              containerPort: 16686
+              protocol: TCP
+            - name: collector-http
+              containerPort: 14268
+              protocol: TCP
+            - name: collector-grpc
+              containerPort: 14250
+              protocol: TCP
+            - name: agent-zipkin
+              containerPort: 5775
+              protocol: UDP
+            - name: agent-compact
+              containerPort: 6831
+              protocol: UDP
+            - name: agent-binary
+              containerPort: 6832
+              protocol: UDP
+            - name: admin-http
+              containerPort: 14269
+              protocol: TCP
+          env:
+            - name: COLLECTOR_ZIPKIN_HOST_PORT
+              value: ":9411"
+            - name: COLLECTOR_OTLP_ENABLED
+              value: "true"
+            {{- if eq .Values.observability.jaeger.allInOne.storage.type "memory" }}
+            - name: MEMORY_MAX_TRACES
+              value: "{{ .Values.observability.jaeger.allInOne.storage.memory.maxTraces }}"
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: admin-http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 1
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /
+              port: admin-http
+            initialDelaySeconds: 1
+            periodSeconds: 5
+            timeoutSeconds: 1
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.observability.jaeger.allInOne.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-query
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: jaeger
+    service: query
+spec:
+  type: ClusterIP
+  ports:
+    - name: query-http
+      port: {{ .Values.observability.jaeger.allInOne.service.ports.query }}
+      targetPort: query-http
+      protocol: TCP
+  selector:
+    {{- include "oran-sc-platform.selectorLabels" . | nindent 4 }}
+    component: jaeger
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-collector
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: jaeger
+    service: collector
+spec:
+  type: ClusterIP
+  ports:
+    - name: collector-http
+      port: {{ .Values.observability.jaeger.allInOne.service.ports.collector }}
+      targetPort: collector-http
+      protocol: TCP
+    - name: collector-grpc
+      port: 14250
+      targetPort: collector-grpc
+      protocol: TCP
+  selector:
+    {{- include "oran-sc-platform.selectorLabels" . | nindent 4 }}
+    component: jaeger
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-agent
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: jaeger
+    service: agent
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: agent-zipkin-thrift
+      port: 5775
+      targetPort: agent-zipkin
+      protocol: UDP
+    - name: agent-compact
+      port: {{ .Values.observability.jaeger.allInOne.service.ports.agent }}
+      targetPort: agent-compact
+      protocol: UDP
+    - name: agent-binary
+      port: 6832
+      targetPort: agent-binary
+      protocol: UDP
+  selector:
+    {{- include "oran-sc-platform.selectorLabels" . | nindent 4 }}
+    component: jaeger
+{{- end }}
+
+{{- if .Values.observability.jaeger.production.enabled }}
+# Production Jaeger deployment with separate collector and query services
+# This would include Elasticsearch backend and separate deployments
+# Implementation omitted for brevity - would include:
+# - jaeger-collector deployment
+# - jaeger-query deployment
+# - jaeger-agent daemonset
+# - elasticsearch deployment (if enabled)
+{{- end }}
+{{- end }}

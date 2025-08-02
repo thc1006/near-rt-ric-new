@@ -17,6 +17,76 @@ global:
     platform: o-ran-sc
     release: oran-sc-platform
 
+# TLS Configuration for secure communications
+tls:
+  enabled: true
+  # Certificate configuration
+  keySize: 2048
+  certValidityDays: 365
+  organization: "O-RAN SC"
+  country: "US"
+  province: "CA"
+  city: "San Francisco"
+  autoRotate: true
+  rotationThreshold: "720h" # 30 days
+  
+  # Whether to create certificates automatically
+  createCertificates: true
+  
+  # Pre-existing certificates (if createCertificates is false)
+  certificates:
+    ca:
+      cert: ""
+      key: ""
+    server:
+      cert: ""
+      key: ""
+    client:
+      cert: ""
+      key: ""
+
+# Dashboard API Configuration
+dashboard:
+  enabled: true
+  replicaCount: 1
+  image:
+    registry: nexus3.o-ran-sc.org:10002
+    name: o-ran-sc/ric-plt-dashboard-api
+    tag: latest
+  service:
+    type: ClusterIP
+    ports:
+      http: 8080
+      https: 8443
+  ingress:
+    enabled: false
+    annotations: {}
+    hosts: []
+    tls: []
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+      - ALL
+  extraEnv: []
+  extraVolumes: []
+  extraVolumeMounts: []
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
 # Core Components Configuration
 # These are the mandatory O-RAN SC components
 
@@ -292,7 +362,254 @@ storage:
     schedule: "0 2 * * *"
     retention: 7
 
-# Monitoring and Observability
+# Monitoring and Observability Stack
+observability:
+  # Prometheus for metrics collection
+  prometheus:
+    enabled: true
+    image:
+      registry: quay.io
+      name: prometheus/prometheus
+      tag: v2.45.0
+    service:
+      type: ClusterIP
+      port: 9090
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: ""
+    retention: 15d
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+    # Alerting rules
+    alerting:
+      enabled: true
+      rules:
+        - name: oran-sc-platform
+          rules:
+            - alert: ComponentDown
+              expr: up == 0
+              for: 1m
+              labels:
+                severity: critical
+              annotations:
+                summary: "Component {{ $labels.instance }} is down"
+            - alert: HighErrorRate
+              expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "High error rate on {{ $labels.instance }}"
+            - alert: E2NodeDisconnected
+              expr: e2_nodes_connected < 1
+              for: 30s
+              labels:
+                severity: critical
+              annotations:
+                summary: "No E2 nodes connected"
+    
+  # Grafana for visualization
+  grafana:
+    enabled: true
+    image:
+      registry: grafana
+      name: grafana
+      tag: 10.0.0
+    service:
+      type: ClusterIP
+      port: 3000
+    persistence:
+      enabled: true
+      size: 1Gi
+      storageClass: ""
+    adminUser: admin
+    adminPassword: admin123
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+    # Pre-configured dashboards
+    dashboards:
+      enabled: true
+      configMaps:
+        - oran-sc-platform-dashboard
+        - e2-interface-dashboard
+        - a1-interface-dashboard
+        - o1-interface-dashboard
+        - xapp-dashboard
+    # Data sources
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus:9090
+        access: proxy
+        isDefault: true
+      - name: Loki
+        type: loki
+        url: http://loki:3100
+        access: proxy
+      - name: Jaeger
+        type: jaeger
+        url: http://jaeger-query:16686
+        access: proxy
+  
+  # Loki for log aggregation
+  loki:
+    enabled: true
+    image:
+      registry: grafana
+      name: loki
+      tag: 2.9.0
+    service:
+      type: ClusterIP
+      port: 3100
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: ""
+    retention: 168h # 7 days
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 100m
+        memory: 512Mi
+    config:
+      auth_enabled: false
+      server:
+        http_listen_port: 3100
+      ingester:
+        lifecycler:
+          address: 127.0.0.1
+          ring:
+            kvstore:
+              store: inmemory
+            replication_factor: 1
+        chunk_idle_period: 5m
+        chunk_retain_period: 30s
+      schema_config:
+        configs:
+          - from: 2020-10-24
+            store: boltdb
+            object_store: filesystem
+            schema: v11
+            index:
+              prefix: index_
+              period: 168h
+      storage_config:
+        boltdb:
+          directory: /loki/index
+        filesystem:
+          directory: /loki/chunks
+      limits_config:
+        enforce_metric_name: false
+        reject_old_samples: true
+        reject_old_samples_max_age: 168h
+  
+  # Promtail for log shipping
+  promtail:
+    enabled: true
+    image:
+      registry: grafana
+      name: promtail
+      tag: 2.9.0
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    config:
+      server:
+        http_listen_port: 9080
+        grpc_listen_port: 0
+      positions:
+        filename: /tmp/positions.yaml
+      clients:
+        - url: http://loki:3100/loki/api/v1/push
+      scrape_configs:
+        - job_name: kubernetes-pods
+          kubernetes_sd_configs:
+            - role: pod
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+              action: keep
+              regex: true
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+              action: replace
+              target_label: __metrics_path__
+              regex: (.+)
+  
+  # Jaeger for distributed tracing
+  jaeger:
+    enabled: true
+    # All-in-one deployment for development
+    allInOne:
+      enabled: true
+      image:
+        registry: jaegertracing
+        name: all-in-one
+        tag: 1.47.0
+      service:
+        type: ClusterIP
+        ports:
+          query: 16686
+          collector: 14268
+          agent: 6831
+      resources:
+        limits:
+          cpu: 500m
+          memory: 512Mi
+        requests:
+          cpu: 100m
+          memory: 256Mi
+      # Memory storage for development
+      storage:
+        type: memory
+        memory:
+          maxTraces: 50000
+    # Production deployment with Elasticsearch (disabled by default)
+    production:
+      enabled: false
+      collector:
+        replicaCount: 2
+      query:
+        replicaCount: 2
+      elasticsearch:
+        enabled: false
+  
+  # Node Exporter for system metrics
+  nodeExporter:
+    enabled: true
+    image:
+      registry: quay.io
+      name: prometheus/node-exporter
+      tag: v1.6.0
+    service:
+      type: ClusterIP
+      port: 9100
+    resources:
+      limits:
+        cpu: 200m
+        memory: 200Mi
+      requests:
+        cpu: 100m
+        memory: 100Mi
+
+# Legacy monitoring configuration (kept for backward compatibility)
 monitoring:
   # Prometheus metrics
   prometheus:
@@ -332,3 +649,145 @@ development:
     requests:
       cpu: 50m
       memory: 128Mi
+# Produc
+tion configuration
+production:
+  enabled: false
+  
+  logging:
+    level: "info"
+  
+  security:
+    certRotationDays: 30
+    jwtExpiry: "1h"
+    jwtRefreshExpiry: "24h"
+    rateLimitRpm: 1000
+    rateLimitBurst: 100
+  
+  performance:
+    dbMaxConnections: 100
+    dbIdleTimeout: "5m"
+    dbMaxLifetime: "1h"
+    httpMaxIdleConns: 100
+    httpIdleTimeout: "90s"
+    httpResponseTimeout: "30s"
+    cacheTtl: "5m"
+    cacheMaxSize: "100MB"
+    metricsInterval: "30s"
+    detailedMetrics: false
+  
+  monitoring:
+    healthCheckInterval: "30s"
+    healthCheckTimeout: "10s"
+    healthCheckFailureThreshold: 3
+    alertWebhook: ""
+    tracingEnabled: true
+    tracingSamplingRate: 0.1
+    jaegerEndpoint: "http://jaeger-collector:14268/api/traces"
+  
+  resources:
+    defaultCpuLimit: "1000m"
+    defaultMemoryLimit: "2Gi"
+    defaultCpuRequest: "100m"
+    defaultMemoryRequest: "256Mi"
+    maxCpuLimit: "4000m"
+    maxMemoryLimit: "8Gi"
+  
+  resourceQuota:
+    requestsCpu: "10"
+    requestsMemory: "20Gi"
+    limitsCpu: "20"
+    limitsMemory: "40Gi"
+    pvcCount: "10"
+    requestsStorage: "100Gi"
+  
+  podDisruptionBudget:
+    minAvailable: "50%"
+  
+  secrets:
+    jwtPrivateKey: ""
+    jwtPublicKey: ""
+    databasePassword: ""
+    monitoringApiKey: ""
+    encryptionKey: ""
+
+# Blue-Green deployment configuration
+blueGreen:
+  enabled: false
+  autoPromotion: false
+  scaleDownDelay: 30
+  
+  probes:
+    liveness:
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    readiness:
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 3
+    startup:
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 30
+  
+  analysis:
+    interval: "30s"
+    count: 5
+    successRate: 0.95
+    maxResponseTime: 0.5
+    maxErrorRate: 0.05
+    failureLimit: 3
+    prometheusAddress: "http://prometheus:9090"
+
+# Backup and disaster recovery
+backup:
+  enabled: false
+  schedule: "0 2 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  
+  image:
+    repository: "alpine/k8s"
+    tag: "1.28.4"
+    pullPolicy: "IfNotPresent"
+  
+  storage:
+    size: "50Gi"
+    storageClass: ""
+  
+  s3Bucket: ""
+  s3Region: "us-east-1"
+  s3AccessKeyId: ""
+  s3SecretAccessKey: ""
+  
+  resources:
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+
+# Deployment validation
+validation:
+  enabled: true
+  integrationTests: true
+  performanceTests: false
+  securityTests: true
+  
+  image:
+    repository: "alpine/k8s"
+    tag: "1.28.4"
+    pullPolicy: "IfNotPresent"
+  
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+    requests:
+      cpu: "100m"
+      memory: "256Mi"

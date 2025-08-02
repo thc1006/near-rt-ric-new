@@ -1,0 +1,594 @@
+{{- if .Values.validation.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: validation-scripts
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: validation
+data:
+  smoke-tests.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    NAMESPACE="{{ .Values.namespace }}"
+    TIMEOUT=300
+    
+    echo "=== O-RAN RIC Smoke Tests ==="
+    echo "Timestamp: $(date)"
+    echo "Namespace: $NAMESPACE"
+    echo
+    
+    # Test 1: Pod Health Check
+    echo "1. Checking pod health..."
+    COMPONENTS=("e2term" "e2mgr" "submgr" "a1mediator" "o1mediator" "dbaas")
+    
+    for component in "${COMPONENTS[@]}"; do
+        echo -n "  $component: "
+        if kubectl get pods -n "$NAMESPACE" -l app="$component" --no-headers | grep -q Running; then
+            echo "✓ Running"
+        else
+            echo "✗ Not running"
+            exit 1
+        fi
+    done
+    echo
+    
+    # Test 2: Service Endpoints
+    echo "2. Checking service endpoints..."
+    SERVICES=("e2mgr" "submgr" "a1mediator" "o1mediator")
+    
+    for service in "${SERVICES[@]}"; do
+        echo -n "  $service health endpoint: "
+        if kubectl exec -n "$NAMESPACE" deployment/"$service" -- \
+           curl -sf localhost:8080/health >/dev/null 2>&1; then
+            echo "✓ Healthy"
+        else
+            echo "✗ Unhealthy"
+            exit 1
+        fi
+    done
+    echo
+    
+    # Test 3: Database Connectivity
+    echo "3. Checking database connectivity..."
+    echo -n "  Redis ping: "
+    if kubectl exec -n "$NAMESPACE" deployment/dbaas -- redis-cli ping | grep -q PONG; then
+        echo "✓ Connected"
+    else
+        echo "✗ Connection failed"
+        exit 1
+    fi
+    echo
+    
+    # Test 4: Inter-component Communication
+    echo "4. Checking inter-component communication..."
+    echo -n "  E2MGR -> SubMgr: "
+    if kubectl exec -n "$NAMESPACE" deployment/e2mgr -- \
+       nc -z submgr.${NAMESPACE}.svc.cluster.local 8080; then
+        echo "✓ Connected"
+    else
+        echo "✗ Connection failed"
+        exit 1
+    fi
+    
+    echo -n "  SubMgr -> E2Term: "
+    if kubectl exec -n "$NAMESPACE" deployment/submgr -- \
+       nc -z e2term.${NAMESPACE}.svc.cluster.local 8080; then
+        echo "✓ Connected"
+    else
+        echo "✗ Connection failed"
+        exit 1
+    fi
+    echo
+    
+    # Test 5: API Endpoints
+    echo "5. Checking API endpoints..."
+    
+    # A1 API
+    echo -n "  A1 API: "
+    if kubectl exec -n "$NAMESPACE" deployment/a1mediator -- \
+       curl -sf localhost:8080/a1-p/healthcheck >/dev/null 2>&1; then
+        echo "✓ Available"
+    else
+        echo "✗ Not available"
+        exit 1
+    fi
+    
+    # Dashboard API
+    if kubectl get deployment dashboard -n "$NAMESPACE" >/dev/null 2>&1; then
+        echo -n "  Dashboard API: "
+        if kubectl exec -n "$NAMESPACE" deployment/dashboard -- \
+           curl -sf localhost:8080/health >/dev/null 2>&1; then
+            echo "✓ Available"
+        else
+            echo "✗ Not available"
+            exit 1
+        fi
+    fi
+    echo
+    
+    # Test 6: Metrics Collection
+    echo "6. Checking metrics collection..."
+    METRIC_SERVICES=("e2mgr" "submgr" "a1mediator")
+    
+    for service in "${METRIC_SERVICES[@]}"; do
+        echo -n "  $service metrics: "
+        if kubectl exec -n "$NAMESPACE" deployment/"$service" -- \
+           curl -sf localhost:9090/metrics | head -1 >/dev/null 2>&1; then
+            echo "✓ Available"
+        else
+            echo "✗ Not available"
+            exit 1
+        fi
+    done
+    echo
+    
+    echo "=== All Smoke Tests Passed ✓ ==="
+  
+  integration-tests.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    NAMESPACE="{{ .Values.namespace }}"
+    
+    echo "=== O-RAN RIC Integration Tests ==="
+    echo "Timestamp: $(date)"
+    echo
+    
+    # Test 1: E2 Node Registration Simulation
+    echo "1. Testing E2 node registration simulation..."
+    
+    # Create test E2 node data
+    TEST_NODE_DATA='{
+        "globalE2NodeId": {
+            "plmnId": "001001",
+            "nodeId": "test-node-001"
+        },
+        "ranFunctions": [
+            {
+                "ranFunctionId": 1,
+                "ranFunctionDefinition": "test-function",
+                "ranFunctionRevision": 1
+            }
+        ]
+    }'
+    
+    # Simulate E2 setup request
+    echo -n "  E2 setup simulation: "
+    if kubectl exec -n "$NAMESPACE" deployment/e2mgr -- \
+       curl -sf -X POST localhost:3800/v1/nodeb/test-node-001 \
+       -H "Content-Type: application/json" \
+       -d "$TEST_NODE_DATA" >/dev/null 2>&1; then
+        echo "✓ Success"
+    else
+        echo "✗ Failed"
+        exit 1
+    fi
+    echo
+    
+    # Test 2: Subscription Creation
+    echo "2. Testing subscription creation..."
+    
+    SUBSCRIPTION_DATA='{
+        "e2NodeId": "test-node-001",
+        "ranFunctionId": 1,
+        "eventTrigger": {
+            "type": "periodic",
+            "period": "1000ms"
+        },
+        "actions": [
+            {
+                "id": 1,
+                "type": "report"
+            }
+        ]
+    }'
+    
+    echo -n "  Subscription creation: "
+    if kubectl exec -n "$NAMESPACE" deployment/submgr -- \
+       curl -sf -X POST localhost:8080/ric/v1/subscriptions \
+       -H "Content-Type: application/json" \
+       -d "$SUBSCRIPTION_DATA" >/dev/null 2>&1; then
+        echo "✓ Success"
+    else
+        echo "✗ Failed"
+        exit 1
+    fi
+    echo
+    
+    # Test 3: Policy Management
+    echo "3. Testing policy management..."
+    
+    # Create policy type
+    POLICY_TYPE_DATA='{
+        "name": "Test Policy Type",
+        "description": "Test policy for integration testing",
+        "policy_type_schema": {
+            "type": "object",
+            "properties": {
+                "priority": {"type": "integer"},
+                "threshold": {"type": "number"}
+            }
+        }
+    }'
+    
+    echo -n "  Policy type creation: "
+    if kubectl exec -n "$NAMESPACE" deployment/a1mediator -- \
+       curl -sf -X POST localhost:8080/a1-p/policytypes/1001 \
+       -H "Content-Type: application/json" \
+       -d "$POLICY_TYPE_DATA" >/dev/null 2>&1; then
+        echo "✓ Success"
+    else
+        echo "✗ Failed"
+        exit 1
+    fi
+    
+    # Create policy instance
+    POLICY_INSTANCE_DATA='{
+        "priority": 10,
+        "threshold": 0.8
+    }'
+    
+    echo -n "  Policy instance creation: "
+    if kubectl exec -n "$NAMESPACE" deployment/a1mediator -- \
+       curl -sf -X PUT localhost:8080/a1-p/policytypes/1001/policies/test-policy-1 \
+       -H "Content-Type: application/json" \
+       -d "$POLICY_INSTANCE_DATA" >/dev/null 2>&1; then
+        echo "✓ Success"
+    else
+        echo "✗ Failed"
+        exit 1
+    fi
+    echo
+    
+    # Test 4: Database Operations
+    echo "4. Testing database operations..."
+    
+    echo -n "  Database write: "
+    if kubectl exec -n "$NAMESPACE" deployment/dbaas -- \
+       redis-cli set test-key "test-value" | grep -q OK; then
+        echo "✓ Success"
+    else
+        echo "✗ Failed"
+        exit 1
+    fi
+    
+    echo -n "  Database read: "
+    if kubectl exec -n "$NAMESPACE" deployment/dbaas -- \
+       redis-cli get test-key | grep -q "test-value"; then
+        echo "✓ Success"
+    else
+        echo "✗ Failed"
+        exit 1
+    fi
+    
+    echo -n "  Database cleanup: "
+    if kubectl exec -n "$NAMESPACE" deployment/dbaas -- \
+       redis-cli del test-key | grep -q 1; then
+        echo "✓ Success"
+    else
+        echo "✗ Failed"
+        exit 1
+    fi
+    echo
+    
+    # Test 5: Load Testing
+    echo "5. Running basic load test..."
+    
+    echo -n "  Health endpoint load (100 requests): "
+    if kubectl exec -n "$NAMESPACE" deployment/e2mgr -- \
+       sh -c 'for i in $(seq 1 100); do curl -sf localhost:8080/health >/dev/null || exit 1; done'; then
+        echo "✓ Success"
+    else
+        echo "✗ Failed"
+        exit 1
+    fi
+    echo
+    
+    echo "=== All Integration Tests Passed ✓ ==="
+  
+  performance-tests.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    NAMESPACE="{{ .Values.namespace }}"
+    
+    echo "=== O-RAN RIC Performance Tests ==="
+    echo "Timestamp: $(date)"
+    echo
+    
+    # Test 1: Response Time Test
+    echo "1. Testing API response times..."
+    
+    ENDPOINTS=("e2mgr:8080/health" "submgr:8080/health" "a1mediator:8080/a1-p/healthcheck")
+    
+    for endpoint in "${ENDPOINTS[@]}"; do
+        service=$(echo "$endpoint" | cut -d: -f1)
+        path=$(echo "$endpoint" | cut -d: -f2-)
+        
+        echo -n "  $service response time: "
+        
+        # Measure response time (5 requests)
+        total_time=0
+        for i in {1..5}; do
+            start_time=$(date +%s%N)
+            kubectl exec -n "$NAMESPACE" deployment/"$service" -- \
+                curl -sf localhost:"$path" >/dev/null 2>&1
+            end_time=$(date +%s%N)
+            request_time=$(( (end_time - start_time) / 1000000 ))  # Convert to milliseconds
+            total_time=$((total_time + request_time))
+        done
+        
+        avg_time=$((total_time / 5))
+        
+        if [ "$avg_time" -lt 100 ]; then
+            echo "✓ ${avg_time}ms (Good)"
+        elif [ "$avg_time" -lt 500 ]; then
+            echo "⚠ ${avg_time}ms (Acceptable)"
+        else
+            echo "✗ ${avg_time}ms (Too slow)"
+            exit 1
+        fi
+    done
+    echo
+    
+    # Test 2: Throughput Test
+    echo "2. Testing API throughput..."
+    
+    echo -n "  E2MGR concurrent requests (50 requests, 10 concurrent): "
+    start_time=$(date +%s)
+    kubectl exec -n "$NAMESPACE" deployment/e2mgr -- \
+        sh -c 'for i in $(seq 1 10); do (for j in $(seq 1 5); do curl -sf localhost:8080/health >/dev/null; done) & done; wait'
+    end_time=$(date +%s)
+    duration=$((end_time - start_time))
+    
+    if [ "$duration" -lt 5 ]; then
+        echo "✓ ${duration}s (Good)"
+    elif [ "$duration" -lt 10 ]; then
+        echo "⚠ ${duration}s (Acceptable)"
+    else
+        echo "✗ ${duration}s (Too slow)"
+        exit 1
+    fi
+    echo
+    
+    # Test 3: Memory Usage Test
+    echo "3. Checking memory usage..."
+    
+    COMPONENTS=("e2mgr" "submgr" "a1mediator" "dbaas")
+    
+    for component in "${COMPONENTS[@]}"; do
+        echo -n "  $component memory usage: "
+        
+        # Get memory usage (requires metrics-server)
+        memory_usage=$(kubectl top pod -n "$NAMESPACE" -l app="$component" --no-headers 2>/dev/null | \
+            awk '{print $3}' | sed 's/Mi//' || echo "0")
+        
+        if [ "$memory_usage" -lt 500 ]; then
+            echo "✓ ${memory_usage}Mi (Good)"
+        elif [ "$memory_usage" -lt 1000 ]; then
+            echo "⚠ ${memory_usage}Mi (Acceptable)"
+        else
+            echo "✗ ${memory_usage}Mi (High)"
+            exit 1
+        fi
+    done
+    echo
+    
+    # Test 4: Database Performance
+    echo "4. Testing database performance..."
+    
+    echo -n "  Redis operations (1000 SET/GET operations): "
+    start_time=$(date +%s)
+    kubectl exec -n "$NAMESPACE" deployment/dbaas -- \
+        sh -c 'for i in $(seq 1 1000); do redis-cli set perf-test-$i "value-$i" >/dev/null; redis-cli get perf-test-$i >/dev/null; done'
+    end_time=$(date +%s)
+    duration=$((end_time - start_time))
+    
+    if [ "$duration" -lt 10 ]; then
+        echo "✓ ${duration}s (Good)"
+    elif [ "$duration" -lt 30 ]; then
+        echo "⚠ ${duration}s (Acceptable)"
+    else
+        echo "✗ ${duration}s (Too slow)"
+        exit 1
+    fi
+    
+    # Cleanup test data
+    kubectl exec -n "$NAMESPACE" deployment/dbaas -- \
+        redis-cli eval "for i=1,1000 do redis.call('del', 'perf-test-'..i) end" 0 >/dev/null
+    echo
+    
+    echo "=== All Performance Tests Passed ✓ ==="
+  
+  security-tests.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    NAMESPACE="{{ .Values.namespace }}"
+    
+    echo "=== O-RAN RIC Security Tests ==="
+    echo "Timestamp: $(date)"
+    echo
+    
+    # Test 1: Pod Security Context
+    echo "1. Checking pod security contexts..."
+    
+    COMPONENTS=("e2mgr" "submgr" "a1mediator" "o1mediator")
+    
+    for component in "${COMPONENTS[@]}"; do
+        echo -n "  $component security context: "
+        
+        # Check if running as non-root
+        run_as_user=$(kubectl get pod -n "$NAMESPACE" -l app="$component" -o jsonpath='{.items[0].spec.securityContext.runAsUser}' 2>/dev/null || echo "")
+        
+        if [ "$run_as_user" != "0" ] && [ -n "$run_as_user" ]; then
+            echo "✓ Non-root user ($run_as_user)"
+        else
+            echo "✗ Running as root or not specified"
+            exit 1
+        fi
+    done
+    echo
+    
+    # Test 2: Network Policies
+    echo "2. Checking network policies..."
+    
+    echo -n "  Network policy existence: "
+    if kubectl get networkpolicy -n "$NAMESPACE" --no-headers | wc -l | grep -q -v "^0$"; then
+        echo "✓ Network policies configured"
+    else
+        echo "✗ No network policies found"
+        exit 1
+    fi
+    echo
+    
+    # Test 3: TLS Configuration
+    echo "3. Checking TLS configuration..."
+    
+    echo -n "  TLS secrets: "
+    tls_secrets=$(kubectl get secrets -n "$NAMESPACE" -o json | \
+        jq '[.items[] | select(.type=="kubernetes.io/tls")] | length')
+    
+    if [ "$tls_secrets" -gt 0 ]; then
+        echo "✓ $tls_secrets TLS secrets found"
+    else
+        echo "✗ No TLS secrets found"
+        exit 1
+    fi
+    echo
+    
+    # Test 4: RBAC Configuration
+    echo "4. Checking RBAC configuration..."
+    
+    echo -n "  Service accounts: "
+    sa_count=$(kubectl get serviceaccounts -n "$NAMESPACE" --no-headers | grep -v default | wc -l)
+    
+    if [ "$sa_count" -gt 0 ]; then
+        echo "✓ $sa_count custom service accounts"
+    else
+        echo "✗ No custom service accounts found"
+        exit 1
+    fi
+    
+    echo -n "  Role bindings: "
+    rb_count=$(kubectl get rolebindings -n "$NAMESPACE" --no-headers | wc -l)
+    
+    if [ "$rb_count" -gt 0 ]; then
+        echo "✓ $rb_count role bindings"
+    else
+        echo "✗ No role bindings found"
+        exit 1
+    fi
+    echo
+    
+    # Test 5: Resource Limits
+    echo "5. Checking resource limits..."
+    
+    for component in "${COMPONENTS[@]}"; do
+        echo -n "  $component resource limits: "
+        
+        cpu_limit=$(kubectl get pod -n "$NAMESPACE" -l app="$component" -o jsonpath='{.items[0].spec.containers[0].resources.limits.cpu}' 2>/dev/null || echo "")
+        memory_limit=$(kubectl get pod -n "$NAMESPACE" -l app="$component" -o jsonpath='{.items[0].spec.containers[0].resources.limits.memory}' 2>/dev/null || echo "")
+        
+        if [ -n "$cpu_limit" ] && [ -n "$memory_limit" ]; then
+            echo "✓ CPU: $cpu_limit, Memory: $memory_limit"
+        else
+            echo "✗ Resource limits not configured"
+            exit 1
+        fi
+    done
+    echo
+    
+    echo "=== All Security Tests Passed ✓ ==="
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: deployment-validation-{{ randAlphaNum 5 | lower }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: validation
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "oran-sc-platform.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: validation
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: validation
+        image: "{{ .Values.validation.image.repository }}:{{ .Values.validation.image.tag | default "latest" }}"
+        imagePullPolicy: {{ .Values.validation.image.pullPolicy | default "IfNotPresent" }}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Starting deployment validation..."
+          
+          # Wait for all pods to be ready
+          echo "Waiting for pods to be ready..."
+          kubectl wait --for=condition=ready pods --all -n {{ .Values.namespace }} --timeout=600s
+          
+          # Run smoke tests
+          echo "Running smoke tests..."
+          /scripts/smoke-tests.sh
+          
+          # Run integration tests if enabled
+          {{- if .Values.validation.integrationTests }}
+          echo "Running integration tests..."
+          /scripts/integration-tests.sh
+          {{- end }}
+          
+          # Run performance tests if enabled
+          {{- if .Values.validation.performanceTests }}
+          echo "Running performance tests..."
+          /scripts/performance-tests.sh
+          {{- end }}
+          
+          # Run security tests if enabled
+          {{- if .Values.validation.securityTests }}
+          echo "Running security tests..."
+          /scripts/security-tests.sh
+          {{- end }}
+          
+          echo "All validation tests completed successfully!"
+        env:
+        - name: NAMESPACE
+          value: {{ .Values.namespace }}
+        volumeMounts:
+        - name: validation-scripts
+          mountPath: /scripts
+          readOnly: true
+        resources:
+          limits:
+            cpu: {{ .Values.validation.resources.limits.cpu | default "500m" }}
+            memory: {{ .Values.validation.resources.limits.memory | default "1Gi" }}
+          requests:
+            cpu: {{ .Values.validation.resources.requests.cpu | default "100m" }}
+            memory: {{ .Values.validation.resources.requests.memory | default "256Mi" }}
+      volumes:
+      - name: validation-scripts
+        configMap:
+          name: validation-scripts
+          defaultMode: 0755
+
+{{- end }}

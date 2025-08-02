@@ -1,0 +1,381 @@
+{{- if .Values.observability.prometheus.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: prometheus
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: {{ .Values.observability.prometheus.scrapeInterval }}
+      evaluation_interval: {{ .Values.observability.prometheus.evaluationInterval }}
+      external_labels:
+        cluster: 'oran-sc-platform'
+        replica: '{{ .Values.observability.prometheus.replicaCount | default 1 }}'
+
+    rule_files:
+      - "/etc/prometheus/rules/*.yml"
+
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets:
+              - alertmanager:9093
+
+    scrape_configs:
+      # O-RAN SC Platform Components
+      - job_name: 'e2term'
+        static_configs:
+          - targets: ['e2term:{{ .Values.e2term.service.ports.prometheus }}']
+        metrics_path: /metrics
+        scrape_interval: 15s
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: component
+            replacement: e2term
+          - source_labels: [__address__]
+            target_label: interface
+            replacement: E2
+
+      - job_name: 'e2mgr'
+        static_configs:
+          - targets: ['e2mgr:{{ .Values.e2mgr.service.ports.http }}']
+        metrics_path: /metrics
+        scrape_interval: 15s
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: component
+            replacement: e2mgr
+
+      - job_name: 'submgr'
+        static_configs:
+          - targets: ['submgr:{{ .Values.submgr.service.ports.http }}']
+        metrics_path: /metrics
+        scrape_interval: 15s
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: component
+            replacement: submgr
+
+      - job_name: 'rtmgr'
+        static_configs:
+          - targets: ['rtmgr:{{ .Values.rtmgr.service.ports.http }}']
+        metrics_path: /metrics
+        scrape_interval: 15s
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: component
+            replacement: rtmgr
+
+      - job_name: 'appmgr'
+        static_configs:
+          - targets: ['appmgr:{{ .Values.appmgr.service.ports.http }}']
+        metrics_path: /metrics
+        scrape_interval: 15s
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: component
+            replacement: appmgr
+
+      - job_name: 'a1mediator'
+        static_configs:
+          - targets: ['a1mediator:{{ .Values.a1mediator.service.ports.http }}']
+        metrics_path: /metrics
+        scrape_interval: 15s
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: component
+            replacement: a1mediator
+          - source_labels: [__address__]
+            target_label: interface
+            replacement: A1
+
+      - job_name: 'o1mediator'
+        static_configs:
+          - targets: ['o1mediator:{{ .Values.o1mediator.service.ports.http }}']
+        metrics_path: /metrics
+        scrape_interval: 15s
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: component
+            replacement: o1mediator
+          - source_labels: [__address__]
+            target_label: interface
+            replacement: O1
+
+      - job_name: 'dashboard'
+        static_configs:
+          - targets: ['dashboard:{{ .Values.dashboard.service.ports.http }}']
+        metrics_path: /metrics
+        scrape_interval: 15s
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: component
+            replacement: dashboard
+
+      - job_name: 'dbaas'
+        static_configs:
+          - targets: ['dbaas:{{ .Values.dbaas.service.ports.redis }}']
+        metrics_path: /metrics
+        scrape_interval: 15s
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: component
+            replacement: dbaas
+
+      # System metrics
+      - job_name: 'node-exporter'
+        kubernetes_sd_configs:
+          - role: endpoints
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_endpoints_name]
+            action: keep
+            regex: node-exporter
+          - source_labels: [__meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: metrics
+
+      # Kubernetes API server
+      - job_name: 'kubernetes-apiservers'
+        kubernetes_sd_configs:
+          - role: endpoints
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: default;kubernetes;https
+
+      # Kubernetes pods with prometheus.io/scrape annotation
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+
+  alerting_rules.yml: |
+    groups:
+    {{- if .Values.observability.prometheus.alerting.enabled }}
+    {{- range .Values.observability.prometheus.alerting.rules }}
+      - name: {{ .name }}
+        rules:
+        {{- range .rules }}
+          - alert: {{ .alert }}
+            expr: {{ .expr }}
+            for: {{ .for }}
+            labels:
+              {{- range $key, $value := .labels }}
+              {{ $key }}: {{ $value }}
+              {{- end }}
+            annotations:
+              {{- range $key, $value := .annotations }}
+              {{ $key }}: {{ $value | quote }}
+              {{- end }}
+        {{- end }}
+    {{- end }}
+    {{- end }}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: prometheus
+spec:
+  replicas: {{ .Values.observability.prometheus.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "oran-sc-platform.selectorLabels" . | nindent 6 }}
+      component: prometheus
+  template:
+    metadata:
+      labels:
+        {{- include "oran-sc-platform.selectorLabels" . | nindent 8 }}
+        component: prometheus
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: prometheus
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
+      containers:
+        - name: prometheus
+          image: "{{ .Values.observability.prometheus.image.registry }}/{{ .Values.observability.prometheus.image.name }}:{{ .Values.observability.prometheus.image.tag }}"
+          imagePullPolicy: {{ .Values.global.pullPolicy }}
+          args:
+            - '--config.file=/etc/prometheus/prometheus.yml'
+            - '--storage.tsdb.path=/prometheus/'
+            - '--web.console.libraries=/etc/prometheus/console_libraries'
+            - '--web.console.templates=/etc/prometheus/consoles'
+            - '--storage.tsdb.retention.time={{ .Values.observability.prometheus.retention }}'
+            - '--web.enable-lifecycle'
+            - '--web.enable-admin-api'
+          ports:
+            - name: web
+              containerPort: 9090
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: web
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: web
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 4
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.observability.prometheus.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+            - name: storage
+              mountPath: /prometheus
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-config
+        - name: storage
+          {{- if .Values.observability.prometheus.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: prometheus-storage
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: prometheus
+spec:
+  type: {{ .Values.observability.prometheus.service.type }}
+  ports:
+    - port: {{ .Values.observability.prometheus.service.port }}
+      targetPort: web
+      protocol: TCP
+      name: web
+  selector:
+    {{- include "oran-sc-platform.selectorLabels" . | nindent 4 }}
+    component: prometheus
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: prometheus
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: prometheus
+rules:
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - nodes/proxy
+      - services
+      - endpoints
+      - pods
+    verbs: ["get", "list", "watch"]
+  - apiGroups:
+      - extensions
+    resources:
+      - ingresses
+    verbs: ["get", "list", "watch"]
+  - nonResourceURLs: ["/metrics"]
+    verbs: ["get"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: {{ .Values.global.namespace }}
+
+{{- if .Values.observability.prometheus.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-storage
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: prometheus
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.observability.prometheus.persistence.size }}
+  {{- if .Values.observability.prometheus.persistence.storageClass }}
+  storageClassName: {{ .Values.observability.prometheus.persistence.storageClass }}
+  {{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,288 @@
+{{- if .Values.observability.grafana.enabled }}
+{{- if .Values.observability.grafana.dashboards.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: a1-interface-dashboard
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: grafana
+    dashboard: a1
+data:
+  a1-interface.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "A1 Interface Monitoring",
+        "tags": ["oran-sc", "a1", "interface"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Policy Types",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "a1_policy_types_total",
+                "legendFormat": "Policy Types"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": 0}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Policy Instances",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "a1_policy_instances_total",
+                "legendFormat": "Policy Instances"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "A1 Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(a1_policy_requests_total[5m])",
+                "legendFormat": "{{operation}} - {{status}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "id": 4,
+            "title": "Policy Processing Latency",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, rate(a1_policy_processing_duration_seconds_bucket[5m]))",
+                "legendFormat": "95th percentile"
+              },
+              {
+                "expr": "histogram_quantile(0.50, rate(a1_policy_processing_duration_seconds_bucket[5m]))",
+                "legendFormat": "50th percentile"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 5,
+            "title": "Policy Success Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(a1_policy_requests_total{status=\"success\"}[5m]) / rate(a1_policy_requests_total[5m])",
+                "legendFormat": "Success Rate"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "15s"
+      }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: o1-interface-dashboard
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: grafana
+    dashboard: o1
+data:
+  o1-interface.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "O1 Interface Monitoring",
+        "tags": ["oran-sc", "o1", "interface"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Active NETCONF Sessions",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "o1_netconf_sessions_active",
+                "legendFormat": "NETCONF Sessions"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "green", "value": 1}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Configuration Operations Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(o1_config_operations_total[5m])",
+                "legendFormat": "{{operation}} - {{status}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 6, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Alarm Events Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(o1_alarm_events_total[5m])",
+                "legendFormat": "{{severity}} alarms"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "O1 Operation Latency",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, rate(o1_operation_processing_duration_seconds_bucket[5m]))",
+                "legendFormat": "95th percentile"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "15s"
+      }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: xapp-dashboard
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: grafana
+    dashboard: xapp
+data:
+  xapp-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "xApp Monitoring",
+        "tags": ["oran-sc", "xapp"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Deployed xApps",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "count(up{job=~\"xapp-.*\"})",
+                "legendFormat": "Deployed xApps"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "xApp Health Status",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "up{job=~\"xapp-.*\"}",
+                "legendFormat": "{{job}}"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "green", "value": 1}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 6, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "xApp Memory Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "process_resident_memory_bytes{job=~\"xapp-.*\"}",
+                "legendFormat": "{{job}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "xApp CPU Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(process_cpu_seconds_total{job=~\"xapp-.*\"}[5m])",
+                "legendFormat": "{{job}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }
+{{- end }}
+{{- end }}

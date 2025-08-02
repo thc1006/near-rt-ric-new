@@ -1,0 +1,208 @@
+{{- if .Values.dashboard.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-dashboard-api
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: dashboard-api
+spec:
+  replicas: {{ .Values.dashboard.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "oran-sc-platform.selectorLabels" . | nindent 6 }}
+      component: dashboard-api
+  template:
+    metadata:
+      labels:
+        {{- include "oran-sc-platform.selectorLabels" . | nindent 8 }}
+        component: dashboard-api
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- if .Values.tls.enabled }}
+        checksum/tls-config: {{ include (print $.Template.BasePath "/tls-config.yaml") . | sha256sum }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "oran-sc-platform.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.dashboard.podSecurityContext | nindent 8 }}
+      containers:
+      - name: dashboard-api
+        image: "{{ .Values.dashboard.image.registry }}/{{ .Values.dashboard.image.name }}:{{ .Values.dashboard.image.tag }}"
+        imagePullPolicy: {{ .Values.global.pullPolicy }}
+        securityContext:
+          {{- toYaml .Values.dashboard.securityContext | nindent 10 }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.dashboard.service.ports.http | default 8080 }}
+          protocol: TCP
+        {{- if .Values.tls.enabled }}
+        - name: https
+          containerPort: {{ .Values.dashboard.service.ports.https | default 8443 }}
+          protocol: TCP
+        {{- end }}
+        env:
+        - name: PORT
+          value: "{{ .Values.dashboard.service.ports.http | default 8080 }}"
+        {{- if .Values.tls.enabled }}
+        - name: TLS_PORT
+          value: "{{ .Values.dashboard.service.ports.https | default 8443 }}"
+        - name: TLS_ENABLED
+          value: "true"
+        {{- end }}
+        - name: E2MGR_ENDPOINT
+          value: "{{ include "oran-sc-platform.fullname" . }}-e2mgr:{{ .Values.e2mgr.service.ports.grpc }}"
+        - name: SUBMGR_ENDPOINT
+          value: "{{ include "oran-sc-platform.fullname" . }}-submgr:{{ .Values.submgr.service.ports.grpc }}"
+        - name: E2TERM_ENDPOINT
+          value: "{{ include "oran-sc-platform.fullname" . }}-e2term:{{ .Values.e2term.service.ports.grpc }}"
+        - name: A1MEDIATOR_ENDPOINT
+          value: "{{ include "oran-sc-platform.fullname" . }}-a1mediator:{{ .Values.a1mediator.service.ports.http }}"
+        - name: O1MEDIATOR_ENDPOINT
+          value: "{{ include "oran-sc-platform.fullname" . }}-o1mediator:{{ .Values.o1mediator.service.ports.http }}"
+        - name: DBAAS_ENDPOINT
+          value: "{{ include "oran-sc-platform.fullname" . }}-dbaas:{{ .Values.dbaas.service.ports.redis }}"
+        - name: RTMGR_ENDPOINT
+          value: "{{ include "oran-sc-platform.fullname" . }}-rtmgr:{{ .Values.rtmgr.service.ports.grpc }}"
+        - name: APPMGR_ENDPOINT
+          value: "{{ include "oran-sc-platform.fullname" . }}-appmgr:{{ .Values.appmgr.service.ports.http }}"
+        {{- if .Values.dashboard.extraEnv }}
+        {{- toYaml .Values.dashboard.extraEnv | nindent 8 }}
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+            {{- if .Values.tls.enabled }}
+            scheme: HTTPS
+            {{- end }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+            {{- if .Values.tls.enabled }}
+            scheme: HTTPS
+            {{- end }}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          {{- toYaml .Values.dashboard.resources | nindent 10 }}
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        {{- if .Values.tls.enabled }}
+        - name: tls-config
+          mountPath: /etc/tls-config
+          readOnly: true
+        - name: tls-certs
+          mountPath: /etc/certs
+          readOnly: true
+        {{- end }}
+        {{- if .Values.dashboard.extraVolumeMounts }}
+        {{- toYaml .Values.dashboard.extraVolumeMounts | nindent 8 }}
+        {{- end }}
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "oran-sc-platform.fullname" . }}-config
+      {{- if .Values.tls.enabled }}
+      - name: tls-config
+        configMap:
+          name: {{ include "oran-sc-platform.fullname" . }}-tls-config
+      - name: tls-certs
+        secret:
+          secretName: {{ include "oran-sc-platform.fullname" . }}-tls-certs
+          defaultMode: 0600
+      {{- end }}
+      {{- if .Values.dashboard.extraVolumes }}
+      {{- toYaml .Values.dashboard.extraVolumes | nindent 6 }}
+      {{- end }}
+      {{- with .Values.dashboard.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.dashboard.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.dashboard.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-dashboard-api
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: dashboard-api
+spec:
+  type: {{ .Values.dashboard.service.type }}
+  ports:
+  - port: {{ .Values.dashboard.service.ports.http | default 8080 }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  {{- if .Values.tls.enabled }}
+  - port: {{ .Values.dashboard.service.ports.https | default 8443 }}
+    targetPort: https
+    protocol: TCP
+    name: https
+  {{- end }}
+  selector:
+    {{- include "oran-sc-platform.selectorLabels" . | nindent 4 }}
+    component: dashboard-api
+{{- if and .Values.dashboard.ingress.enabled .Values.tls.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-dashboard-tls
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: dashboard-api
+  {{- with .Values.dashboard.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+  {{- end }}
+spec:
+  {{- if .Values.dashboard.ingress.tls }}
+  tls:
+    {{- range .Values.dashboard.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.dashboard.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "oran-sc-platform.fullname" $ }}-dashboard-api
+                port:
+                  number: {{ $.Values.dashboard.service.ports.https | default 8443 }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
@@ -27,6 +28,7 @@ type ClientManager struct {
 	e2tConn        *grpc.ClientConn
 	httpClient     *http.Client
 	config         *Config
+	tlsConfig      *tls.Config
 	
 	// High-level client interfaces
 	e2ManagerClient       *E2ManagerClient
@@ -73,6 +75,18 @@ func NewClientManager(config *Config) (*ClientManager, error) {
 	cm.initializeHighLevelClients()
 
 	return cm, nil
+}
+
+// SetTLSConfig sets the TLS configuration for gRPC connections
+func (cm *ClientManager) SetTLSConfig(tlsConfig *tls.Config) {
+	cm.tlsConfig = tlsConfig
+	
+	// Update HTTP client to use TLS config
+	if tlsConfig != nil {
+		cm.httpClient.Transport = &http.Transport{
+			TLSClientConfig: tlsConfig,
+		}
+	}
 }
 
 // StartSCTPManager starts the SCTP connection manager
@@ -168,14 +182,20 @@ func (cm *ClientManager) createGRPCConnection(endpoint string) (*grpc.ClientConn
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	// Try secure connection first, fallback to insecure
 	opts := []grpc.DialOption{
 		grpc.WithBlock(),
 	}
 
-	// For development, use insecure connections
-	// In production, this should use proper TLS credentials
-	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// Try to use TLS credentials if available
+	if cm.tlsConfig != nil {
+		creds := credentials.NewTLS(cm.tlsConfig)
+		opts = append(opts, grpc.WithTransportCredentials(creds))
+		log.Printf("Using TLS credentials for gRPC connection to %s", endpoint)
+	} else {
+		// Fallback to insecure for development
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		log.Printf("Warning: Using insecure connection to %s", endpoint)
+	}
 
 	conn, err := grpc.DialContext(ctx, endpoint, opts...)
 	if err != nil {

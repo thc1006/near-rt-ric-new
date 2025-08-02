@@ -1,0 +1,427 @@
+{{- if .Values.blueGreen.enabled }}
+{{- $components := list "e2term" "e2mgr" "submgr" "a1mediator" "o1mediator" }}
+{{- range $component := $components }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ $component }}-rollout
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" $ }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/component: {{ $component }}
+    app.kubernetes.io/part-of: oran-ric
+spec:
+  replicas: {{ index $.Values $component "replicaCount" | default 2 }}
+  strategy:
+    blueGreen:
+      activeService: {{ $component }}-active
+      previewService: {{ $component }}-preview
+      autoPromotionEnabled: {{ $.Values.blueGreen.autoPromotion | default false }}
+      scaleDownDelaySeconds: {{ $.Values.blueGreen.scaleDownDelay | default 30 }}
+      prePromotionAnalysis:
+        templates:
+        - templateName: {{ $component }}-analysis
+        args:
+        - name: service-name
+          value: {{ $component }}-preview
+      postPromotionAnalysis:
+        templates:
+        - templateName: {{ $component }}-analysis
+        args:
+        - name: service-name
+          value: {{ $component }}-active
+  selector:
+    matchLabels:
+      app: {{ $component }}
+      app.kubernetes.io/part-of: oran-ric
+  template:
+    metadata:
+      labels:
+        app: {{ $component }}
+        app.kubernetes.io/name: {{ include "oran-sc-platform.name" $ }}
+        app.kubernetes.io/instance: {{ $.Release.Name }}
+        app.kubernetes.io/component: {{ $component }}
+        app.kubernetes.io/part-of: oran-ric
+        version: {{ $.Chart.AppVersion | quote }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: {{ $component }}-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: {{ $component }}
+        image: "{{ index $.Values $component "image" "repository" }}:{{ index $.Values $component "image" "tag" | default $.Chart.AppVersion }}"
+        imagePullPolicy: {{ index $.Values $component "image" "pullPolicy" | default "IfNotPresent" }}
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        {{- if eq $component "e2term" }}
+        - name: e2ap
+          containerPort: 36422
+          protocol: SCTP
+        {{- end }}
+        env:
+        - name: COMPONENT_NAME
+          value: {{ $component }}
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: DEPLOYMENT_TYPE
+          value: "blue-green"
+        envFrom:
+        - configMapRef:
+            name: {{ $component }}-config
+        - secretRef:
+            name: {{ $component }}-secret
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: {{ $.Values.blueGreen.probes.liveness.initialDelaySeconds | default 30 }}
+          periodSeconds: {{ $.Values.blueGreen.probes.liveness.periodSeconds | default 10 }}
+          timeoutSeconds: {{ $.Values.blueGreen.probes.liveness.timeoutSeconds | default 5 }}
+          failureThreshold: {{ $.Values.blueGreen.probes.liveness.failureThreshold | default 3 }}
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: {{ $.Values.blueGreen.probes.readiness.initialDelaySeconds | default 10 }}
+          periodSeconds: {{ $.Values.blueGreen.probes.readiness.periodSeconds | default 5 }}
+          timeoutSeconds: {{ $.Values.blueGreen.probes.readiness.timeoutSeconds | default 3 }}
+          failureThreshold: {{ $.Values.blueGreen.probes.readiness.failureThreshold | default 3 }}
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: {{ $.Values.blueGreen.probes.startup.initialDelaySeconds | default 10 }}
+          periodSeconds: {{ $.Values.blueGreen.probes.startup.periodSeconds | default 10 }}
+          timeoutSeconds: {{ $.Values.blueGreen.probes.startup.timeoutSeconds | default 5 }}
+          failureThreshold: {{ $.Values.blueGreen.probes.startup.failureThreshold | default 30 }}
+        resources:
+          limits:
+            cpu: {{ index $.Values $component "resources" "limits" "cpu" | default "2000m" }}
+            memory: {{ index $.Values $component "resources" "limits" "memory" | default "4Gi" }}
+          requests:
+            cpu: {{ index $.Values $component "resources" "requests" "cpu" | default "500m" }}
+            memory: {{ index $.Values $component "resources" "requests" "memory" | default "1Gi" }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          capabilities:
+            drop:
+            - ALL
+            {{- if eq $component "e2term" }}
+            add:
+            - NET_BIND_SERVICE
+            {{- end }}
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        - name: secrets
+          mountPath: /etc/secrets
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        - name: var-log
+          mountPath: /var/log
+        {{- if $.Values.production.enabled }}
+        - name: production-config
+          mountPath: /etc/production
+          readOnly: true
+        {{- end }}
+      volumes:
+      - name: config
+        configMap:
+          name: {{ $component }}-config
+      - name: secrets
+        secret:
+          secretName: {{ $component }}-secret
+      - name: tmp
+        emptyDir: {}
+      - name: var-log
+        emptyDir: {}
+      {{- if $.Values.production.enabled }}
+      - name: production-config
+        configMap:
+          name: production-config
+      {{- end }}
+      nodeSelector:
+        {{- toYaml (index $.Values $component "nodeSelector" | default $.Values.nodeSelector) | nindent 8 }}
+      tolerations:
+        {{- toYaml (index $.Values $component "tolerations" | default $.Values.tolerations) | nindent 8 }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - {{ $component }}
+              topologyKey: kubernetes.io/hostname
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $component }}-active
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" $ }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/component: {{ $component }}
+    app.kubernetes.io/part-of: oran-ric
+    service-type: active
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: http
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: metrics
+    protocol: TCP
+    name: metrics
+  {{- if eq $component "e2term" }}
+  - port: 36422
+    targetPort: e2ap
+    protocol: SCTP
+    name: e2ap
+  {{- end }}
+  selector:
+    app: {{ $component }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $component }}-preview
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" $ }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/component: {{ $component }}
+    app.kubernetes.io/part-of: oran-ric
+    service-type: preview
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: http
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: metrics
+    protocol: TCP
+    name: metrics
+  {{- if eq $component "e2term" }}
+  - port: 36422
+    targetPort: e2ap
+    protocol: SCTP
+    name: e2ap
+  {{- end }}
+  selector:
+    app: {{ $component }}
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: {{ $component }}-analysis
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" $ }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/component: {{ $component }}
+spec:
+  args:
+  - name: service-name
+  metrics:
+  - name: success-rate
+    interval: {{ $.Values.blueGreen.analysis.interval | default "30s" }}
+    count: {{ $.Values.blueGreen.analysis.count | default 5 }}
+    successCondition: result[0] >= {{ $.Values.blueGreen.analysis.successRate | default 0.95 }}
+    failureLimit: {{ $.Values.blueGreen.analysis.failureLimit | default 3 }}
+    provider:
+      prometheus:
+        address: {{ $.Values.blueGreen.analysis.prometheusAddress | default "http://prometheus:9090" }}
+        query: |
+          sum(rate(http_requests_total{service="{{ "{{" }}args.service-name{{ "}}" }}",code!~"5.."}[2m])) /
+          sum(rate(http_requests_total{service="{{ "{{" }}args.service-name{{ "}}" }}"}[2m]))
+  
+  - name: response-time
+    interval: {{ $.Values.blueGreen.analysis.interval | default "30s" }}
+    count: {{ $.Values.blueGreen.analysis.count | default 5 }}
+    successCondition: result[0] <= {{ $.Values.blueGreen.analysis.maxResponseTime | default 0.5 }}
+    failureLimit: {{ $.Values.blueGreen.analysis.failureLimit | default 3 }}
+    provider:
+      prometheus:
+        address: {{ $.Values.blueGreen.analysis.prometheusAddress | default "http://prometheus:9090" }}
+        query: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{service="{{ "{{" }}args.service-name{{ "}}" }}"}[2m])) by (le)
+          )
+  
+  - name: error-rate
+    interval: {{ $.Values.blueGreen.analysis.interval | default "30s" }}
+    count: {{ $.Values.blueGreen.analysis.count | default 5 }}
+    successCondition: result[0] <= {{ $.Values.blueGreen.analysis.maxErrorRate | default 0.05 }}
+    failureLimit: {{ $.Values.blueGreen.analysis.failureLimit | default 3 }}
+    provider:
+      prometheus:
+        address: {{ $.Values.blueGreen.analysis.prometheusAddress | default "http://prometheus:9090" }}
+        query: |
+          sum(rate(http_requests_total{service="{{ "{{" }}args.service-name{{ "}}" }}",code=~"5.."}[2m])) /
+          sum(rate(http_requests_total{service="{{ "{{" }}args.service-name{{ "}}" }}"}[2m]))
+
+{{- end }}
+{{- end }}
+
+---
+{{- if .Values.blueGreen.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blue-green-scripts
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: blue-green-scripts
+data:
+  promote.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    COMPONENT=${1:-""}
+    NAMESPACE={{ .Values.namespace }}
+    
+    if [ -z "$COMPONENT" ]; then
+        echo "Usage: $0 <component>"
+        echo "Available components: e2term, e2mgr, submgr, a1mediator, o1mediator"
+        exit 1
+    fi
+    
+    echo "Promoting $COMPONENT to active..."
+    
+    # Promote the rollout
+    kubectl argo rollouts promote "$COMPONENT-rollout" -n "$NAMESPACE"
+    
+    # Wait for promotion to complete
+    kubectl argo rollouts status "$COMPONENT-rollout" -n "$NAMESPACE" --timeout=600s
+    
+    echo "Promotion completed for $COMPONENT"
+  
+  abort.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    COMPONENT=${1:-""}
+    NAMESPACE={{ .Values.namespace }}
+    
+    if [ -z "$COMPONENT" ]; then
+        echo "Usage: $0 <component>"
+        exit 1
+    fi
+    
+    echo "Aborting rollout for $COMPONENT..."
+    
+    # Abort the rollout
+    kubectl argo rollouts abort "$COMPONENT-rollout" -n "$NAMESPACE"
+    
+    echo "Rollout aborted for $COMPONENT"
+  
+  status.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    NAMESPACE={{ .Values.namespace }}
+    COMPONENTS=("e2term" "e2mgr" "submgr" "a1mediator" "o1mediator")
+    
+    echo "Blue-Green Deployment Status"
+    echo "============================"
+    
+    for component in "${COMPONENTS[@]}"; do
+        echo
+        echo "Component: $component"
+        echo "-------------------"
+        kubectl argo rollouts status "$component-rollout" -n "$NAMESPACE" || echo "Rollout not found"
+    done
+  
+  validate.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    COMPONENT=${1:-""}
+    SERVICE_TYPE=${2:-"preview"}  # preview or active
+    NAMESPACE={{ .Values.namespace }}
+    
+    if [ -z "$COMPONENT" ]; then
+        echo "Usage: $0 <component> [service_type]"
+        exit 1
+    fi
+    
+    SERVICE_NAME="$COMPONENT-$SERVICE_TYPE"
+    
+    echo "Validating $COMPONENT ($SERVICE_TYPE)..."
+    
+    # Health check
+    if kubectl exec -n "$NAMESPACE" deployment/"$COMPONENT-rollout" -- \
+       curl -sf "http://$SERVICE_NAME:8080/health" >/dev/null 2>&1; then
+        echo "✓ Health check passed"
+    else
+        echo "✗ Health check failed"
+        exit 1
+    fi
+    
+    # Readiness check
+    if kubectl exec -n "$NAMESPACE" deployment/"$COMPONENT-rollout" -- \
+       curl -sf "http://$SERVICE_NAME:8080/ready" >/dev/null 2>&1; then
+        echo "✓ Readiness check passed"
+    else
+        echo "✗ Readiness check failed"
+        exit 1
+    fi
+    
+    # Metrics check
+    if kubectl exec -n "$NAMESPACE" deployment/"$COMPONENT-rollout" -- \
+       curl -sf "http://$SERVICE_NAME:9090/metrics" >/dev/null 2>&1; then
+        echo "✓ Metrics endpoint accessible"
+    else
+        echo "✗ Metrics endpoint not accessible"
+        exit 1
+    fi
+    
+    echo "Validation completed successfully for $COMPONENT ($SERVICE_TYPE)"
+
+{{- end }}

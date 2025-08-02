@@ -1,0 +1,77 @@
+{{- if .Values.tls.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-tls-config
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: tls-config
+data:
+  tls-config.yaml: |
+    certDir: "/etc/certs"
+    caKeyFile: "ca-key.pem"
+    caCertFile: "ca-cert.pem"
+    serverKeyFile: "server-key.pem"
+    serverCertFile: "server-cert.pem"
+    clientKeyFile: "client-key.pem"
+    clientCertFile: "client-cert.pem"
+    keySize: {{ .Values.tls.keySize | default 2048 }}
+    certValidityDays: {{ .Values.tls.certValidityDays | default 365 }}
+    organization: "{{ .Values.tls.organization | default "O-RAN SC" }}"
+    country: "{{ .Values.tls.country | default "US" }}"
+    province: "{{ .Values.tls.province | default "CA" }}"
+    city: "{{ .Values.tls.city | default "San Francisco" }}"
+    autoRotate: {{ .Values.tls.autoRotate | default true }}
+    rotationThreshold: "{{ .Values.tls.rotationThreshold | default "720h" }}"
+---
+{{- if .Values.tls.createCertificates }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-tls-certs
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: tls-certs
+type: Opaque
+data:
+  {{- if .Values.tls.certificates.ca.cert }}
+  ca-cert.pem: {{ .Values.tls.certificates.ca.cert | b64enc }}
+  {{- end }}
+  {{- if .Values.tls.certificates.ca.key }}
+  ca-key.pem: {{ .Values.tls.certificates.ca.key | b64enc }}
+  {{- end }}
+  {{- if .Values.tls.certificates.server.cert }}
+  server-cert.pem: {{ .Values.tls.certificates.server.cert | b64enc }}
+  {{- end }}
+  {{- if .Values.tls.certificates.server.key }}
+  server-key.pem: {{ .Values.tls.certificates.server.key | b64enc }}
+  {{- end }}
+  {{- if .Values.tls.certificates.client.cert }}
+  client-cert.pem: {{ .Values.tls.certificates.client.cert | b64enc }}
+  {{- end }}
+  {{- if .Values.tls.certificates.client.key }}
+  client-key.pem: {{ .Values.tls.certificates.client.key | b64enc }}
+  {{- end }}
+{{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "oran-sc-platform.fullname" . }}-dashboard-tls
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "oran-sc-platform.labels" . | nindent 4 }}
+    component: dashboard-tls
+spec:
+  type: {{ .Values.dashboard.service.type }}
+  ports:
+  - port: {{ .Values.dashboard.service.ports.https | default 8443 }}
+    targetPort: https
+    protocol: TCP
+    name: https
+  selector:
+    {{- include "oran-sc-platform.selectorLabels" . | nindent 4 }}
+    component: dashboard-api
+{{- end }}

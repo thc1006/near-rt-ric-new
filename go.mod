@@ -11,6 +11,13 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/xeipuuv/gojsonschema v1.2.0
 	golang.org/x/crypto v0.21.0
+	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/prometheus/client_golang v1.17.0
+	github.com/google/uuid v1.3.1
+	go.opentelemetry.io/otel v1.19.0
+	go.opentelemetry.io/otel/exporters/jaeger v1.17.0
+	go.opentelemetry.io/otel/sdk v1.19.0
+	go.opentelemetry.io/otel/trace v1.19.0
 )
 
 require (

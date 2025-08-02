@@ -1,0 +1,401 @@
+{{- if .Values.backup.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: backup-sa
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: backup
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backup-role
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: backup
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps", "secrets", "persistentvolumeclaims"]
+  verbs: ["get", "list", "create", "update", "patch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "statefulsets"]
+  verbs: ["get", "list", "create", "update", "patch"]
+- apiGroups: ["extensions", "networking.k8s.io"]
+  resources: ["ingresses", "networkpolicies"]
+  verbs: ["get", "list", "create", "update", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: backup-binding
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: backup
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: backup-role
+subjects:
+- kind: ServiceAccount
+  name: backup-sa
+  namespace: {{ .Values.namespace }}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-scripts
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: backup
+data:
+  backup.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    NAMESPACE="{{ .Values.namespace }}"
+    BACKUP_NAME="backup-$(date +%Y%m%d-%H%M%S)"
+    BACKUP_DIR="/backups/$BACKUP_NAME"
+    S3_BUCKET="{{ .Values.backup.s3Bucket }}"
+    
+    echo "Starting backup: $BACKUP_NAME"
+    mkdir -p "$BACKUP_DIR"
+    
+    # Backup Kubernetes resources
+    echo "Backing up Kubernetes resources..."
+    kubectl get all -n "$NAMESPACE" -o yaml > "$BACKUP_DIR/resources.yaml"
+    kubectl get configmaps -n "$NAMESPACE" -o yaml > "$BACKUP_DIR/configmaps.yaml"
+    kubectl get secrets -n "$NAMESPACE" -o yaml > "$BACKUP_DIR/secrets.yaml"
+    kubectl get pvc -n "$NAMESPACE" -o yaml > "$BACKUP_DIR/pvcs.yaml" 2>/dev/null || true
+    kubectl get ingress -n "$NAMESPACE" -o yaml > "$BACKUP_DIR/ingress.yaml" 2>/dev/null || true
+    kubectl get networkpolicies -n "$NAMESPACE" -o yaml > "$BACKUP_DIR/networkpolicies.yaml" 2>/dev/null || true
+    
+    # Backup Helm releases
+    echo "Backing up Helm releases..."
+    helm list -n "$NAMESPACE" -o yaml > "$BACKUP_DIR/helm-releases.yaml"
+    
+    # Backup database
+    echo "Backing up database..."
+    if kubectl get deployment dbaas -n "$NAMESPACE" >/dev/null 2>&1; then
+        kubectl exec -n "$NAMESPACE" deployment/dbaas -- redis-cli bgsave
+        sleep 10
+        kubectl cp "$NAMESPACE/$(kubectl get pods -n "$NAMESPACE" -l app=dbaas -o jsonpath='{.items[0].metadata.name}'):/data/dump.rdb" "$BACKUP_DIR/redis-dump.rdb" 2>/dev/null || true
+    fi
+    
+    # Create backup metadata
+    cat > "$BACKUP_DIR/metadata.json" << EOF
+    {
+        "backup_name": "$BACKUP_NAME",
+        "timestamp": "$(date -Iseconds)",
+        "namespace": "$NAMESPACE",
+        "kubernetes_version": "$(kubectl version --short --client | grep Client | cut -d' ' -f3)",
+        "helm_version": "$(helm version --short)",
+        "components": $(kubectl get deployments -n "$NAMESPACE" -o json | jq '[.items[].metadata.name]')
+    }
+    EOF
+    
+    # Compress backup
+    echo "Compressing backup..."
+    tar -czf "/backups/$BACKUP_NAME.tar.gz" -C /backups "$BACKUP_NAME"
+    rm -rf "$BACKUP_DIR"
+    
+    # Upload to S3 if configured
+    if [ -n "$S3_BUCKET" ]; then
+        echo "Uploading to S3..."
+        aws s3 cp "/backups/$BACKUP_NAME.tar.gz" "s3://$S3_BUCKET/oran-ric-backups/"
+    fi
+    
+    # Cleanup old local backups (keep last 5)
+    cd /backups
+    ls -t backup-*.tar.gz | tail -n +6 | xargs -r rm -f
+    
+    echo "Backup completed: $BACKUP_NAME"
+  
+  restore.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    BACKUP_NAME=${1:-""}
+    NAMESPACE="{{ .Values.namespace }}"
+    S3_BUCKET="{{ .Values.backup.s3Bucket }}"
+    
+    if [ -z "$BACKUP_NAME" ]; then
+        echo "Usage: $0 <backup_name>"
+        echo "Available backups:"
+        if [ -n "$S3_BUCKET" ]; then
+            aws s3 ls "s3://$S3_BUCKET/oran-ric-backups/" | grep backup-
+        else
+            ls -la /backups/backup-*.tar.gz 2>/dev/null || echo "No local backups found"
+        fi
+        exit 1
+    fi
+    
+    echo "Starting restore from backup: $BACKUP_NAME"
+    
+    # Download from S3 if not local
+    if [ ! -f "/backups/$BACKUP_NAME.tar.gz" ] && [ -n "$S3_BUCKET" ]; then
+        echo "Downloading backup from S3..."
+        aws s3 cp "s3://$S3_BUCKET/oran-ric-backups/$BACKUP_NAME.tar.gz" "/backups/"
+    fi
+    
+    if [ ! -f "/backups/$BACKUP_NAME.tar.gz" ]; then
+        echo "Backup file not found: $BACKUP_NAME.tar.gz"
+        exit 1
+    fi
+    
+    # Extract backup
+    echo "Extracting backup..."
+    cd /backups
+    tar -xzf "$BACKUP_NAME.tar.gz"
+    
+    # Validate backup
+    if [ ! -f "/backups/$BACKUP_NAME/metadata.json" ]; then
+        echo "Invalid backup: metadata.json not found"
+        exit 1
+    fi
+    
+    echo "Backup metadata:"
+    cat "/backups/$BACKUP_NAME/metadata.json"
+    
+    read -p "Continue with restore? (y/N): " confirm
+    if [ "$confirm" != "y" ]; then
+        echo "Restore cancelled"
+        exit 0
+    fi
+    
+    # Scale down deployments
+    echo "Scaling down deployments..."
+    kubectl scale deployment --all -n "$NAMESPACE" --replicas=0
+    kubectl wait --for=delete pods --all -n "$NAMESPACE" --timeout=300s
+    
+    # Restore resources
+    echo "Restoring Kubernetes resources..."
+    kubectl apply -f "/backups/$BACKUP_NAME/configmaps.yaml" 2>/dev/null || true
+    kubectl apply -f "/backups/$BACKUP_NAME/secrets.yaml" 2>/dev/null || true
+    kubectl apply -f "/backups/$BACKUP_NAME/pvcs.yaml" 2>/dev/null || true
+    kubectl apply -f "/backups/$BACKUP_NAME/resources.yaml" 2>/dev/null || true
+    kubectl apply -f "/backups/$BACKUP_NAME/ingress.yaml" 2>/dev/null || true
+    kubectl apply -f "/backups/$BACKUP_NAME/networkpolicies.yaml" 2>/dev/null || true
+    
+    # Restore database
+    if [ -f "/backups/$BACKUP_NAME/redis-dump.rdb" ]; then
+        echo "Restoring database..."
+        # Wait for database pod to be ready
+        kubectl wait --for=condition=ready pod -l app=dbaas -n "$NAMESPACE" --timeout=300s
+        kubectl cp "/backups/$BACKUP_NAME/redis-dump.rdb" \
+            "$NAMESPACE/$(kubectl get pods -n "$NAMESPACE" -l app=dbaas -o jsonpath='{.items[0].metadata.name}'):/data/dump.rdb"
+        kubectl exec -n "$NAMESPACE" deployment/dbaas -- redis-cli debug restart
+    fi
+    
+    # Wait for all pods to be ready
+    echo "Waiting for pods to be ready..."
+    kubectl wait --for=condition=ready pods --all -n "$NAMESPACE" --timeout=600s
+    
+    # Cleanup
+    rm -rf "/backups/$BACKUP_NAME"
+    
+    echo "Restore completed successfully"
+  
+  disaster-recovery.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    SCENARIO=${1:-""}
+    NAMESPACE="{{ .Values.namespace }}"
+    
+    case "$SCENARIO" in
+        "database-failure")
+            echo "Disaster Recovery: Database Failure"
+            
+            # Stop all components
+            kubectl scale deployment --all -n "$NAMESPACE" --replicas=0
+            
+            # Restore database from latest backup
+            LATEST_BACKUP=$(ls -t /backups/backup-*.tar.gz | head -1 | xargs basename -s .tar.gz)
+            if [ -n "$LATEST_BACKUP" ]; then
+                echo "Restoring database from $LATEST_BACKUP"
+                tar -xzf "/backups/$LATEST_BACKUP.tar.gz" -C /backups
+                
+                # Restart database
+                kubectl scale deployment dbaas -n "$NAMESPACE" --replicas=1
+                kubectl wait --for=condition=ready pod -l app=dbaas -n "$NAMESPACE" --timeout=300s
+                
+                # Restore data
+                if [ -f "/backups/$LATEST_BACKUP/redis-dump.rdb" ]; then
+                    kubectl cp "/backups/$LATEST_BACKUP/redis-dump.rdb" \
+                        "$NAMESPACE/$(kubectl get pods -n "$NAMESPACE" -l app=dbaas -o jsonpath='{.items[0].metadata.name}'):/data/dump.rdb"
+                    kubectl exec -n "$NAMESPACE" deployment/dbaas -- redis-cli debug restart
+                fi
+                
+                # Restart components
+                kubectl scale deployment --all -n "$NAMESPACE" --replicas=1
+                
+                rm -rf "/backups/$LATEST_BACKUP"
+            else
+                echo "No backup available for database recovery"
+                exit 1
+            fi
+            ;;
+            
+        "complete-failure")
+            echo "Disaster Recovery: Complete Platform Failure"
+            
+            # Find latest backup
+            LATEST_BACKUP=$(ls -t /backups/backup-*.tar.gz | head -1 | xargs basename -s .tar.gz)
+            if [ -n "$LATEST_BACKUP" ]; then
+                echo "Performing complete restore from $LATEST_BACKUP"
+                ./restore.sh "$LATEST_BACKUP"
+            else
+                echo "No backup available for complete recovery"
+                exit 1
+            fi
+            ;;
+            
+        "network-partition")
+            echo "Disaster Recovery: Network Partition"
+            
+            # Restart networking components
+            kubectl delete pods -l app=e2term -n "$NAMESPACE"
+            kubectl delete pods -l app=rtmgr -n "$NAMESPACE"
+            
+            # Wait for pods to restart
+            kubectl wait --for=condition=ready pods -l app=e2term -n "$NAMESPACE" --timeout=300s
+            kubectl wait --for=condition=ready pods -l app=rtmgr -n "$NAMESPACE" --timeout=300s
+            
+            echo "Network components restarted"
+            ;;
+            
+        *)
+            echo "Usage: $0 {database-failure|complete-failure|network-partition}"
+            echo "  database-failure  - Recover from database corruption/failure"
+            echo "  complete-failure  - Recover from complete platform failure"
+            echo "  network-partition - Recover from network connectivity issues"
+            exit 1
+            ;;
+    esac
+    
+    echo "Disaster recovery completed for scenario: $SCENARIO"
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: backup-cronjob
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: backup
+spec:
+  schedule: "{{ .Values.backup.schedule | default "0 2 * * *" }}"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .Values.backup.successfulJobsHistoryLimit | default 3 }}
+  failedJobsHistoryLimit: {{ .Values.backup.failedJobsHistoryLimit | default 1 }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: {{ include "oran-sc-platform.name" . }}
+            app.kubernetes.io/instance: {{ .Release.Name }}
+            app.kubernetes.io/component: backup
+        spec:
+          serviceAccountName: backup-sa
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+          containers:
+          - name: backup
+            image: "{{ .Values.backup.image.repository }}:{{ .Values.backup.image.tag | default "latest" }}"
+            imagePullPolicy: {{ .Values.backup.image.pullPolicy | default "IfNotPresent" }}
+            command:
+            - /bin/bash
+            - /scripts/backup.sh
+            env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: backup-secrets
+                  key: aws-access-key-id
+                  optional: true
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backup-secrets
+                  key: aws-secret-access-key
+                  optional: true
+            - name: AWS_DEFAULT_REGION
+              value: "{{ .Values.backup.s3Region | default "us-east-1" }}"
+            volumeMounts:
+            - name: backup-scripts
+              mountPath: /scripts
+              readOnly: true
+            - name: backup-storage
+              mountPath: /backups
+            resources:
+              limits:
+                cpu: {{ .Values.backup.resources.limits.cpu | default "1000m" }}
+                memory: {{ .Values.backup.resources.limits.memory | default "2Gi" }}
+              requests:
+                cpu: {{ .Values.backup.resources.requests.cpu | default "100m" }}
+                memory: {{ .Values.backup.resources.requests.memory | default "256Mi" }}
+          volumes:
+          - name: backup-scripts
+            configMap:
+              name: backup-scripts
+              defaultMode: 0755
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: backup-pvc
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backup-pvc
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: backup
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.backup.storage.size | default "50Gi" }}
+  {{- if .Values.backup.storage.storageClass }}
+  storageClassName: {{ .Values.backup.storage.storageClass }}
+  {{- end }}
+
+---
+{{- if .Values.backup.s3Bucket }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backup-secrets
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "oran-sc-platform.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: backup
+type: Opaque
+data:
+  aws-access-key-id: {{ .Values.backup.s3AccessKeyId | b64enc }}
+  aws-secret-access-key: {{ .Values.backup.s3SecretAccessKey | b64enc }}
+{{- end }}
+
+{{- end }}
