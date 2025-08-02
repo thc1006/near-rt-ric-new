@@ -17,6 +17,7 @@ import (
 // XAppCommunicationAPI provides communication APIs for xApps
 type XAppCommunicationAPI struct {
 	clientManager    *ClientManager
+	messageBus       *RMRMessageBus
 	rmrManager       *RMRManager
 	subscriptionAPI  *SubscriptionAPI
 	controlAPI       *ControlAPI
@@ -47,18 +48,21 @@ type RMRMessage struct {
 // SubscriptionAPI provides E2 subscription management APIs
 type SubscriptionAPI struct {
 	submgrClient *SubscriptionManagerClient
+	messageBus   *RMRMessageBus
 	mu           sync.RWMutex
 }
 
 // ControlAPI provides RIC control message APIs
 type ControlAPI struct {
-	e2tClient *E2TClient
-	mu        sync.RWMutex
+	e2tClient  *E2TClient
+	messageBus *RMRMessageBus
+	mu         sync.RWMutex
 }
 
 // PlatformAPI provides platform service APIs
 type PlatformAPI struct {
 	e2mgrClient *E2ManagerClient
+	messageBus  *RMRMessageBus
 	mu          sync.RWMutex
 }
 
@@ -145,11 +149,12 @@ type ServiceDescriptor struct {
 }
 
 // NewXAppCommunicationAPI creates a new communication API
-func NewXAppCommunicationAPI(clientManager *ClientManager) *XAppCommunicationAPI {
+func NewXAppCommunicationAPI(clientManager *ClientManager, messageBus *RMRMessageBus) *XAppCommunicationAPI {
 	ctx, cancel := context.WithCancel(context.Background())
 	
 	api := &XAppCommunicationAPI{
 		clientManager:   clientManager,
+		messageBus:      messageBus,
 		messageHandlers: make(map[int]MessageHandler),
 		ctx:             ctx,
 		cancel:          cancel,
@@ -161,14 +166,17 @@ func NewXAppCommunicationAPI(clientManager *ClientManager) *XAppCommunicationAPI
 	// Initialize sub-APIs
 	api.subscriptionAPI = &SubscriptionAPI{
 		submgrClient: clientManager.GetSubscriptionManagerClient(),
+		messageBus:   messageBus,
 	}
 	
 	api.controlAPI = &ControlAPI{
-		e2tClient: clientManager.GetE2TClient(),
+		e2tClient:  clientManager.GetE2TClient(),
+		messageBus: messageBus,
 	}
 	
 	api.platformAPI = &PlatformAPI{
 		e2mgrClient: clientManager.GetE2ManagerClient(),
+		messageBus:  messageBus,
 	}
 	
 	return api

@@ -22,6 +22,10 @@ type XAppFramework struct {
 	configManager    *XAppConfigManager
 	lifecycleManager *XAppLifecycleManager
 	clientManager    *ClientManager
+	messageBus       *RMRMessageBus
+	serviceRegistry  *ServiceModelRegistry
+	subscriptionMgr  *XAppSubscriptionManager
+	healthMonitor    *XAppHealthMonitor
 	mu               sync.RWMutex
 	ctx              context.Context
 	cancel           context.CancelFunc
@@ -108,21 +112,25 @@ type XAppMetrics struct {
 }
 
 // NewXAppFramework creates a new xApp framework instance
-func NewXAppFramework(clientManager *ClientManager) *XAppFramework {
+func NewXAppFramework(clientManager *ClientManager, messageBus *RMRMessageBus, serviceRegistry *ServiceModelRegistry) *XAppFramework {
 	ctx, cancel := context.WithCancel(context.Background())
 	
 	framework := &XAppFramework{
-		clientManager: clientManager,
-		ctx:           ctx,
-		cancel:        cancel,
+		clientManager:   clientManager,
+		messageBus:      messageBus,
+		serviceRegistry: serviceRegistry,
+		ctx:             ctx,
+		cancel:          cancel,
 	}
 	
 	// Initialize framework components
 	framework.registry = NewXAppRegistry()
 	framework.resourceManager = NewXAppResourceManager()
-	framework.communicationAPI = NewXAppCommunicationAPI(clientManager)
+	framework.communicationAPI = NewXAppCommunicationAPI(clientManager, messageBus)
 	framework.configManager = NewXAppConfigManager()
 	framework.lifecycleManager = NewXAppLifecycleManager(clientManager)
+	framework.subscriptionMgr = NewXAppSubscriptionManager(clientManager, messageBus)
+	framework.healthMonitor = NewXAppHealthMonitor()
 	
 	return framework
 }

@@ -256,11 +256,18 @@ type IECriticalityDiagnostics struct {
 }
 
 // E2APEncoder provides ASN.1 PER encoding/decoding for E2AP messages
-type E2APEncoder struct{}
+type E2APEncoder struct {
+	// ASN.1 encoding context
+	encodingBuffer []byte
+	decodingBuffer []byte
+}
 
 // NewE2APEncoder creates a new E2AP encoder
 func NewE2APEncoder() *E2APEncoder {
-	return &E2APEncoder{}
+	return &E2APEncoder{
+		encodingBuffer: make([]byte, 0, 4096),
+		decodingBuffer: make([]byte, 0, 4096),
+	}
 }
 
 // EncodeE2APMessage encodes an E2AP message to ASN.1 PER format
@@ -388,30 +395,202 @@ func (e *E2APEncoder) decodeMessageValue(procedureCode, pduType uint8, data []by
 	return value, nil
 }
 
-// Simplified encoding functions (in production, use proper ASN.1 library)
+// Enhanced ASN.1 PER encoding functions
 func (e *E2APEncoder) encodeE2SetupRequest(value map[string]interface{}) ([]byte, error) {
-	// Simplified implementation
-	return []byte("E2SetupRequest"), nil
+	buf := make([]byte, 0, 1024)
+	
+	// Encode transaction ID (INTEGER 0..255)
+	if transactionID, ok := value["transactionId"].(uint32); ok {
+		buf = append(buf, byte(transactionID))
+	} else {
+		return nil, fmt.Errorf("missing or invalid transaction ID")
+	}
+	
+	// Encode Global E2 Node ID
+	if globalE2NodeID, ok := value["globalE2NodeId"].(GlobalE2NodeID); ok {
+		nodeIDBytes, err := e.encodeGlobalE2NodeID(globalE2NodeID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode global E2 node ID: %w", err)
+		}
+		buf = append(buf, nodeIDBytes...)
+	} else {
+		return nil, fmt.Errorf("missing or invalid global E2 node ID")
+	}
+	
+	// Encode RAN Functions List
+	if ranFunctions, ok := value["ranFunctions"].([]RANFunctionItem); ok {
+		ranFuncBytes, err := e.encodeRANFunctionsList(ranFunctions)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode RAN functions: %w", err)
+		}
+		buf = append(buf, ranFuncBytes...)
+	}
+	
+	// Encode E2 Node Component Config Add List
+	if componentConfig, ok := value["componentConfig"].([]E2NodeComponentConfigAddItem); ok {
+		configBytes, err := e.encodeComponentConfigAddList(componentConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode component config: %w", err)
+		}
+		buf = append(buf, configBytes...)
+	}
+	
+	return buf, nil
 }
 
 func (e *E2APEncoder) encodeE2SetupResponse(value map[string]interface{}) ([]byte, error) {
-	return []byte("E2SetupResponse"), nil
+	buf := make([]byte, 0, 1024)
+	
+	// Encode transaction ID
+	if transactionID, ok := value["transactionId"].(uint32); ok {
+		buf = append(buf, byte(transactionID))
+	} else {
+		return nil, fmt.Errorf("missing transaction ID")
+	}
+	
+	// Encode Global RIC ID
+	if globalRICID, ok := value["globalRicId"].(GlobalRICID); ok {
+		ricIDBytes, err := e.encodeGlobalRICID(globalRICID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode global RIC ID: %w", err)
+		}
+		buf = append(buf, ricIDBytes...)
+	}
+	
+	// Encode accepted RAN functions
+	if accepted, ok := value["ranFunctionsAccepted"].([]RANFunctionIDItem); ok {
+		acceptedBytes, err := e.encodeRANFunctionIDList(accepted)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode accepted RAN functions: %w", err)
+		}
+		buf = append(buf, acceptedBytes...)
+	}
+	
+	// Encode rejected RAN functions
+	if rejected, ok := value["ranFunctionsRejected"].([]RANFunctionIDCauseItem); ok {
+		rejectedBytes, err := e.encodeRANFunctionIDCauseList(rejected)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode rejected RAN functions: %w", err)
+		}
+		buf = append(buf, rejectedBytes...)
+	}
+	
+	return buf, nil
 }
 
 func (e *E2APEncoder) encodeE2SetupFailure(value map[string]interface{}) ([]byte, error) {
-	return []byte("E2SetupFailure"), nil
+	buf := make([]byte, 0, 512)
+	
+	// Encode transaction ID
+	if transactionID, ok := value["transactionId"].(uint32); ok {
+		buf = append(buf, byte(transactionID))
+	} else {
+		return nil, fmt.Errorf("missing transaction ID")
+	}
+	
+	// Encode cause
+	if cause, ok := value["cause"].(E2APCause); ok {
+		causeBytes, err := e.encodeE2APCause(cause)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode cause: %w", err)
+		}
+		buf = append(buf, causeBytes...)
+	} else {
+		return nil, fmt.Errorf("missing cause")
+	}
+	
+	// Encode optional time to wait
+	if timeToWait, ok := value["timeToWait"].(*uint32); ok && timeToWait != nil {
+		buf = append(buf, 1) // presence flag
+		buf = append(buf, byte(*timeToWait))
+	} else {
+		buf = append(buf, 0) // not present
+	}
+	
+	return buf, nil
 }
 
 func (e *E2APEncoder) encodeE2NodeConfigUpdate(value map[string]interface{}) ([]byte, error) {
-	return []byte("E2NodeConfigUpdate"), nil
+	buf := make([]byte, 0, 1024)
+	
+	// Encode transaction ID
+	if transactionID, ok := value["transactionId"].(uint32); ok {
+		buf = append(buf, byte(transactionID))
+	} else {
+		return nil, fmt.Errorf("missing transaction ID")
+	}
+	
+	// Encode optional Global E2 Node ID
+	if globalE2NodeID, ok := value["globalE2NodeId"].(*GlobalE2NodeID); ok && globalE2NodeID != nil {
+		buf = append(buf, 1) // presence flag
+		nodeIDBytes, err := e.encodeGlobalE2NodeID(*globalE2NodeID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode global E2 node ID: %w", err)
+		}
+		buf = append(buf, nodeIDBytes...)
+	} else {
+		buf = append(buf, 0) // not present
+	}
+	
+	// Encode config add list
+	if configAddList, ok := value["configAddList"].([]E2NodeComponentConfigAddItem); ok {
+		addListBytes, err := e.encodeComponentConfigAddList(configAddList)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode config add list: %w", err)
+		}
+		buf = append(buf, addListBytes...)
+	}
+	
+	return buf, nil
 }
 
 func (e *E2APEncoder) encodeE2ResetRequest(value map[string]interface{}) ([]byte, error) {
-	return []byte("E2ResetRequest"), nil
+	buf := make([]byte, 0, 256)
+	
+	// Encode transaction ID
+	if transactionID, ok := value["transactionId"].(uint32); ok {
+		buf = append(buf, byte(transactionID))
+	} else {
+		return nil, fmt.Errorf("missing transaction ID")
+	}
+	
+	// Encode cause
+	if cause, ok := value["cause"].(E2APCause); ok {
+		causeBytes, err := e.encodeE2APCause(cause)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode cause: %w", err)
+		}
+		buf = append(buf, causeBytes...)
+	} else {
+		return nil, fmt.Errorf("missing cause")
+	}
+	
+	return buf, nil
 }
 
 func (e *E2APEncoder) encodeE2ResetResponse(value map[string]interface{}) ([]byte, error) {
-	return []byte("E2ResetResponse"), nil
+	buf := make([]byte, 0, 256)
+	
+	// Encode transaction ID
+	if transactionID, ok := value["transactionId"].(uint32); ok {
+		buf = append(buf, byte(transactionID))
+	} else {
+		return nil, fmt.Errorf("missing transaction ID")
+	}
+	
+	// Encode optional criticality diagnostics
+	if critDiag, ok := value["criticalityDiagnostics"].(*CriticalityDiagnostics); ok && critDiag != nil {
+		buf = append(buf, 1) // presence flag
+		diagBytes, err := e.encodeCriticalityDiagnostics(*critDiag)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode criticality diagnostics: %w", err)
+		}
+		buf = append(buf, diagBytes...)
+	} else {
+		buf = append(buf, 0) // not present
+	}
+	
+	return buf, nil
 }
 
 // Simplified decoding functions
@@ -455,4 +634,274 @@ func (e *E2APEncoder) decodeE2ResetResponse(data []byte) (map[string]interface{}
 		"messageType": "E2ResetResponse",
 		"timestamp":   time.Now(),
 	}, nil
+}
+// Helpe
+r encoding functions for ASN.1 PER
+
+func (e *E2APEncoder) encodeGlobalE2NodeID(nodeID GlobalE2NodeID) ([]byte, error) {
+	buf := make([]byte, 0, 64)
+	
+	// Encode PLMN ID (3 bytes)
+	if len(nodeID.PlmnID) != 6 { // Hex string representation
+		return nil, fmt.Errorf("invalid PLMN ID length: %d", len(nodeID.PlmnID))
+	}
+	
+	plmnBytes := make([]byte, 3)
+	for i := 0; i < 3; i++ {
+		if _, err := fmt.Sscanf(nodeID.PlmnID[i*2:i*2+2], "%02x", &plmnBytes[i]); err != nil {
+			return nil, fmt.Errorf("invalid PLMN ID format: %w", err)
+		}
+	}
+	buf = append(buf, plmnBytes...)
+	
+	// Encode Node ID (variable length)
+	nodeIDBytes := []byte(nodeID.NodeID)
+	buf = append(buf, byte(len(nodeIDBytes))) // length
+	buf = append(buf, nodeIDBytes...)
+	
+	// Encode Node Type
+	buf = append(buf, byte(e.nodeTypeToInt(nodeID.Type)))
+	
+	return buf, nil
+}
+
+func (e *E2APEncoder) encodeGlobalRICID(ricID GlobalRICID) ([]byte, error) {
+	buf := make([]byte, 0, 32)
+	
+	// Encode PLMN ID
+	if len(ricID.PlmnID) != 6 {
+		return nil, fmt.Errorf("invalid PLMN ID length: %d", len(ricID.PlmnID))
+	}
+	
+	plmnBytes := make([]byte, 3)
+	for i := 0; i < 3; i++ {
+		if _, err := fmt.Sscanf(ricID.PlmnID[i*2:i*2+2], "%02x", &plmnBytes[i]); err != nil {
+			return nil, fmt.Errorf("invalid PLMN ID format: %w", err)
+		}
+	}
+	buf = append(buf, plmnBytes...)
+	
+	// Encode RIC ID
+	buf = append(buf, byte(len(ricID.RicID))) // length
+	buf = append(buf, ricID.RicID...)
+	
+	return buf, nil
+}
+
+func (e *E2APEncoder) encodeRANFunctionsList(ranFunctions []RANFunctionItem) ([]byte, error) {
+	buf := make([]byte, 0, 512)
+	
+	// Encode list length
+	buf = append(buf, byte(len(ranFunctions)))
+	
+	for _, ranFunc := range ranFunctions {
+		// Encode RAN Function ID (2 bytes)
+		binary.BigEndian.PutUint16(buf[len(buf):len(buf)+2], uint16(ranFunc.RANFunctionID))
+		buf = buf[:len(buf)+2]
+		
+		// Encode RAN Function Definition length and data
+		binary.BigEndian.PutUint16(buf[len(buf):len(buf)+2], uint16(len(ranFunc.RANFunctionDefinition)))
+		buf = buf[:len(buf)+2]
+		buf = append(buf, ranFunc.RANFunctionDefinition...)
+		
+		// Encode RAN Function Revision (2 bytes)
+		binary.BigEndian.PutUint16(buf[len(buf):len(buf)+2], uint16(ranFunc.RANFunctionRevision))
+		buf = buf[:len(buf)+2]
+		
+		// Encode RAN Function OID
+		oidBytes := []byte(ranFunc.RANFunctionOID)
+		buf = append(buf, byte(len(oidBytes)))
+		buf = append(buf, oidBytes...)
+	}
+	
+	return buf, nil
+}
+
+func (e *E2APEncoder) encodeRANFunctionIDList(ranFunctions []RANFunctionIDItem) ([]byte, error) {
+	buf := make([]byte, 0, 256)
+	
+	// Encode list length
+	buf = append(buf, byte(len(ranFunctions)))
+	
+	for _, ranFunc := range ranFunctions {
+		// Encode RAN Function ID (2 bytes)
+		binary.BigEndian.PutUint16(buf[len(buf):len(buf)+2], uint16(ranFunc.RANFunctionID))
+		buf = buf[:len(buf)+2]
+		
+		// Encode RAN Function Revision (2 bytes)
+		binary.BigEndian.PutUint16(buf[len(buf):len(buf)+2], uint16(ranFunc.RANFunctionRevision))
+		buf = buf[:len(buf)+2]
+	}
+	
+	return buf, nil
+}
+
+func (e *E2APEncoder) encodeRANFunctionIDCauseList(ranFunctions []RANFunctionIDCauseItem) ([]byte, error) {
+	buf := make([]byte, 0, 256)
+	
+	// Encode list length
+	buf = append(buf, byte(len(ranFunctions)))
+	
+	for _, ranFunc := range ranFunctions {
+		// Encode RAN Function ID (2 bytes)
+		binary.BigEndian.PutUint16(buf[len(buf):len(buf)+2], uint16(ranFunc.RANFunctionID))
+		buf = buf[:len(buf)+2]
+		
+		// Encode Cause
+		causeBytes, err := e.encodeE2APCause(ranFunc.Cause)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode cause for RAN function %d: %w", ranFunc.RANFunctionID, err)
+		}
+		buf = append(buf, causeBytes...)
+	}
+	
+	return buf, nil
+}
+
+func (e *E2APEncoder) encodeComponentConfigAddList(configList []E2NodeComponentConfigAddItem) ([]byte, error) {
+	buf := make([]byte, 0, 512)
+	
+	// Encode list length
+	buf = append(buf, byte(len(configList)))
+	
+	for _, config := range configList {
+		// Encode interface type
+		buf = append(buf, byte(config.E2NodeComponentInterfaceType))
+		
+		// Encode component ID
+		componentIDBytes, err := e.encodeE2NodeComponentID(config.E2NodeComponentID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode component ID: %w", err)
+		}
+		buf = append(buf, componentIDBytes...)
+		
+		// Encode component configuration
+		configBytes, err := e.encodeE2NodeComponentConfiguration(config.E2NodeComponentConfiguration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode component configuration: %w", err)
+		}
+		buf = append(buf, configBytes...)
+	}
+	
+	return buf, nil
+}
+
+func (e *E2APEncoder) encodeE2NodeComponentID(componentID E2NodeComponentID) ([]byte, error) {
+	buf := make([]byte, 0, 64)
+	
+	// Determine which component type is present and encode accordingly
+	if componentID.E2NodeComponentTypeNG != nil {
+		buf = append(buf, 0) // NG type indicator
+		buf = append(buf, byte(len(componentID.E2NodeComponentTypeNG.AMFID)))
+		buf = append(buf, componentID.E2NodeComponentTypeNG.AMFID...)
+	} else if componentID.E2NodeComponentTypeXn != nil {
+		buf = append(buf, 1) // Xn type indicator
+		buf = append(buf, byte(len(componentID.E2NodeComponentTypeXn.GlobalNGRANNodeID)))
+		buf = append(buf, componentID.E2NodeComponentTypeXn.GlobalNGRANNodeID...)
+	} else if componentID.E2NodeComponentTypeE1 != nil {
+		buf = append(buf, 2) // E1 type indicator
+		binary.BigEndian.PutUint64(buf[len(buf):len(buf)+8], componentID.E2NodeComponentTypeE1.GNBCUCPID)
+		buf = buf[:len(buf)+8]
+	} else if componentID.E2NodeComponentTypeF1 != nil {
+		buf = append(buf, 3) // F1 type indicator
+		binary.BigEndian.PutUint64(buf[len(buf):len(buf)+8], componentID.E2NodeComponentTypeF1.GNBDUID)
+		buf = buf[:len(buf)+8]
+	} else if componentID.E2NodeComponentTypeW1 != nil {
+		buf = append(buf, 4) // W1 type indicator
+		binary.BigEndian.PutUint64(buf[len(buf):len(buf)+8], componentID.E2NodeComponentTypeW1.NGENBDUID)
+		buf = buf[:len(buf)+8]
+	} else if componentID.E2NodeComponentTypeS1 != nil {
+		buf = append(buf, 5) // S1 type indicator
+		buf = append(buf, byte(len(componentID.E2NodeComponentTypeS1.MMEID)))
+		buf = append(buf, componentID.E2NodeComponentTypeS1.MMEID...)
+	} else if componentID.E2NodeComponentTypeX2 != nil {
+		buf = append(buf, 6) // X2 type indicator
+		buf = append(buf, byte(len(componentID.E2NodeComponentTypeX2.GlobalENBID)))
+		buf = append(buf, componentID.E2NodeComponentTypeX2.GlobalENBID...)
+	} else {
+		return nil, fmt.Errorf("no component type specified")
+	}
+	
+	return buf, nil
+}
+
+func (e *E2APEncoder) encodeE2NodeComponentConfiguration(config E2NodeComponentConfiguration) ([]byte, error) {
+	buf := make([]byte, 0, 256)
+	
+	// Encode request part length and data
+	binary.BigEndian.PutUint16(buf[len(buf):len(buf)+2], uint16(len(config.E2NodeComponentRequestPart)))
+	buf = buf[:len(buf)+2]
+	buf = append(buf, config.E2NodeComponentRequestPart...)
+	
+	// Encode response part length and data
+	binary.BigEndian.PutUint16(buf[len(buf):len(buf)+2], uint16(len(config.E2NodeComponentResponsePart)))
+	buf = buf[:len(buf)+2]
+	buf = append(buf, config.E2NodeComponentResponsePart...)
+	
+	return buf, nil
+}
+
+func (e *E2APEncoder) encodeE2APCause(cause E2APCause) ([]byte, error) {
+	buf := make([]byte, 2)
+	buf[0] = byte(cause.CauseType)
+	buf[1] = byte(cause.CauseValue)
+	return buf, nil
+}
+
+func (e *E2APEncoder) encodeCriticalityDiagnostics(diag CriticalityDiagnostics) ([]byte, error) {
+	buf := make([]byte, 0, 128)
+	
+	// Encode optional procedure code
+	if diag.ProcedureCode != nil {
+		buf = append(buf, 1) // presence flag
+		buf = append(buf, byte(*diag.ProcedureCode))
+	} else {
+		buf = append(buf, 0) // not present
+	}
+	
+	// Encode optional triggering message
+	if diag.TriggeringMessage != nil {
+		buf = append(buf, 1) // presence flag
+		buf = append(buf, byte(*diag.TriggeringMessage))
+	} else {
+		buf = append(buf, 0) // not present
+	}
+	
+	// Encode optional procedure criticality
+	if diag.ProcedureCriticality != nil {
+		buf = append(buf, 1) // presence flag
+		buf = append(buf, byte(*diag.ProcedureCriticality))
+	} else {
+		buf = append(buf, 0) // not present
+	}
+	
+	// Encode IEs criticality diagnostics list
+	buf = append(buf, byte(len(diag.IEsCriticalityDiagnostics)))
+	for _, ieDiag := range diag.IEsCriticalityDiagnostics {
+		binary.BigEndian.PutUint32(buf[len(buf):len(buf)+4], ieDiag.IEID)
+		buf = buf[:len(buf)+4]
+		buf = append(buf, byte(ieDiag.IECriticality))
+		buf = append(buf, byte(ieDiag.TypeOfError))
+	}
+	
+	return buf, nil
+}
+
+func (e *E2APEncoder) nodeTypeToInt(nodeType E2NodeType) int {
+	switch nodeType {
+	case E2NodeTypeGNB:
+		return 0
+	case E2NodeTypeENB:
+		return 1
+	case E2NodeTypeOCU:
+		return 2
+	case E2NodeTypeODU:
+		return 3
+	case E2NodeTypeOCUCP:
+		return 4
+	case E2NodeTypeOCUUP:
+		return 5
+	default:
+		return 0
+	}
 }
