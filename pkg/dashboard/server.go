@@ -59,6 +59,10 @@ type Server struct {
 	performanceOptimizer    *PerformanceOptimizer
 	loadBalancer            *LoadBalancer
 	horizontalScaler        *HorizontalScaler
+	
+	// Production Hardening Components
+	productionHardening     *ProductionHardeningManager
+	productionHardeningHandlers *ProductionHardeningHandlers
 }
 
 // NewServer creates a new dashboard server instance
@@ -68,6 +72,10 @@ func NewServer(config *Config) (*Server, error) {
 	
 	// Initialize performance optimizer
 	performanceOptimizer := NewPerformanceOptimizer()
+	
+	// Initialize production hardening with comprehensive configuration
+	productionHardeningConfig := DefaultProductionHardeningConfig()
+	productionHardening := NewProductionHardeningManager(productionHardeningConfig)
 	
 	// Initialize metrics
 	metricsManager := NewMetricsManager()
@@ -175,6 +183,7 @@ func NewServer(config *Config) (*Server, error) {
 		performanceOptimizer:   performanceOptimizer,
 		loadBalancer:           NewLoadBalancer(RoundRobin),
 		horizontalScaler:       NewHorizontalScaler(nil), // TODO: Add Kubernetes client
+		productionHardening:    productionHardening,
 	}
 
 	// Setup HTTP router with observability middleware
@@ -229,6 +238,13 @@ func NewServer(config *Config) (*Server, error) {
 func (s *Server) Start() error {
 	ctx := context.Background()
 	
+	// Start production hardening manager first
+	if err := s.productionHardening.Start(); err != nil {
+		s.logger.ErrorCtx(ctx, "Failed to start production hardening", "error", err)
+		return fmt.Errorf("failed to start production hardening: %w", err)
+	}
+	s.logger.InfoCtx(ctx, "Production hardening started successfully")
+	
 	// Initialize and start metrics WebSocket hub
 	InitializeMetricsWebSocket()
 	
@@ -269,6 +285,13 @@ func (s *Server) Start() error {
 // Shutdown gracefully shuts down the server
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.logger.InfoCtx(ctx, "Shutting down dashboard server")
+	
+	// Stop production hardening manager first
+	if s.productionHardening != nil {
+		if err := s.productionHardening.Stop(); err != nil {
+			s.logger.ErrorCtx(ctx, "Failed to stop production hardening", "error", err)
+		}
+	}
 	
 	// Stop discovery service
 	s.discovery.Stop()
@@ -400,6 +423,21 @@ func (s *Server) setupRoutes() *mux.Router {
 	tlsAPI.HandleFunc("/certificates/stats", s.tlsHandlers.GetCertificateStatsHandler).Methods("GET", "OPTIONS")
 	tlsAPI.HandleFunc("/config", s.tlsHandlers.GetTLSConfigHandler).Methods("GET", "OPTIONS")
 	tlsAPI.HandleFunc("/validate", s.tlsHandlers.ValidateTLSConfigHandler).Methods("GET", "OPTIONS")
+
+	// Production hardening routes (admin only)
+	hardeningAPI := api.PathPrefix("/hardening").Subrouter()
+	hardeningAPI.Use(s.authMiddleware.AdminOnly)
+	hardeningAPI.HandleFunc("/metrics", s.productionHardeningHandlers.GetMetrics).Methods("GET", "OPTIONS")
+	hardeningAPI.HandleFunc("/connection-pools", s.productionHardeningHandlers.GetConnectionPoolMetrics).Methods("GET", "OPTIONS")
+	hardeningAPI.HandleFunc("/circuit-breakers", s.productionHardeningHandlers.GetCircuitBreakerStatus).Methods("GET", "OPTIONS")
+	hardeningAPI.HandleFunc("/circuit-breakers/{name}/reset", s.productionHardeningHandlers.ResetCircuitBreaker).Methods("POST", "OPTIONS")
+	hardeningAPI.HandleFunc("/health", s.productionHardeningHandlers.GetServiceHealth).Methods("GET", "OPTIONS")
+	hardeningAPI.HandleFunc("/resources", s.productionHardeningHandlers.GetResourceUsage).Methods("GET", "OPTIONS")
+	hardeningAPI.HandleFunc("/logging/metrics", s.productionHardeningHandlers.GetLoggingMetrics).Methods("GET", "OPTIONS")
+	hardeningAPI.HandleFunc("/connections/test", s.productionHardeningHandlers.TestConnection).Methods("POST", "OPTIONS")
+	hardeningAPI.HandleFunc("/errors/statistics", s.productionHardeningHandlers.GetErrorStatistics).Methods("GET", "OPTIONS")
+	hardeningAPI.HandleFunc("/errors/recent", s.productionHardeningHandlers.GetRecentErrors).Methods("GET", "OPTIONS")
+	hardeningAPI.HandleFunc("/healthcheck", s.productionHardeningHandlers.HealthCheck).Methods("GET", "OPTIONS")
 
 	// Protected API endpoints (require authentication)
 	protectedAPI := api.PathPrefix("").Subrouter()
