@@ -1,0 +1,247 @@
+version: '3.8'
+
+services:
+  # =============================================================================
+  # Analytics & Telemetry Infrastructure
+  # =============================================================================
+
+  # Kafka for real-time message streaming
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka
+    ports:
+      - "9093:9093"
+      - "9999:9999"  # JMX
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9093'
+      KAFKA_LISTENERS: 'PLAINTEXT://kafka:29092,CONTROLLER://kafka:29093,PLAINTEXT_HOST://0.0.0.0:9093'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_JMX_PORT: 9999
+      KAFKA_JMX_HOSTNAME: kafka
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+    volumes:
+      - kafka-data:/tmp/kraft-combined-logs
+    networks:
+      - oran-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9093", "--list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Kafka UI for management
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8087:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: oran-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_METRICS_PORT: 9999
+    depends_on:
+      - kafka
+    networks:
+      - oran-network
+    restart: unless-stopped
+
+  # InfluxDB for time-series data storage
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: oran
+      DOCKER_INFLUXDB_INIT_PASSWORD: oran123456
+      DOCKER_INFLUXDB_INIT_ORG: oran
+      DOCKER_INFLUXDB_INIT_BUCKET: oran-metrics
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: oran-super-secret-token
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - ./configs/influxdb:/etc/influxdb2:ro
+    networks:
+      - oran-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Telemetry collector service
+  telemetry-collector:
+    build:
+      context: .
+      dockerfile: build/telemetry-collector/Dockerfile
+    image: oran/telemetry-collector:${VERSION:-latest}
+    container_name: telemetry-collector
+    ports:
+      - "8085:8085"  # HTTP API
+      - "9094:9094"  # Metrics
+    environment:
+      - LOG_LEVEL=debug
+      - KAFKA_BROKERS=kafka:29092
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=oran-super-secret-token
+      - INFLUXDB_ORG=oran
+      - INFLUXDB_BUCKET=oran-metrics
+      - VES_ENDPOINT=/api/v1/ves
+    depends_on:
+      kafka:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    networks:
+      - oran-network
+    volumes:
+      - ./configs/telemetry:/configs:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # KPI calculator service
+  kpi-calculator:
+    build:
+      context: .
+      dockerfile: build/kpi-calculator/Dockerfile
+    image: oran/kpi-calculator:${VERSION:-latest}
+    container_name: kpi-calculator
+    ports:
+      - "8086:8086"
+      - "9095:9095"  # Metrics
+    environment:
+      - LOG_LEVEL=debug
+      - KAFKA_BROKERS=kafka:29092
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=oran-super-secret-token
+      - INFLUXDB_ORG=oran
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      kafka:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - oran-network
+    volumes:
+      - ./configs/kpi:/configs:ro
+    restart: unless-stopped
+
+  # ML prediction service
+  ml-predictor:
+    build:
+      context: .
+      dockerfile: build/ml-predictor/Dockerfile
+    image: oran/ml-predictor:${VERSION:-latest}
+    container_name: ml-predictor
+    ports:
+      - "8087:8087"
+      - "9096:9096"  # Metrics
+    environment:
+      - LOG_LEVEL=debug
+      - KAFKA_BROKERS=kafka:29092
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=oran-super-secret-token
+      - INFLUXDB_ORG=oran
+      - MODEL_PATH=/models
+      - PREDICTION_INTERVAL=60s
+    depends_on:
+      kafka:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    networks:
+      - oran-network
+    volumes:
+      - ./configs/ml:/configs:ro
+      - ml-models:/models
+    restart: unless-stopped
+
+  # Apache Flink for stream processing
+  flink-jobmanager:
+    image: flink:1.18-scala_2.12
+    container_name: flink-jobmanager
+    ports:
+      - "8081:8081"
+    command: jobmanager
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+      - FLINK_PROPERTIES="jobmanager.rpc.address: flink-jobmanager"
+    networks:
+      - oran-network
+    volumes:
+      - flink-data:/tmp
+    restart: unless-stopped
+
+  flink-taskmanager:
+    image: flink:1.18-scala_2.12
+    container_name: flink-taskmanager
+    depends_on:
+      - flink-jobmanager
+    command: taskmanager
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+      - FLINK_PROPERTIES="jobmanager.rpc.address: flink-jobmanager"
+    networks:
+      - oran-network
+    volumes:
+      - flink-data:/tmp
+    restart: unless-stopped
+
+  # Analytics API gateway
+  analytics-api:
+    build:
+      context: .
+      dockerfile: build/analytics-api/Dockerfile
+    image: oran/analytics-api:${VERSION:-latest}
+    container_name: analytics-api
+    ports:
+      - "8088:8088"
+      - "9097:9097"  # Metrics
+    environment:
+      - LOG_LEVEL=debug
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=oran-super-secret-token
+      - INFLUXDB_ORG=oran
+      - KAFKA_BROKERS=kafka:29092
+    depends_on:
+      influxdb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - oran-network
+    volumes:
+      - ./configs/analytics:/configs:ro
+    restart: unless-stopped
+
+networks:
+  oran-network:
+    external: true
+
+volumes:
+  kafka-data:
+    driver: local
+  influxdb-data:
+    driver: local
+  ml-models:
+    driver: local
+  flink-data:
+    driver: local

@@ -1,0 +1,121 @@
+{
+  "event": {
+    "commonEventHeader": {
+      "domain": "measurement",
+      "eventId": "measurement-001-20240906-001",
+      "eventName": "measurement_O-RAN-DU",
+      "eventType": "O-RAN_PM",
+      "internalHeaderFields": {},
+      "lastEpochMicrosec": 1725620400000000,
+      "nfNamingCode": "oran-du",
+      "nfcNamingCode": "du",
+      "priority": "Normal",
+      "reportingEntityId": "du-001",
+      "reportingEntityName": "O-RAN-DU-001",
+      "sequence": 1,
+      "sourceId": "cell-001",
+      "sourceName": "O-RAN-DU-001",
+      "startEpochMicrosec": 1725620340000000,
+      "timeZoneOffset": "UTC",
+      "version": "4.0",
+      "vesEventListenerVersion": "7.2"
+    },
+    "measurementFields": {
+      "measurementInterval": 60,
+      "measurementFieldsVersion": "4.0",
+      "additionalMeasurements": [
+        {
+          "name": "radio-resource-management",
+          "hashMap": {
+            "prb.used.dl": "65.5",
+            "prb.used.ul": "45.2",
+            "prb.available.dl": "100.0",
+            "prb.available.ul": "100.0",
+            "mac.volume.dl.bytes": "125000000",
+            "mac.volume.ul.bytes": "85000000",
+            "rrc.connected.users": "128",
+            "handover.success.rate": "98.5",
+            "call.drop.rate": "0.8"
+          }
+        },
+        {
+          "name": "radio-quality-metrics",
+          "hashMap": {
+            "cqi.avg": "12.5",
+            "rsrp.avg": "-85.2",
+            "rsrq.avg": "-12.8",
+            "sinr.avg": "18.5",
+            "bler.dl": "0.05",
+            "bler.ul": "0.03"
+          }
+        },
+        {
+          "name": "latency-metrics",
+          "hashMap": {
+            "latency.e2e.ms": "25.5",
+            "latency.ran.ms": "8.2",
+            "latency.core.ms": "17.3"
+          }
+        },
+        {
+          "name": "energy-efficiency",
+          "hashMap": {
+            "power.consumption.watts": "1250.0",
+            "energy.efficiency.mbps.per.watt": "2.85",
+            "spectral.efficiency.bps.hz": "3.2"
+          }
+        },
+        {
+          "name": "network-slicing",
+          "hashMap": {
+            "slice.1.throughput.dl.mbps": "150.5",
+            "slice.1.throughput.ul.mbps": "75.2",
+            "slice.1.latency.ms": "10.5",
+            "slice.1.users": "45",
+            "slice.2.throughput.dl.mbps": "85.0",
+            "slice.2.throughput.ul.mbps": "35.5",
+            "slice.2.latency.ms": "45.2",
+            "slice.2.users": "83"
+          }
+        }
+      ],
+      "cpuUsageArray": [
+        {
+          "cpuIdentifier": "cpu0",
+          "percentUsage": 75.5,
+          "cpuIdle": 24.5,
+          "cpuUsageSystem": 45.2,
+          "cpuUsageUser": 30.3
+        },
+        {
+          "cpuIdentifier": "cpu1",
+          "percentUsage": 68.2,
+          "cpuIdle": 31.8,
+          "cpuUsageSystem": 38.5,
+          "cpuUsageUser": 29.7
+        }
+      ],
+      "memoryUsageArray": [
+        {
+          "vmIdentifier": "vm1",
+          "memoryFree": 2147483648,
+          "memoryUsed": 6442450944,
+          "memoryBuffered": 536870912,
+          "memoryCached": 1073741824,
+          "memoryConfigured": 8589934592
+        }
+      ],
+      "nicPerformanceArray": [
+        {
+          "nicIdentifier": "eth0",
+          "receivedOctets": 12500000000,
+          "receivedTotalPackets": 8500000,
+          "receivedErrorPackets": 25,
+          "transmittedOctets": 8500000000,
+          "transmittedTotalPackets": 6200000,
+          "transmittedErrorPackets": 18
+        }
+      ]
+    }
+  }
+}

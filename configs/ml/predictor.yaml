@@ -1,0 +1,141 @@
+# O-RAN ML Predictor Configuration
+
+server:
+  host: "0.0.0.0"
+  port: 8087
+  metrics_port: 9096
+
+kafka:
+  brokers:
+    - "kafka:29092"
+  consumer:
+    group_id: "ml-predictor"
+    topics:
+      - "oran-kpis"
+  producer:
+    topic: "oran-predictions"
+
+influxdb:
+  url: "http://influxdb:8086"
+  token: "${INFLUXDB_TOKEN}"
+  org: "oran"
+  query_bucket: "oran-kpis"
+  write_bucket: "oran-predictions"
+
+models:
+  storage_path: "/models"
+  
+  load_prediction:
+    type: "moving_average"
+    features:
+      - "prb_utilization_dl"
+      - "prb_utilization_ul"
+      - "active_users"
+    parameters:
+      window_size: 10
+      trend_threshold: 0.1
+    training_interval: "6h"
+    
+  quality_prediction:
+    type: "linear_regression"
+    features:
+      - "rsrp"
+      - "rsrq"
+      - "sinr"
+      - "cqi"
+    parameters:
+      coefficients:
+        rsrp: 0.3
+        rsrq: 0.25
+        sinr: 0.35
+        cqi: 0.1
+    training_interval: "12h"
+    
+  anomaly_detection:
+    type: "isolation_forest"
+    features:
+      - "prb_utilization_dl"
+      - "throughput_dl_mbps"
+      - "energy_efficiency"
+      - "latency_e2e_ms"
+    parameters:
+      contamination: 0.1
+      threshold: 0.6
+      n_estimators: 100
+    training_interval: "4h"
+
+predictions:
+  # Prediction horizons
+  horizons:
+    short_term: "15m"    # 15 minutes
+    medium_term: "1h"    # 1 hour
+    long_term: "4h"      # 4 hours
+    
+  # Confidence thresholds
+  confidence:
+    high: 0.85
+    medium: 0.65
+    low: 0.45
+    
+  # Update intervals
+  intervals:
+    real_time: "1m"
+    periodic: "5m"
+    batch: "1h"
+
+recommendations:
+  # Priority levels for recommendations
+  priorities:
+    critical:
+      threshold: 0.9
+      actions:
+        - "immediate_handover"
+        - "emergency_load_balancing"
+        - "power_adjustment"
+    high:
+      threshold: 0.7
+      actions:
+        - "load_balancing"
+        - "resource_reallocation"
+        - "power_control"
+    medium:
+      threshold: 0.5
+      actions:
+        - "optimization_tuning"
+        - "preventive_maintenance"
+    low:
+      threshold: 0.3
+      actions:
+        - "performance_monitoring"
+        - "trend_analysis"
+
+anomaly_detection:
+  # Anomaly types and thresholds
+  types:
+    high_load:
+      prb_threshold: 90.0
+      user_threshold: 1000
+    low_throughput:
+      threshold: 1.0  # Mbps
+    high_latency:
+      threshold: 50.0  # ms
+    quality_degradation:
+      rsrp_threshold: -110.0
+      rsrq_threshold: -20.0
+      
+  # Response actions
+  responses:
+    immediate:
+      - "alert_operator"
+      - "trigger_automation"
+    delayed:
+      - "schedule_maintenance"
+      - "update_models"
+
+logging:
+  level: "info"
+  format: "json"
+  
+monitoring:
+  health_check_interval: "30s"
+  model_performance_check: "1h"

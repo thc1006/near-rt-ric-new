@@ -1,0 +1,82 @@
+# O-RAN KPI Calculator Configuration
+
+server:
+  host: "0.0.0.0"
+  port: 8086
+  metrics_port: 9095
+
+kafka:
+  brokers:
+    - "kafka:29092"
+  consumer:
+    group_id: "kpi-calculator"
+    topics:
+      - "ves-measurement"
+    auto_offset_reset: "latest"
+  producer:
+    topic: "oran-kpis"
+    batch_size: 100
+
+influxdb:
+  url: "http://influxdb:8086"
+  token: "${INFLUXDB_TOKEN}"
+  org: "oran"
+  query_bucket: "oran-metrics"
+  write_bucket: "oran-kpis"
+
+redis:
+  host: "redis"
+  port: 6379
+  db: 0
+  password: ""
+
+kpi_calculations:
+  # PRB Utilization thresholds
+  prb:
+    warning_threshold: 70.0
+    critical_threshold: 90.0
+    
+  # Throughput thresholds (Mbps)
+  throughput:
+    low_threshold: 10.0
+    target_threshold: 50.0
+    
+  # Quality thresholds
+  rsrp:
+    excellent: -70.0
+    good: -85.0
+    fair: -100.0
+    poor: -110.0
+    
+  rsrq:
+    excellent: -10.0
+    good: -15.0
+    fair: -20.0
+    
+  # Efficiency calculations
+  energy_efficiency:
+    target_mbps_per_watt: 2.0
+    
+  spectral_efficiency:
+    bandwidth_mhz: 20.0
+    target_bps_hz: 2.0
+
+processing:
+  calculation_interval: 30s
+  aggregation_interval: 5m
+  worker_count: 3
+  
+aggregations:
+  time_windows:
+    - "1h"
+    - "24h"
+    - "7d"
+  metrics:
+    - "mean"
+    - "max"
+    - "min"
+    - "percentile_95"
+
+logging:
+  level: "info"
+  format: "json"

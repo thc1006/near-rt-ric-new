@@ -1,0 +1,141 @@
+# O-RAN Analytics API Configuration
+
+server:
+  host: "0.0.0.0"
+  port: 8088
+  metrics_port: 9097
+  read_timeout: 30s
+  write_timeout: 30s
+  idle_timeout: 60s
+
+influxdb:
+  url: "http://influxdb:8086"
+  token: "${INFLUXDB_TOKEN}"
+  org: "oran"
+  buckets:
+    metrics: "oran-metrics"
+    kpis: "oran-kpis"
+    predictions: "oran-predictions"
+
+kafka:
+  brokers:
+    - "kafka:29092"
+  producer:
+    topic: "analytics-requests"
+
+api:
+  version: "v1"
+  base_path: "/api/v1"
+  
+  # Rate limiting
+  rate_limit:
+    enabled: true
+    requests_per_minute: 100
+    burst: 20
+    
+  # CORS settings
+  cors:
+    enabled: true
+    allowed_origins:
+      - "*"
+    allowed_methods:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+      - "OPTIONS"
+    allowed_headers:
+      - "Content-Type"
+      - "Authorization"
+      - "X-Requested-With"
+      
+  # Caching
+  cache:
+    enabled: true
+    ttl: "5m"
+    max_size: 1000
+
+endpoints:
+  kpi_summary:
+    path: "/kpi-summary"
+    default_time_range: "1h"
+    max_time_range: "30d"
+    
+  predictions:
+    path: "/predictions"
+    default_time_range: "1h"
+    max_time_range: "7d"
+    
+  insights:
+    path: "/insights"
+    default_analysis_period: "24h"
+    max_analysis_period: "30d"
+    
+  timeseries:
+    path: "/timeseries"
+    max_data_points: 10000
+    default_aggregation: "1m"
+    
+  realtime:
+    path: "/realtime"
+    max_sources: 50
+
+query_limits:
+  max_execution_time: "30s"
+  max_memory_usage: "512MB"
+  max_data_points: 100000
+
+aggregations:
+  default_window: "5m"
+  available_functions:
+    - "mean"
+    - "max"
+    - "min"
+    - "sum"
+    - "count"
+    - "percentile_95"
+    - "percentile_99"
+
+insights:
+  health_scoring:
+    excellent_threshold: 90.0
+    good_threshold: 75.0
+    fair_threshold: 50.0
+    
+  performance_analysis:
+    top_sites_count: 10
+    underperforming_threshold: 30.0
+    high_load_threshold: 80.0
+    
+  predictions:
+    confidence_levels:
+      - 0.95
+      - 0.90
+      - 0.85
+    forecast_horizons:
+      - "1h"
+      - "4h"
+      - "24h"
+
+security:
+  authentication:
+    enabled: false  # Enable in production
+    type: "jwt"
+    secret: "${JWT_SECRET}"
+    
+  authorization:
+    enabled: false  # Enable in production
+    roles:
+      - "admin"
+      - "operator"
+      - "viewer"
+
+logging:
+  level: "info"
+  format: "json"
+  access_log: true
+  
+monitoring:
+  metrics_enabled: true
+  health_check_path: "/health"
+  ready_check_path: "/ready"

@@ -1,0 +1,58 @@
+# Go
+*.exe
+*.exe~
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# Build
+/bin/
+/coverage/
+/dist/
+/certs/
+/test-results/
+
+# Kubernetes
+*.kubeconfig
+*.kube/
+
+# Helm
+charts/
+*.tgz
+
+# Development Artifacts
+*.log
+tmp/
+*.tmp
+
+# OS Generated
+.DS_Store
+Thumbs.db
+
+# Security
+secrets/
+*.pem
+*.key
+
+# IDE
+.vscode/
+.idea/
+
+# Build
+_output/
+_build/
+
+# Dependency Management
+vendor/
+node_modules/
+
+# Temp xApp Development
+xapp-template/
+
+# Security Reports
+vulnerability_report.json
+vulnerability_summary.txt
+security_compliance_report.yaml
+security_test_report.yaml

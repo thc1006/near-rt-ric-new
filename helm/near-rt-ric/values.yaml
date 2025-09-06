@@ -1,0 +1,338 @@
+# Default values for near-rt-ric
+# This is a YAML-formatted file
+# Declare variables to be passed into your templates
+
+# Global configuration
+global:
+  imageRegistry: "ghcr.io"
+  imagePullSecrets: []
+  storageClass: ""
+  
+# Core O-RAN Components
+dashboard-api:
+  enabled: true
+  image:
+    repository: oran/dashboard-api
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  replicaCount: 3
+  
+  service:
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+    annotations: {}
+    
+  ingress:
+    enabled: false
+    className: "nginx"
+    annotations: {}
+    hosts:
+      - host: dashboard-api.local
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+  
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+      
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+    
+  podSecurityContext:
+    fsGroup: 1001
+    runAsNonRoot: true
+    
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 1001
+    
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 8080
+    initialDelaySeconds: 15
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+    
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  
+  config:
+    logLevel: info
+    database:
+      host: postgresql
+      port: 5432
+      name: oran
+      user: oran
+    redis:
+      host: redis-master
+      port: 6379
+    monitoring:
+      enabled: true
+      jaeger:
+        host: jaeger-collector
+        port: 14268
+
+ric:
+  enabled: true
+  image:
+    repository: oran/ric
+    tag: "latest"
+    pullPolicy: IfNotPresent
+    
+  replicaCount: 2
+  
+  service:
+    type: ClusterIP
+    ports:
+      e2: 36421
+      http: 8081
+      metrics: 9091
+    annotations: {}
+    
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+      
+  podSecurityContext:
+    fsGroup: 1001
+    runAsNonRoot: true
+    
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      add:
+        - NET_ADMIN
+        - SYS_ADMIN
+    readOnlyRootFilesystem: false
+    runAsNonRoot: true
+    runAsUser: 1001
+    
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8081
+    initialDelaySeconds: 60
+    periodSeconds: 20
+    timeoutSeconds: 10
+    failureThreshold: 3
+    
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 8081
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 5
+    
+  persistence:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 10Gi
+    
+  config:
+    e2:
+      bindAddr: "0.0.0.0:36421"
+      enableTLS: false
+    logLevel: info
+
+xapp-hello-world:
+  enabled: true
+  image:
+    repository: oran/xapp-hello-world
+    tag: "latest"
+    pullPolicy: IfNotPresent
+    
+  replicaCount: 1
+  
+  service:
+    type: ClusterIP
+    port: 8082
+    targetPort: 8082
+    
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+      
+  config:
+    logLevel: info
+    ric:
+      host: ric
+      port: 8081
+
+# Database Configuration (External Dependencies)
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "postgresql-admin"
+    username: "oran"
+    password: "oran123"
+    database: "oran"
+  architecture: standalone
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: "redis123"
+  architecture: standalone
+  master:
+    persistence:
+      enabled: true
+      size: 8Gi
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+# Monitoring Stack
+monitoring:
+  enabled: true
+  
+  prometheus:
+    enabled: true
+    server:
+      persistentVolume:
+        enabled: true
+        size: 50Gi
+      resources:
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    alertmanager:
+      enabled: true
+      persistence:
+        size: 2Gi
+      
+  grafana:
+    enabled: true
+    admin:
+      user: admin
+      password: admin123
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+    
+  jaeger:
+    enabled: true
+    storage:
+      type: elasticsearch
+    elasticsearch:
+      persistence:
+        enabled: true
+        size: 20Gi
+
+# Network Policies
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+
+# Pod Disruption Budgets
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Service Monitor for Prometheus
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
+
+# RBAC Configuration
+rbac:
+  create: true
+  rules: []
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod Security Policy
+podSecurityPolicy:
+  enabled: false
+
+# Additional volumes and mounts
+extraVolumes: []
+extraVolumeMounts: []
+
+# Node selector, tolerations, and affinity for all components
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Pod annotations
+podAnnotations: {}
+
+# Test configuration
+tests:
+  enabled: true
+  image:
+    repository: curlimages/curl
+    tag: latest

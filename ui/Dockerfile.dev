@@ -1,0 +1,39 @@
+# Development Dockerfile for React UI
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Install additional tools for development
+RUN apk add --no-cache \
+    git \
+    curl \
+    bash
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S reactjs -u 1001
+
+# Copy package files first for better caching
+COPY package*.json ./
+RUN npm ci --include=dev
+
+# Install global development tools
+RUN npm install -g @storybook/cli serve
+
+# Copy the rest of the application
+COPY . .
+
+# Change ownership to non-root user
+RUN chown -R reactjs:nodejs /app
+USER reactjs
+
+# Expose ports
+EXPOSE 3000 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:3000 || exit 1
+
+# Default command for development
+CMD ["npm", "start"]

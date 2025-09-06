@@ -1,0 +1,58 @@
+apiVersion: v2
+name: near-rt-ric
+description: O-RAN Near-RT RIC Helm Chart for production deployment
+type: application
+version: 1.0.0
+appVersion: "v1.0.0"
+kubeVersion: ">=1.20.0"
+
+keywords:
+  - oran
+  - near-rt-ric
+  - telecommunications
+  - 5g
+  - ran
+
+home: https://github.com/your-org/near-rt-ric-new
+sources:
+  - https://github.com/your-org/near-rt-ric-new
+
+maintainers:
+  - name: O-RAN Development Team
+    email: dev@oran.org
+
+annotations:
+  category: Telecommunications
+  licenses: Apache-2.0
+
+dependencies:
+  - name: postgresql
+    version: "11.9.13"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+    tags:
+      - database
+  - name: redis
+    version: "17.3.7"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+    tags:
+      - database
+  - name: prometheus
+    version: "15.12.0"
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: monitoring.prometheus.enabled
+    tags:
+      - monitoring
+  - name: grafana
+    version: "6.40.4"
+    repository: https://grafana.github.io/helm-charts
+    condition: monitoring.grafana.enabled
+    tags:
+      - monitoring
+  - name: jaeger
+    version: "0.57.0"
+    repository: https://jaegertracing.github.io/helm-charts
+    condition: monitoring.jaeger.enabled
+    tags:
+      - monitoring
