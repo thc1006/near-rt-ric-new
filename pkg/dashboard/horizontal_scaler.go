@@ -84,17 +84,6 @@ type ScalingMetrics struct {
 	mu              sync.RWMutex
 }
 
-// ResourceUsage tracks resource utilization
-type ResourceUsage struct {
-	CPUUsage       float64
-	MemoryUsage    float64
-	NetworkIn      int64
-	NetworkOut     int64
-	RequestRate    float64
-	ErrorRate      float64
-	AverageLatency time.Duration
-	LastUpdated    time.Time
-}
 
 // ScaleExecutor handles the actual scaling operations
 type ScaleExecutor struct {

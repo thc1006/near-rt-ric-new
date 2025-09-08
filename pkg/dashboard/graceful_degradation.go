@@ -128,19 +128,7 @@ type FallbackHandler interface {
 	GetFallbackType() string
 }
 
-// HealthChecker defines the interface for health checkers
-type HealthChecker interface {
-	CheckHealth(ctx context.Context) (*HealthCheckResult, error)
-	GetServiceName() string
-}
 
-// HealthCheckResult represents the result of a health check
-type HealthCheckResult struct {
-	Healthy      bool                   `json:"healthy"`
-	ResponseTime time.Duration          `json:"responseTime"`
-	ErrorMessage string                 `json:"errorMessage,omitempty"`
-	Metadata     map[string]interface{} `json:"metadata,omitempty"`
-}
 
 // NewGracefulDegradationManager creates a new graceful degradation manager
 func NewGracefulDegradationManager() *GracefulDegradationManager {

@@ -73,21 +73,6 @@ type E2NodeComponentConfig struct {
 	E2NodeComponentConfiguration []byte `json:"e2NodeComponentConfiguration"`
 }
 
-// E2Node represents an E2 node in the system
-type E2Node struct {
-	ID                string                 `json:"id"`
-	GlobalE2NodeID    GlobalE2NodeID         `json:"globalE2NodeId"`
-	ConnectionStatus  E2NodeConnectionStatus `json:"connectionStatus"`
-	SetupRequest      *E2SetupRequest        `json:"setupRequest,omitempty"`
-	ServiceModels     []ServiceModel         `json:"serviceModels"`
-	RANFunctions      []RANFunction          `json:"ranFunctions"`
-	LastUpdate        time.Time              `json:"lastUpdate"`
-	Subscriptions     []SubscriptionInfo     `json:"subscriptions"`
-	IPAddress         string                 `json:"ipAddress"`
-	Port              uint32                 `json:"port"`
-	AssociationID     string                 `json:"associationId"`
-	SCTPStreams       uint32                 `json:"sctpStreams"`
-}
 
 // SubscriptionInfo represents subscription information for an E2 node
 type SubscriptionInfo struct {

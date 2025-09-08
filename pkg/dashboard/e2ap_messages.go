@@ -50,14 +50,6 @@ const (
 	E2AP_CAUSE_MISC         = 6
 )
 
-// E2APMessage represents a generic E2AP message
-type E2APMessage struct {
-	PDUType       uint8                  `json:"pduType"`
-	ProcedureCode uint8                  `json:"procedureCode"`
-	Criticality   uint8                  `json:"criticality"`
-	Value         map[string]interface{} `json:"value"`
-	RawData       []byte                 `json:"rawData,omitempty"`
-}
 
 // E2SetupRequestMessage represents E2 Setup Request
 type E2SetupRequestMessage struct {
@@ -107,11 +99,6 @@ type E2ResetResponseMessage struct {
 
 // Supporting data structures
 
-// GlobalRICID represents Global RIC ID
-type GlobalRICID struct {
-	PlmnID string `json:"plmnId"`
-	RicID  []byte `json:"ricId"`
-}
 
 // RANFunctionItem represents RAN Function Item
 type RANFunctionItem struct {
@@ -228,11 +215,6 @@ const (
 	E2NodeComponentConfigAckTypeFailure E2NodeComponentConfigAckType = 1
 )
 
-// E2NodeComponentConfigUpdateAck represents config update ack
-type E2NodeComponentConfigUpdateAck struct {
-	UpdateOutcome E2NodeComponentConfigAckType `json:"updateOutcome"`
-	FailureCause  *E2APCause                   `json:"failureCause,omitempty"`
-}
 
 // E2APCause represents E2AP cause
 type E2APCause struct {

@@ -262,15 +262,6 @@ type SIMDAcceleratorStats struct {
 	ProcessingSpeedupRatio  float64
 }
 
-// SIMDOperation represents a SIMD-optimized operation
-type SIMDOperation struct {
-	Name            string
-	VectorWidth     int
-	Function        unsafe.Pointer
-	Fallback        unsafe.Pointer
-	InputTypes      []SIMDDataType
-	OutputType      SIMDDataType
-}
 
 // HighThroughputRouter manages high-speed message routing
 type HighThroughputRouter struct {
@@ -320,28 +311,7 @@ type NodeMapShard struct {
 	mu      sync.RWMutex
 }
 
-// E2Node represents an optimized E2 node
-type E2Node struct {
-	ID              string
-	Address         string
-	Port            int
-	Status          NodeStatus
-	Subscriptions   []string
-	LastHeartbeat   time.Time
-	Metrics         NodeMetrics
-	Connection      *OptimizedConnection
-	mu              sync.RWMutex
-}
 
-// OptimizedConnection represents a high-performance connection
-type OptimizedConnection struct {
-	conn            net.Conn
-	readBuffer      []byte
-	writeBuffer     []byte
-	lastActivity    time.Time
-	stats           ConnectionStats
-	mu              sync.RWMutex
-}
 
 // NewAdvancedSMOPerformanceOptimizer creates a new advanced optimizer
 func NewAdvancedSMOPerformanceOptimizer(config *AdvancedPerformanceConfig) *AdvancedSMOPerformanceOptimizer {

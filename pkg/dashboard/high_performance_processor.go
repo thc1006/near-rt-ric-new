@@ -141,30 +141,7 @@ type SIMDProcessor struct {
 	mu              sync.RWMutex
 }
 
-// SIMDOperation represents a SIMD-optimized operation
-type SIMDOperation struct {
-	Name            string
-	Function        unsafe.Pointer
-	InputTypes      []SIMDDataType
-	OutputType      SIMDDataType
-	VectorWidth     int
-}
 
-// SIMDDataType represents data types for SIMD operations
-type SIMDDataType int
-
-const (
-	SIMDInt8 SIMDDataType = iota
-	SIMDInt16
-	SIMDInt32
-	SIMDInt64
-	SIMDFloat32
-	SIMDFloat64
-	SIMDUint8
-	SIMDUint16
-	SIMDUint32
-	SIMDUint64
-)
 
 // SIMDStats tracks SIMD operation statistics
 type SIMDStats struct {
@@ -206,25 +183,7 @@ type BatchStats struct {
 	SizeFlushes         uint64
 }
 
-// LatencyTracker tracks latency with high precision
-type LatencyTracker struct {
-	samples         []time.Duration
-	sampleIndex     int
-	sampleCount     uint64
-	histogram       map[time.Duration]uint64
-	percentiles     LatencyPercentiles
-	mu              sync.RWMutex
-}
 
-// LatencyPercentiles stores calculated percentiles
-type LatencyPercentiles struct {
-	P50     time.Duration
-	P90     time.Duration
-	P95     time.Duration
-	P99     time.Duration
-	P999    time.Duration
-	P9999   time.Duration
-}
 
 // AdvancedMemoryManager handles NUMA-aware memory management
 type AdvancedMemoryManager struct {
@@ -260,7 +219,6 @@ type AllocationStrategy int
 
 const (
 	LocalFirst AllocationStrategy = iota
-	RoundRobin
 	LeastUsed
 	Interleaved
 )

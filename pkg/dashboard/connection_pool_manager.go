@@ -90,13 +90,6 @@ type PoolHealthChecker struct {
 	isRunning    bool
 }
 
-// ResourceUsage represents current resource usage
-type ResourceUsage struct {
-	CPUUsage     float64 `json:"cpuUsage"`
-	MemoryUsage  float64 `json:"memoryUsage"`
-	NetworkUsage float64 `json:"networkUsage"`
-	DiskUsage    float64 `json:"diskUsage"`
-}
 
 // NewConnectionPoolManager creates a new connection pool manager
 func NewConnectionPoolManager(config ConnectionPoolConfig) *ConnectionPoolManager {

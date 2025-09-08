@@ -92,13 +92,6 @@ func WithCorrelationID(ctx context.Context, correlationID string) context.Contex
 	return context.WithValue(ctx, CorrelationIDKey{}, correlationID)
 }
 
-// GetCorrelationID retrieves the correlation ID from context
-func GetCorrelationID(ctx context.Context) string {
-	if id, ok := ctx.Value(CorrelationIDKey{}).(string); ok {
-		return id
-	}
-	return ""
-}
 
 // WithContext creates a logger with context information
 func (l *Logger) WithContext(ctx context.Context) *Logger {
