@@ -290,35 +290,7 @@ type APIBackend struct {
 	mu                      sync.RWMutex
 }
 
-// HorizontalScaler manages automatic scaling of API instances
-type HorizontalScaler struct {
-	currentInstances        int
-	targetInstances         int
-	minInstances            int
-	maxInstances            int
-	
-	// Scaling triggers
-	cpuThreshold            float64
-	memoryThreshold         float64
-	latencyThreshold        time.Duration
-	requestRateThreshold    int
-	
-	// Scaling cooldown
-	lastScaleUp             time.Time
-	lastScaleDown           time.Time
-	scaleUpCooldown         time.Duration
-	scaleDownCooldown       time.Duration
-	
-	// Kubernetes integration
-	k8sClient               interface{} // kubernetes.Interface
-	deploymentName          string
-	namespace               string
-	
-	// Metrics collection
-	metricsCollector        *ScalingMetricsCollector
-	
-	mu                      sync.RWMutex
-}
+// HorizontalScaler type is now defined in types.go to avoid redeclaration
 
 // ProductionE2NodeManager handles 100+ concurrent E2 nodes
 type ProductionE2NodeManager struct {
@@ -904,9 +876,7 @@ func (api *ProductionDashboardAPI) updateLatencyMetrics(endpoint string, duratio
 	}
 }
 
-func generateConnectionID() string {
-	return fmt.Sprintf("conn_%d_%d", time.Now().Unix(), time.Now().Nanosecond())
-}
+// generateConnectionID is defined in enhanced_dashboard_api.go to avoid redeclaration
 
 func getDefaultProductionAPIConfig() *ProductionAPIConfig {
 	return &ProductionAPIConfig{
@@ -1012,12 +982,6 @@ func (w *gzipResponseWriter) Write(b []byte) (int, error) {
 }
 
 // Response writer wrapper for metrics
-type responseWriter struct {
-	http.ResponseWriter
-	statusCode int
-}
+// responseWriter is now using the ResponseWriterWrapper from types.go to avoid redeclaration
 
-func (rw *responseWriter) WriteHeader(code int) {
-	rw.statusCode = code
-	rw.ResponseWriter.WriteHeader(code)
-}
+// WriteHeader method is now defined in types.go with ResponseWriterWrapper

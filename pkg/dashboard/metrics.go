@@ -429,7 +429,7 @@ func (mm *MetricsManager) HTTPMiddleware(next http.Handler) http.Handler {
 		defer mm.DecHTTPRequestsInFlight()
 
 		// Wrap response writer to capture status code
-		wrapped := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+		wrapped := &ResponseWriterWrapper{ResponseWriter: w, statusCode: http.StatusOK}
 		
 		next.ServeHTTP(wrapped, r)
 		
@@ -438,16 +438,9 @@ func (mm *MetricsManager) HTTPMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// responseWriter wraps http.ResponseWriter to capture status code
-type responseWriter struct {
-	http.ResponseWriter
-	statusCode int
-}
+// responseWriter is now using the ResponseWriterWrapper from types.go to avoid redeclaration
 
-func (rw *responseWriter) WriteHeader(code int) {
-	rw.statusCode = code
-	rw.ResponseWriter.WriteHeader(code)
-}
+// WriteHeader method is now defined in types.go with ResponseWriterWrapper
 
 // Global metrics manager instance
 var GlobalMetrics *MetricsManager

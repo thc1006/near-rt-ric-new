@@ -47,15 +47,7 @@ type TestResult struct {
 	Evidence    []Evidence    `json:"evidence,omitempty"`
 }
 
-// TestSummary provides overall test execution summary
-type TestSummary struct {
-	Total    int           `json:"total"`
-	Passed   int           `json:"passed"`
-	Failed   int           `json:"failed"`
-	Skipped  int           `json:"skipped"`
-	Duration time.Duration `json:"duration"`
-	Coverage float64       `json:"coverage"`
-}
+// TestSummary type is now defined in types.go to avoid redeclaration
 
 // Evidence represents proof of compliance
 type Evidence struct {
@@ -65,15 +57,7 @@ type Evidence struct {
 	Timestamp   time.Time   `json:"timestamp"`
 }
 
-// TestSeverity indicates the importance of a test
-type TestSeverity string
-
-const (
-	SeverityCritical TestSeverity = "critical"
-	SeverityHigh     TestSeverity = "high"
-	SeverityMedium   TestSeverity = "medium"
-	SeverityLow      TestSeverity = "low"
-)
+// TestSeverity type and constants are now defined in types.go to avoid redeclaration
 
 // TestStatus indicates the result of a test
 type TestStatus string

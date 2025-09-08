@@ -21,17 +21,7 @@ type LoadTestScenario struct {
 	ConnectionPattern   string        `json:"connectionPattern"` // "linear", "exponential", "burst"
 }
 
-// E2NodeSimulator simulates an E2 node for load testing
-type E2NodeSimulator struct {
-	ID               string
-	ConnectionTime   time.Time
-	IsConnected      bool
-	Subscriptions    []string
-	IndicationCount  int64
-	LastActivity     time.Time
-	ErrorCount       int64
-	mu               sync.RWMutex
-}
+// E2NodeSimulator type is now defined in types.go to avoid redeclaration
 
 // LoadTestManager manages load testing scenarios
 type LoadTestManager struct {

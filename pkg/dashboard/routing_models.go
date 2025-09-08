@@ -28,13 +28,7 @@ type RoutePolicy struct {
 	Parameters map[string]string `json:"parameters"`
 }
 
-// RouteEntry represents an entry in the routing table
-type RouteEntry struct {
-	MessageType     uint32       `json:"messageType"`
-	SourceEndpoint  string       `json:"sourceEndpoint"`
-	TargetEndpoints []string     `json:"targetEndpoints"`
-	Policy          *RoutePolicy `json:"policy,omitempty"`
-}
+// RouteEntry type is now defined in types.go to avoid redeclaration
 
 // RoutingTable represents the complete routing table
 type RoutingTable struct {

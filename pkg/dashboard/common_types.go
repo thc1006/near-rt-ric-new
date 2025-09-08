@@ -17,26 +17,7 @@ import (
 // E2 Node and Related Types
 // =====================================================================
 
-// E2Node represents an E2 node in the system (from e2_models.go - most comprehensive)
-// E2Node type moved to types.go to avoid redeclaration
-// type E2Node struct {
-	ID                string                 `json:"id"`
-	GlobalE2NodeID    GlobalE2NodeID         `json:"globalE2NodeId"`
-	ConnectionStatus  E2NodeConnectionStatus `json:"connectionStatus"`
-	SetupRequest      *E2SetupRequest        `json:"setupRequest,omitempty"`
-	ServiceModels     []ServiceModel         `json:"serviceModels"`
-	RANFunctions      []RANFunction          `json:"ranFunctions"`
-	LastUpdate        time.Time              `json:"lastUpdate"`
-	Subscriptions     []SubscriptionInfo     `json:"subscriptions"`
-	IPAddress         string                 `json:"ipAddress"`
-	Port              uint32                 `json:"port"`
-	AssociationID     string                 `json:"associationId"`
-	SCTPStreams       uint32                 `json:"sctpStreams"`
-	Address           string                 `json:"address,omitempty"`
-	Metrics           NodeMetrics            `json:"metrics,omitempty"`
-	Connection        *OptimizedConnection   `json:"connection,omitempty"`
-	mu                sync.RWMutex           `json:"-"`
-}
+// E2Node type definition moved to types.go to avoid redeclaration
 
 // NodeMetrics represents performance metrics for an E2 node
 type NodeMetrics struct {
@@ -82,31 +63,13 @@ const (
 // Global RIC ID Type
 // =====================================================================
 
-// GlobalRICID represents the global RIC identifier (from e2t_client.go - most comprehensive)
-type GlobalRICID struct {
-	PlmnID string `json:"plmnId"`
-	RicID  string `json:"ricId"`
-}
+// GlobalRICID type definition moved to types.go to avoid redeclaration
 
 // =====================================================================
 // E2AP Message Types
 // =====================================================================
 
-// E2APMessage represents an E2AP protocol message (from e2t_client.go - most comprehensive)
-type E2APMessage struct {
-	MessageType    string    `json:"messageType"`
-	ProcedureCode  uint8     `json:"procedureCode"`
-	Criticality    string    `json:"criticality"`
-	TransactionID  uint32    `json:"transactionId"`
-	Payload        []byte    `json:"payload"`
-	Timestamp      time.Time `json:"timestamp"`
-	SourceAddress  string    `json:"sourceAddress"`
-	DestAddress    string    `json:"destAddress"`
-	AssociationID  string    `json:"associationId"`
-	PDUType        uint8     `json:"pduType,omitempty"`
-	Value          map[string]interface{} `json:"value,omitempty"`
-	RawData        []byte    `json:"rawData,omitempty"`
-}
+// E2APMessage type definition moved to types.go to avoid redeclaration
 
 // E2MessageType represents different E2 message types
 type E2MessageType int
@@ -123,28 +86,13 @@ const (
 // E2 Node Component Config Update Acknowledgement
 // =====================================================================
 
-// E2NodeComponentConfigUpdateAck represents acknowledgment of component config update
-type E2NodeComponentConfigUpdateAck struct {
-	E2NodeComponentInterfaceType   E2NodeComponentInterfaceType    `json:"e2NodeComponentInterfaceType"`
-	E2NodeComponentID              E2NodeComponentID               `json:"e2NodeComponentId"`
-	E2NodeComponentConfigAck       E2NodeComponentConfigAckType    `json:"e2NodeComponentConfigAck"`
-	E2NodeComponentConfigUpdateAck *E2NodeComponentConfigUpdateAck `json:"e2NodeComponentConfigUpdateAck,omitempty"`
-	UpdateOutcome                  string                          `json:"updateOutcome,omitempty"`
-}
+// E2NodeComponentConfigUpdateAck type definition moved to types.go to avoid redeclaration
 
 // =====================================================================
 // SIMD Operation Types
 // =====================================================================
 
-// SIMDOperation represents a SIMD-optimized operation (from high_performance_processor.go - most comprehensive)
-type SIMDOperation struct {
-	Name            string
-	Function        unsafe.Pointer
-	InputTypes      []SIMDDataType
-	OutputType      SIMDDataType
-	VectorWidth     int
-	Fallback        unsafe.Pointer
-}
+// SIMDOperation type definition moved to types.go to avoid redeclaration
 
 // SIMDDataType represents data types for SIMD operations
 type SIMDDataType int
@@ -166,40 +114,13 @@ const (
 // Resource Usage Types
 // =====================================================================
 
-// ResourceUsage represents current resource usage (from horizontal_scaler.go - most comprehensive)
-type ResourceUsage struct {
-	CPUUsage       float64       `json:"cpuUsage"`
-	MemoryUsage    float64       `json:"memoryUsage"`
-	NetworkIn      int64         `json:"networkIn"`
-	NetworkOut     int64         `json:"networkOut"`
-	RequestRate    float64       `json:"requestRate"`
-	ErrorRate      float64       `json:"errorRate"`
-	AverageLatency time.Duration `json:"averageLatency"`
-	LastUpdated    time.Time     `json:"lastUpdated"`
-	NetworkUsage   float64       `json:"networkUsage,omitempty"`
-	DiskUsage      float64       `json:"diskUsage,omitempty"`
-}
+// ResourceUsage type definition moved to types.go to avoid redeclaration
 
 // =====================================================================
 // Latency Tracker Types
 // =====================================================================
 
-// LatencyTracker tracks latency measurements across different operations (from latency_testing.go - most comprehensive)
-type LatencyTracker struct {
-	e2SetupLatencies        []float64
-	subscriptionLatencies   []float64
-	indicationLatencies     []float64
-	controlLatencies        []float64
-	endToEndLatencies       []float64
-	latencyDistribution     map[float64]int64 // bucket -> count
-	activeOperations        map[string]*LatencyMeasurement
-	samples                 []time.Duration
-	sampleIndex             int
-	sampleCount             uint64
-	histogram               map[time.Duration]uint64
-	percentiles             LatencyPercentiles
-	mu                      sync.RWMutex
-}
+// LatencyTracker type definition moved to types.go to avoid redeclaration
 
 // LatencyMeasurement tracks a single operation's latency
 type LatencyMeasurement struct {
@@ -228,10 +149,9 @@ type LatencyPercentiles struct {
 // LoadBalancingAlgorithm defines load balancing strategies
 type LoadBalancingAlgorithm int
 
-// RoundRobin represents the round-robin load balancing algorithm
+// RoundRobin and other load balancing algorithm constants moved to types.go to avoid redeclaration
 const (
-	RoundRobin LoadBalancingAlgorithm = iota
-	WeightedRoundRobin
+	WeightedRoundRobin LoadBalancingAlgorithm = iota + 1
 	LeastConnections
 	WeightedLeastConnections
 	ConsistentHashing
@@ -243,13 +163,7 @@ const (
 // Health Checker Types
 // =====================================================================
 
-// HealthChecker defines the interface for health checkers (from graceful_degradation.go - interface definition)
-type HealthChecker interface {
-	CheckHealth(ctx context.Context) (*HealthCheckResult, error)
-	GetServiceName() string
-	AddBackend(backend *Backend)
-	RemoveBackend(backendID string)
-}
+// HealthChecker interface definition moved to types.go to avoid redeclaration
 
 // HealthCheckResult represents the result of a health check
 type HealthCheckResult struct {

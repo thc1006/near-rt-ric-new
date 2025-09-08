@@ -153,18 +153,7 @@ type LatencyStats struct {
 	NetworkLatencyMs        LatencyMetrics `json:"networkLatencyMs"`
 }
 
-// LatencyMetrics contains statistical measures for latency
-type LatencyMetrics struct {
-	Mean                    float64       `json:"mean"`
-	Median                  float64       `json:"median"`
-	P95                     float64       `json:"p95"`
-	P99                     float64       `json:"p99"`
-	P999                    float64       `json:"p999"`
-	Min                     float64       `json:"min"`
-	Max                     float64       `json:"max"`
-	StandardDeviation       float64       `json:"standardDeviation"`
-	SampleCount             int64         `json:"sampleCount"`
-}
+// LatencyMetrics type is now defined in types.go to avoid redeclaration
 
 // ThroughputStats provides throughput analysis
 type ThroughputStats struct {

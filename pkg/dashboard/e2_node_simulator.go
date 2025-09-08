@@ -18,43 +18,7 @@ import (
 	"github.com/ishidawataru/sctp"
 )
 
-// E2NodeSimulator simulates an E2 node for testing and development
-type E2NodeSimulator struct {
-	mu                sync.RWMutex
-	nodeID            string
-	globalE2NodeID    GlobalE2NodeID
-	ricAddress        string
-	ricPort           uint32
-	localAddress      string
-	localPort         uint32
-	
-	// SCTP connection
-	conn              *sctp.SCTPConn
-	isConnected       bool
-	
-	// E2AP protocol handler
-	protocolHandler   *E2APProcedureHandler
-	encoder           *E2APEncoder
-	
-	// Simulation state
-	isRunning         bool
-	ctx               context.Context
-	cancel            context.CancelFunc
-	
-	// RAN Functions
-	ranFunctions      []RANFunction
-	serviceModels     []ServiceModel
-	
-	// Subscription management
-	subscriptions     map[string]*SimulatedSubscription
-	
-	// Indication generation
-	indicationTicker  *time.Ticker
-	indicationRate    time.Duration
-	
-	// Configuration
-	config            *E2NodeSimulatorConfig
-}
+// E2NodeSimulator type is now defined in types.go to avoid redeclaration
 
 // E2NodeSimulatorConfig represents configuration for E2 node simulator
 type E2NodeSimulatorConfig struct {

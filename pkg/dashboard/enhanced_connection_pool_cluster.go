@@ -238,24 +238,7 @@ type WorkerPool struct {
 	mu              sync.RWMutex
 }
 
-// Worker represents a high-performance worker thread
-type Worker struct {
-	id              int
-	poolID          string
-	thread          *WorkerThread
-	
-	// CPU affinity
-	cpuCore         int
-	threadID        int
-	
-	// Performance optimization
-	cache           *WorkerCache
-	localQueue      *LocalWorkQueue
-	
-	stats           WorkerStats
-	state           WorkerState
-	mu              sync.RWMutex
-}
+// Worker type is now defined in types.go to avoid redeclaration
 
 // WorkerThread represents the actual thread implementation
 type WorkerThread struct {

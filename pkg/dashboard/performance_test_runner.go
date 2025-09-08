@@ -51,16 +51,7 @@ type ValidationResults struct {
 	MemoryLeakTest          *ValidationResult `json:"memoryLeakTest"`
 }
 
-// ValidationResult represents the result of a specific validation
-type ValidationResult struct {
-	TestName        string    `json:"testName"`
-	RequirementMet  bool      `json:"requirementMet"`
-	ActualValue     float64   `json:"actualValue"`
-	RequiredValue   float64   `json:"requiredValue"`
-	PerformanceGap  float64   `json:"performanceGap"` // Positive means exceeds requirement
-	Details         string    `json:"details"`
-	Timestamp       time.Time `json:"timestamp"`
-}
+// ValidationResult type is now defined in types.go to avoid redeclaration
 
 // RequirementCompliance tracks compliance with each requirement
 type RequirementCompliance struct {

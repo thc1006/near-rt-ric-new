@@ -12,14 +12,7 @@ import (
 	"time"
 )
 
-// ServiceModelType represents the type of service model
-type ServiceModelType string
-
-const (
-	ServiceModelTypeKPM ServiceModelType = "E2SM-KPM"
-	ServiceModelTypeRC  ServiceModelType = "E2SM-RC"
-	ServiceModelTypeNI  ServiceModelType = "E2SM-NI"
-)
+// ServiceModelType and constants are now defined in types.go to avoid redeclaration
 
 // ServiceModelCapability represents a capability of a service model
 type ServiceModelCapability struct {
@@ -41,79 +34,23 @@ type ServiceModelDefinition struct {
 	LastUpdated   time.Time                `json:"lastUpdated"`
 }
 
-// E2SMKPMMetrics represents KPI measurement metrics
-type E2SMKPMMetrics struct {
-	MeasurementName   string                 `json:"measurementName"`
-	MeasurementType   string                 `json:"measurementType"`
-	MeasurementValue  interface{}            `json:"measurementValue"`
-	MeasurementUnit   string                 `json:"measurementUnit"`
-	Timestamp         time.Time              `json:"timestamp"`
-	CellID            string                 `json:"cellId,omitempty"`
-	AdditionalInfo    map[string]interface{} `json:"additionalInfo,omitempty"`
-}
+// E2SMKPMMetrics type is now defined in types.go to avoid redeclaration
 
-// E2SMKPMIndicationHeader represents KPM indication header
-type E2SMKPMIndicationHeader struct {
-	CollectionStartTime time.Time `json:"collectionStartTime"`
-	FileFormatVersion   string    `json:"fileFormatVersion"`
-	SenderName          string    `json:"senderName"`
-	SenderType          string    `json:"senderType"`
-	VendorName          string    `json:"vendorName"`
-}
+// E2SMKPMIndicationHeader type is now defined in types.go to avoid redeclaration
 
-// E2SMKPMIndicationMessage represents KPM indication message
-type E2SMKPMIndicationMessage struct {
-	MeasurementData []E2SMKPMMetrics `json:"measurementData"`
-	GranularityPeriod uint32         `json:"granularityPeriod"`
-	MeasurementInfoList []MeasurementInfo `json:"measurementInfoList"`
-}
+// E2SMKPMIndicationMessage type is now defined in types.go to avoid redeclaration
 
-// MeasurementInfo represents measurement information
-type MeasurementInfo struct {
-	MeasurementTypeID   uint32 `json:"measurementTypeId"`
-	MeasurementTypeName string `json:"measurementTypeName"`
-}
+// MeasurementInfo type is now defined in types.go to avoid redeclaration
 
-// E2SMRCControlHeader represents RC control header
-type E2SMRCControlHeader struct {
-	RICControlHeaderFormat uint32 `json:"ricControlHeaderFormat"`
-	UEIdentity            string `json:"ueIdentity,omitempty"`
-	RANParameterID        uint32 `json:"ranParameterId,omitempty"`
-	RANParameterName      string `json:"ranParameterName,omitempty"`
-}
+// E2SMRCControlHeader type is now defined in types.go to avoid redeclaration
 
-// E2SMRCControlMessage represents RC control message
-type E2SMRCControlMessage struct {
-	RICControlMessageFormat uint32                 `json:"ricControlMessageFormat"`
-	RANParameters          []RANParameter         `json:"ranParameters"`
-	ControlAction          string                 `json:"controlAction"`
-	ControlOutcome         string                 `json:"controlOutcome,omitempty"`
-	AdditionalInfo         map[string]interface{} `json:"additionalInfo,omitempty"`
-}
+// E2SMRCControlMessage type is now defined in types.go to avoid redeclaration
 
-// RANParameter represents a RAN parameter
-type RANParameter struct {
-	ID    uint32      `json:"id"`
-	Name  string      `json:"name"`
-	Value interface{} `json:"value"`
-	Type  string      `json:"type"`
-}
+// RANParameter type is now defined in types.go to avoid redeclaration
 
-// E2SMNIIndicationHeader represents NI indication header
-type E2SMNIIndicationHeader struct {
-	InterfaceType      string    `json:"interfaceType"`
-	InterfaceID        string    `json:"interfaceId"`
-	InterfaceDirection string    `json:"interfaceDirection"`
-	Timestamp          time.Time `json:"timestamp"`
-}
+// E2SMNIIndicationHeader type is now defined in types.go to avoid redeclaration
 
-// E2SMNIIndicationMessage represents NI indication message
-type E2SMNIIndicationMessage struct {
-	InterfaceMessage []byte                 `json:"interfaceMessage"`
-	MessageType      string                 `json:"messageType"`
-	ProtocolIEs      []ProtocolIE          `json:"protocolIEs,omitempty"`
-	AdditionalInfo   map[string]interface{} `json:"additionalInfo,omitempty"`
-}
+// E2SMNIIndicationMessage type is now defined in types.go to avoid redeclaration
 
 // ProtocolIE represents a protocol information element
 type ProtocolIE struct {

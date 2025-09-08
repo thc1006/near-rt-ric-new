@@ -14,8 +14,9 @@ import (
 	"time"
 )
 
-// ServiceModelAPI provides a generic interface for service model operations
-type ServiceModelAPI interface {
+// ServiceModelInterface provides a generic interface for service model operations
+// Renamed to avoid conflict with ServiceModelAPI struct in types.go
+type ServiceModelInterface interface {
 	// GetServiceModelType returns the service model type
 	GetServiceModelType() ServiceModelType
 	
@@ -37,7 +38,7 @@ type ServiceModelAPI interface {
 
 // ServiceModelAPIManager manages all service model APIs
 type ServiceModelAPIManager struct {
-	apis     map[ServiceModelType]ServiceModelAPI
+	apis     map[ServiceModelType]ServiceModelInterface
 	registry *ServiceModelRegistry
 	mu       sync.RWMutex
 }

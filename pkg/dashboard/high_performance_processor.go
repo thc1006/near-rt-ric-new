@@ -224,13 +224,7 @@ const (
 )
 
 // MemoryStats tracks memory allocation statistics
-type MemoryStats struct {
-	TotalAllocated      uint64
-	ByNUMANode          map[int]uint64
-	HitRatio            float64
-	FragmentationRatio  float64
-	GCPressure          float64
-}
+// MemoryStats type is now defined in types.go to avoid redeclaration
 
 // PipelineStats tracks pipeline performance
 type PipelineStats struct {
@@ -243,14 +237,7 @@ type PipelineStats struct {
 }
 
 // WorkerStats tracks individual worker performance
-type WorkerStats struct {
-	MessagesProcessed   uint64
-	ProcessingTime      time.Duration
-	IdleTime            time.Duration
-	ErrorCount          uint64
-	LastActivity        time.Time
-	CPUTime             time.Duration
-}
+// WorkerStats type is now defined in types.go to avoid redeclaration
 
 // NewHighPerformanceMessageProcessor creates a new high-performance message processor
 func NewHighPerformanceMessageProcessor(config *SMOPerformanceConfig) *HighPerformanceMessageProcessor {

@@ -70,14 +70,7 @@ type ThreadPool struct {
 	running    int32
 }
 
-// Worker represents a high-performance worker thread
-type Worker struct {
-	id       int
-	coreID   int
-	workChan chan WorkItem
-	quit     chan bool
-	stats    WorkerStats
-}
+// Worker type is now defined in types.go to avoid redeclaration
 
 // WorkItem represents work to be processed
 type WorkItem struct {
@@ -111,23 +104,9 @@ const (
 	WorkTypePolicyUpdate
 )
 
-// Priority defines work priority levels
-type Priority int
+// Priority type and constants are now defined in types.go to avoid redeclaration
 
-const (
-	PriorityLow Priority = iota
-	PriorityNormal
-	PriorityHigh
-	PriorityCritical
-)
-
-// WorkerStats tracks worker performance
-type WorkerStats struct {
-	ProcessedItems uint64
-	TotalDuration  time.Duration
-	ErrorCount     uint64
-	LastActive     time.Time
-}
+// WorkerStats type is now defined in types.go to avoid redeclaration
 
 // MemoryPool manages memory allocation optimization
 type MemoryPool struct {
@@ -136,14 +115,7 @@ type MemoryPool struct {
 	mu    sync.RWMutex
 }
 
-// MemoryStats tracks memory usage
-type MemoryStats struct {
-	AllocatedBytes   uint64
-	PoolHits         uint64
-	PoolMisses       uint64
-	GCPauses         uint64
-	LastGCDuration   time.Duration
-}
+// MemoryStats type is now defined in types.go to avoid redeclaration
 
 // GCOptimizer manages garbage collection optimization
 type GCOptimizer struct {
@@ -191,15 +163,8 @@ type BottleneckAlert struct {
 	Suggestions []string
 }
 
-// AlertSeverity defines alert severity levels
-type AlertSeverity int
-
-const (
-	SeverityInfo AlertSeverity = iota
-	SeverityWarning
-	SeverityError
-	SeverityCritical
-)
+// AlertSeverity and severity constants are now defined in types.go to avoid redeclaration
+type AlertSeverity = TestSeverity // Use alias to existing type
 
 // NewPerformanceOptimizer creates a new performance optimizer
 func NewPerformanceOptimizer() *PerformanceOptimizer {

@@ -14,14 +14,7 @@ import (
 	"time"
 )
 
-// HorizontalScaler manages automatic scaling of stateless components
-type HorizontalScaler struct {
-	scalingPolicies map[string]*ScalingPolicy
-	instances       map[string]*InstanceGroup
-	metrics         *ScalingMetrics
-	scaleExecutor   *ScaleExecutor
-	mu              sync.RWMutex
-}
+// HorizontalScaler type is now defined in types.go to avoid redeclaration
 
 // ScalingPolicy defines scaling behavior for a component
 type ScalingPolicy struct {

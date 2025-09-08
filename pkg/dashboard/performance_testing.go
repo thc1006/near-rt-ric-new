@@ -135,15 +135,7 @@ type QueueMetrics struct {
 	OverflowRate float64 `json:"overflowRate"`
 }
 
-type LatencyMetrics struct {
-	Mean   float64 `json:"mean"`
-	P50    float64 `json:"p50"`
-	P95    float64 `json:"p95"`
-	P99    float64 `json:"p99"`
-	Max    float64 `json:"max"`
-	Min    float64 `json:"min"`
-	Count  int64   `json:"count"`
-}
+// LatencyMetrics type is now defined in types.go to avoid redeclaration
 
 type LatencyBucket struct {
 	UpperBoundMs float64 `json:"upperBoundMs"`
@@ -224,16 +216,7 @@ type ResourceUtilization struct {
 	DiskUtilization    int64   `json:"diskUtilization"`
 }
 
-type TestSummary struct {
-	TotalTestDuration   time.Duration `json:"totalTestDuration"`
-	TestsExecuted       int           `json:"testsExecuted"`
-	TestsPassed         int           `json:"testsPassed"`
-	TestsFailed         int           `json:"testsFailed"`
-	OverallScore        float64       `json:"overallScore"`
-	Recommendations     []string      `json:"recommendations"`
-	CriticalIssues      []string      `json:"criticalIssues"`
-	PerformanceGrade    string        `json:"performanceGrade"`
-}
+// TestSummary type is now defined in types.go to avoid redeclaration
 
 // NewPerformanceTestSuite creates a new performance test suite
 func NewPerformanceTestSuite(e2Manager *E2ManagerClient, subManager *SubscriptionManagerClient, prometheusClient api.Client) *PerformanceTestSuite {

@@ -79,15 +79,7 @@ const (
 	CategoryInterop       TestCategory = "interoperability"
 )
 
-// TestPriority defines test priorities  
-type TestPriority string
-
-const (
-	PriorityCritical TestPriority = "critical"
-	PriorityHigh     TestPriority = "high"
-	PriorityMedium   TestPriority = "medium"
-	PriorityLow      TestPriority = "low"
-)
+// TestPriority type and constants are now defined in types.go to avoid redeclaration
 
 // TestStep represents a single test step
 type TestStep struct {
@@ -324,13 +316,7 @@ type StepResult struct {
 }
 
 // ValidationResult captures validation outcome
-type ValidationResult struct {
-	Rule     string      `json:"rule"`
-	Expected interface{} `json:"expected"`
-	Actual   interface{} `json:"actual"`
-	Status   string      `json:"status"`
-	Message  string      `json:"message"`
-}
+// ValidationResult type is now defined in types.go to avoid redeclaration
 
 // TestEvidence represents evidence collected during testing
 type TestEvidence struct {

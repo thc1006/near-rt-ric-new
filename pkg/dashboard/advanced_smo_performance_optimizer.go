@@ -279,14 +279,7 @@ type LockFreeRoutingTable struct {
 	version     int64
 }
 
-// RouteEntry represents a routing table entry
-type RouteEntry struct {
-	Destination string
-	NextHop     string
-	Weight      int
-	Latency     time.Duration
-	LoadFactor  float64
-}
+// RouteEntry type is now defined in types.go to avoid redeclaration
 
 // ScalableE2NodeManager handles 100+ concurrent E2 nodes
 type ScalableE2NodeManager struct {

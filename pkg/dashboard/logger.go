@@ -21,19 +21,7 @@ type Logger struct {
 	component string
 }
 
-// LogEntry represents a structured log entry
-type LogEntry struct {
-	Timestamp     time.Time              `json:"timestamp"`
-	Level         string                 `json:"level"`
-	Message       string                 `json:"message"`
-	Component     string                 `json:"component"`
-	CorrelationID string                 `json:"correlation_id,omitempty"`
-	TraceID       string                 `json:"trace_id,omitempty"`
-	SpanID        string                 `json:"span_id,omitempty"`
-	Fields        map[string]interface{} `json:"fields,omitempty"`
-	Caller        string                 `json:"caller,omitempty"`
-	Error         string                 `json:"error,omitempty"`
-}
+// LogEntry type is now defined in types.go to avoid redeclaration
 
 // NewLogger creates a new structured logger for a component
 func NewLogger(component string) *Logger {
