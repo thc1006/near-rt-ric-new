@@ -1,21 +1,23 @@
-# O-RAN Near-RT RIC Development Workflow
+# O-RAN Near-RT RIC Development Workflow Guide
 
-This document outlines the complete development workflow for the O-RAN Near-RT RIC project, including setup, development practices, testing procedures, and deployment processes.
+This comprehensive guide outlines the complete development workflow for the O-RAN Near-RT RIC project, including quick start procedures, development practices, testing strategies, and deployment processes.
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Quick Start](#quick-start)
 - [Development Environment Setup](#development-environment-setup)
 - [Development Workflow](#development-workflow)
 - [Testing Strategy](#testing-strategy)
 - [Code Quality](#code-quality)
-- [Deployment Process](#deployment-process)
+- [Build and Deploy](#build-and-deploy)
+- [CI/CD Pipeline](#cicd-pipeline)
 - [Monitoring and Observability](#monitoring-and-observability)
 - [Troubleshooting](#troubleshooting)
+- [Best Practices](#best-practices)
 
-## 🚀 Quick Start
+## Quick Start
 
-### Prerequisites
+### Prerequisites Check
 
 Ensure you have the following installed:
 - **Docker** 20.10+
@@ -25,16 +27,32 @@ Ensure you have the following installed:
 - **kubectl** (for Kubernetes deployment)
 - **Helm** 3.0+ (for Kubernetes deployment)
 
-### One-Command Setup
-
+Run this script to verify your environment:
 ```bash
-# Clone and setup the entire development environment
-git clone <repository-url>
-cd near-rt-ric-new
-./scripts/dev-setup.sh
+./scripts/check-prerequisites.sh
 ```
 
-### Start Development Environment
+### Initial Setup
+
+```bash
+# Clone and setup
+git clone <repository>
+cd near-rt-ric-new
+
+# Install dependencies
+make setup
+
+# Clean existing artifacts
+make clean
+
+# Build all components
+make build
+
+# Run tests
+make test
+```
+
+### One-Command Development Environment
 
 ```bash
 # Option 1: Full development stack
@@ -47,7 +65,7 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 make dev
 ```
 
-### Access Services
+### Access Development Services
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
@@ -56,10 +74,9 @@ make dev
 | Grafana | http://localhost:3000 | admin/admin123 |
 | Prometheus | http://localhost:9092 | - |
 | Jaeger | http://localhost:16686 | - |
-| SonarQube | http://localhost:9000 | admin/admin |
 | API Documentation | http://localhost:8085 | - |
 
-## 🛠 Development Environment Setup
+## Development Environment Setup
 
 ### Automated Setup
 
@@ -70,12 +87,12 @@ Use the automated setup script:
 ```
 
 This script will:
-- ✅ Check prerequisites
-- ✅ Install Go development tools
-- ✅ Setup Node.js environment
-- ✅ Create necessary directories
-- ✅ Configure development services
-- ✅ Validate the environment
+- Check prerequisites
+- Install Go development tools
+- Setup Node.js environment
+- Create necessary directories
+- Configure development services
+- Validate the environment
 
 ### Manual Setup
 
@@ -106,38 +123,47 @@ GIN_MODE=debug
 HOT_RELOAD=true
 
 # Database
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=oran
-DB_USER=oran
-DB_PASSWORD=oran123
-
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
+DATABASE_URL="postgres://ricuser:ricpassword@localhost:5432/ricdb?sslmode=disable"
+REDIS_URL="redis://:redispassword@localhost:6379/0"
 
 # Monitoring
 JAEGER_AGENT_HOST=localhost
 JAEGER_AGENT_PORT=6831
 PROMETHEUS_URL=http://localhost:9092
+
+# Development
+PORT="8080"
 ```
 
-## 🔄 Development Workflow
+## Development Workflow
 
 ### Branch Strategy
 
 We follow **GitFlow** with the following branches:
-
 - `main` - Production-ready code
 - `develop` - Integration branch for features
 - `feature/*` - Feature development branches
 - `hotfix/*` - Critical bug fixes
 - `release/*` - Release preparation branches
 
-### Development Process
+### Daily Development
 
-#### 1. Start New Feature
+```bash
+# Start your day
+git pull origin develop
+make clean
+make lint
+make test
 
+# Run locally
+make run-local
+# OR use Docker Compose
+docker-compose up -d
+```
+
+### Feature Development Process
+
+#### 1. Create Feature Branch
 ```bash
 # Create and checkout feature branch
 git checkout -b feature/your-feature-name develop
@@ -147,60 +173,66 @@ make dev-stack
 ```
 
 #### 2. Development Loop
-
 ```bash
+# Write code
+vim ...
+
 # Format code
 make fmt
 
 # Run linters
 make lint
 
-# Run tests
-make test
+# Test continuously
+make test-unit
 
-# Build components
-make build
+# Check coverage
+make test-coverage
+open coverage.html
 ```
 
-#### 3. Continuous Testing
-
+#### 3. Integration Testing
 ```bash
-# Run tests in watch mode
-make test-short
+# Start dependencies
+docker-compose up postgres redis -d
 
 # Run integration tests
 make test-integration
-
-# Run E2E tests
-make test-e2e
 ```
 
-#### 4. Pre-commit Checks
-
+#### 4. Before Committing
 ```bash
+# Format and lint
+make fmt
+make lint
+
+# Run tests
+make test-coverage
+
+# Security scan
+make security-scan
+
 # Run all pre-commit checks
 make pre-commit
-
-# Or run individual checks
-make fmt lint test-short security
 ```
 
 #### 5. Submit Changes
-
 ```bash
 # Add changes
 git add .
 
 # Commit with conventional commit format
-git commit -m "feat: add new xApp management API
+git commit -m "feat: add new feature
 
-- Implement xApp lifecycle management
-- Add REST endpoints for xApp operations
-- Include comprehensive unit tests
-- Update API documentation"
+- Implement new functionality
+- Add comprehensive tests
+- Update documentation"
 
 # Push to remote
 git push origin feature/your-feature-name
+
+# Create PR
+gh pr create --title "Add new feature" --body "..."
 ```
 
 ### Code Organization
@@ -228,7 +260,7 @@ near-rt-ric-new/
 └── configs/               # Configuration files
 ```
 
-## 🧪 Testing Strategy
+## Testing Strategy
 
 ### Test Pyramid
 
@@ -248,6 +280,12 @@ make test
 
 # Run tests with coverage
 make test-coverage
+
+# Run specific test
+go test -v -run TestSpecificFunction ./pkg/...
+
+# Debug test
+go test -v -count=1 ./...
 
 # Run benchmarks
 make benchmark
@@ -300,11 +338,9 @@ k6 run test/load/load-test.js
 docker run --rm -v $(pwd)/test/load:/scripts loadimpact/k6:latest run /scripts/load-test.js
 ```
 
-## 📊 Code Quality
+## Code Quality
 
 ### Linting Configuration
-
-The project uses comprehensive linting with `.golangci.yml`:
 
 ```bash
 # Run Go linters
@@ -358,11 +394,22 @@ pre-commit install
 pre-commit run --all-files
 ```
 
-## 🚀 Deployment Process
+## Build and Deploy
 
-### Local Development Deployment
+### Local Development
 
 ```bash
+# Build everything
+make build
+
+# Build Docker images
+make docker-build
+
+# Deploy locally
+docker-compose up -d
+# OR
+make deploy-local
+
 # Deploy to local Kubernetes
 make deploy-local
 
@@ -370,49 +417,100 @@ make deploy-local
 make undeploy-local
 ```
 
-### Docker Deployment
-
-```bash
-# Build Docker images
-make docker-build
-
-# Start with Docker Compose
-make docker-compose-up
-
-# Stop services
-make docker-compose-down
-```
-
 ### Production Deployment
 
 ```bash
-# Build and push images
-make docker-build docker-push
+# Build for production
+make clean
+make test
+make build
+make docker-build
+
+# Push to registry
+make docker-push
 
 # Deploy to production
+make deploy-production
+
+# Or using Helm
 helm upgrade --install near-rt-ric ./helm/near-rt-ric \
   --namespace oran \
   --values helm/values-production.yaml
 ```
 
-### CI/CD Pipeline
+## CI/CD Pipeline
 
-The project includes GitHub Actions workflows:
+### GitHub Actions Workflow
 
-- **CI Pipeline** (`.github/workflows/ci-cd.yml`):
-  - Lint Go and UI code
-  - Run unit and integration tests
-  - Security scanning
-  - Build Docker images
-  - Deploy to staging/production
+The CI/CD pipeline automatically runs on:
+- Push to `main` or `develop`
+- Pull requests
+- Release creation
 
-- **Release Pipeline**:
-  - Automated versioning
-  - Release notes generation
-  - Docker image publishing
-  - Helm chart publishing
+#### Pipeline Stages:
 
-## 📈 Monitoring and Observability
+1. **Lint & Code Quality**
+   - Go linting with golangci-lint
+   - React linting with ESLint
+   - Helm chart validation
+
+2. **Testing**
+   - Unit tests with coverage
+   - Integration tests
+   - Coverage threshold enforcement (>70%)
+
+3. **Security Scanning**
+   - Trivy vulnerability scanning
+   - Gosec security analysis
+
+4. **Build & Push**
+   - Multi-arch Docker builds
+   - Push to GitHub Container Registry
+
+5. **Deployment**
+   - Staging deployment (develop branch)
+   - Production deployment (main branch)
+
+### Manual Release Process
+
+1. **Prepare Release**
+```bash
+# Update version
+git checkout develop
+git pull origin develop
+
+# Create release branch
+git checkout -b release/v1.2.3
+
+# Update CHANGELOG.md
+vim CHANGELOG.md
+
+# Commit changes
+git commit -am "chore: prepare release v1.2.3"
+```
+
+2. **Create Release**
+```bash
+# Merge to main
+git checkout main
+git merge --no-ff release/v1.2.3
+
+# Tag release
+git tag -a v1.2.3 -m "Release v1.2.3"
+
+# Push
+git push origin main --tags
+```
+
+3. **Post-Release**
+```bash
+# Merge back to develop
+git checkout develop
+git merge --no-ff main
+git push origin develop
+```
+
+## Monitoring and Observability
 
 ### Metrics
 
@@ -449,32 +547,46 @@ The project includes GitHub Actions workflows:
 }
 ```
 
-### Tracing
+**Access Services:**
+- Prometheus endpoint: `http://localhost:9090/metrics`
+- Grafana dashboards: `http://localhost:3001`
+- Jaeger UI: `http://localhost:16686`
 
-Distributed tracing with Jaeger:
+Enable tracing with `ENABLE_TRACING=true`
 
-- **Trace Context:** Propagated across service boundaries
-- **Span Attributes:** Include relevant business context
-- **Sampling:** Configurable sampling rates
-
-### Alerting
-
-**Alert Categories:**
-- **Critical:** Service down, high error rate
-- **Warning:** High latency, resource usage
-- **Info:** Deployment events, configuration changes
-
-**Alert Channels:**
-- Email notifications
-- Webhook integrations
-- Dashboard alerts
-
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
-#### Services Not Starting
+#### 1. Build Failures
+```bash
+# Clear Go cache
+go clean -cache -modcache
 
+# Rebuild
+make clean
+make build
+```
+
+#### 2. Test Failures
+```bash
+# Run specific test
+go test -v -run TestSpecificFunction ./pkg/...
+
+# Debug test
+go test -v -count=1 ./...
+```
+
+#### 3. Docker Issues
+```bash
+# Clean Docker resources
+docker system prune -a
+
+# Rebuild without cache
+docker-compose build --no-cache
+```
+
+#### 4. Services Not Starting
 ```bash
 # Check service logs
 docker-compose logs dashboard-api
@@ -486,8 +598,7 @@ make validate
 docker-compose restart dashboard-api
 ```
 
-#### Database Connection Issues
-
+#### 5. Database Connection Issues
 ```bash
 # Check database status
 docker exec postgres pg_isready -U oran
@@ -501,23 +612,19 @@ docker volume rm near-rt-ric-new_postgres-data
 docker-compose up -d postgres
 ```
 
-#### Build Failures
-
+#### 6. Kubernetes Deployment Issues
 ```bash
-# Clean and rebuild
-make clean
-make build
+# Check pod status
+kubectl get pods -n oran
 
-# Check Go module issues
-go mod tidy
-go mod verify
+# Check logs
+kubectl logs -n oran deployment/dashboard-api
 
-# Clear Docker build cache
-docker system prune -f
+# Describe pod
+kubectl describe pod -n oran <pod-name>
 ```
 
-#### Network Issues
-
+#### 7. Network Issues
 ```bash
 # Check network configuration
 docker network ls
@@ -556,22 +663,55 @@ go tool pprof http://localhost:8080/debug/pprof/profile
 curl http://localhost:8080/metrics
 ```
 
+## Best Practices
+
+### Development
+- Write tests first (TDD)
+- Use meaningful commit messages
+- Keep branches small and focused
+- Review your own code before requesting review
+- Update documentation with code changes
+
+### Code Quality
+1. Always run `make lint` before committing
+2. Maintain >80% test coverage
+3. Write integration tests for new features
+4. Document API changes in OpenAPI spec
+
+### Security
+1. Never commit secrets
+2. Run security scans regularly
+3. Keep dependencies updated
+4. Use least privilege principles
+
+### Performance
+1. Profile before optimizing
+2. Use connection pooling
+3. Implement caching strategically
+4. Monitor resource usage
+
+### Documentation
+1. Update README for new features
+2. Document configuration changes
+3. Keep CHANGELOG.md current
+4. Write clear commit messages
+
+## Support
+
 ### Getting Help
+- Check documentation in `/docs`
+- Review examples in `/examples`
+- Open an issue on GitHub
+- Contact the team
 
-1. **Check Documentation**: Review relevant sections above
-2. **Search Issues**: Check existing GitHub issues
-3. **Create Issue**: Use issue templates for bug reports
-4. **Ask Questions**: Use discussion forums or Slack channels
+### Contributing
+1. Fork the repository
+2. Create feature branch
+3. Make changes with tests
+4. Submit pull request
+5. Wait for review
 
-## 📚 Additional Resources
-
-- [O-RAN Architecture](docs/architecture.md)
-- [API Documentation](docs/api/)
-- [Deployment Guide](docs/deployment.md)
-- [Contributing Guidelines](CONTRIBUTING.md)
-- [Security Guidelines](SECURITY.md)
-
-## 🔄 Workflow Automation
+## Workflow Automation
 
 ### Make Targets Summary
 
@@ -590,39 +730,31 @@ curl http://localhost:8080/metrics
 | `make pre-commit` | Run pre-commit checks |
 | `make ci` | Run full CI pipeline locally |
 
-### Git Hooks
+### Docker Compose Profiles
 
-Pre-commit hooks automatically run:
-- Code formatting
-- Linting
-- Unit tests
-- Security checks
+```bash
+# Basic stack
+docker-compose up -d
 
-This ensures code quality before commits reach the repository.
+# With simulators
+docker-compose --profile simulators up -d
 
----
+# With tracing
+docker-compose --profile tracing up -d
 
-## 🎯 Best Practices
+# Full stack
+docker-compose --profile simulators --profile tracing --profile docs up -d
+```
 
-### Development
-- ✅ Write tests first (TDD)
-- ✅ Use meaningful commit messages
-- ✅ Keep branches small and focused
-- ✅ Review your own code before requesting review
-- ✅ Update documentation with code changes
+### Port Mappings
+- Dashboard API: 8080
+- Metrics: 9090
+- UI: 3000
+- PostgreSQL: 5432
+- Redis: 6379
+- Prometheus: 9091
+- Grafana: 3001
+- Jaeger: 16686
+- Documentation: 8088
 
-### Testing
-- ✅ Test behavior, not implementation
-- ✅ Use test doubles for external dependencies
-- ✅ Keep tests fast and reliable
-- ✅ Test error conditions
-- ✅ Maintain test data independently
-
-### Code Quality
-- ✅ Follow established conventions
-- ✅ Write self-documenting code
-- ✅ Handle errors explicitly
-- ✅ Use logging effectively
-- ✅ Keep functions small and focused
-
-This development workflow ensures consistent, high-quality development practices across the O-RAN Near-RT RIC project.
+This comprehensive development workflow ensures consistent, high-quality development practices across the O-RAN Near-RT RIC project.
