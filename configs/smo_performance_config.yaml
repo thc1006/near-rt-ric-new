@@ -1,0 +1,394 @@
+# O-RAN L Release and Nephio R5 SMO Performance Configuration
+# Production-hardened configuration for high-performance deployment
+
+# SMO Performance Optimizer Configuration
+smo_performance:
+  # Performance Targets (Exceeding Phase 8 Requirements)
+  max_e2_nodes: 200                    # Target: 100+, Configured: 200 (100% margin)
+  target_throughput_ips: 20000         # Target: 10,000+, Configured: 20,000 (100% margin)  
+  max_processing_latency_ms: 8         # Target: <10ms, Configured: <8ms (20% margin)
+  max_end_to_end_latency_ms: 40        # Target: <50ms, Configured: <40ms (20% margin)
+  
+  # SMO Integration Settings
+  smo_integration:
+    enabled: true
+    smo_endpoint: "https://smo.oran.local:8443"
+    non_rt_ric_endpoint: "https://nonrtric.oran.local:8081"
+    health_check_interval: "30s"
+    connection_timeout: "30s"
+    request_timeout: "10s"
+    max_retries: 3
+    retry_delay: "2s"
+    
+    # Authentication
+    enable_authentication: true
+    auth_type: "jwt"  # jwt, oauth2, mTLS
+    jwt_secret: "${SMO_JWT_SECRET}"
+    
+    # TLS Configuration
+    tls_enabled: true
+    tls_cert_file: "/certs/smo-client.crt"
+    tls_key_file: "/certs/smo-client.key"
+    tls_ca_file: "/certs/ca.crt"
+    tls_skip_verify: false
+  
+  # Nephio R5 Integration Settings
+  nephio_integration:
+    enabled: true
+    porch_endpoint: "https://porch.nephio.local:7443"
+    ocloud_endpoint: "https://ocloud.nephio.local:8443"
+    kube_config_path: "/kube/config"
+    namespace: "nephio-system"
+    default_repo: "deployments"
+    
+    # Package Management
+    package_sync_interval: "60s"
+    package_validation_timeout: "30s"
+    enable_auto_approval: false
+    
+    # O-Cloud Resource Management
+    energy_efficiency_target: 0.6      # Gbps/W target
+    power_cap: 10000                   # Watts
+    auto_scaling_enabled: true
+    scaling_check_interval: "30s"
+
+# High-Performance Message Processing
+message_processing:
+  # Thread Pool Configuration
+  thread_pool_size: 32                # 4x CPU cores for optimal performance
+  e2_pipeline_workers: 16
+  a1_pipeline_workers: 8
+  o1_pipeline_workers: 8
+  
+  # Zero-Copy Buffer Management  
+  buffer_pools:
+    64: 2000      # Small messages
+    256: 2000     # Medium messages  
+    1024: 1000    # Large messages
+    4096: 500     # Extra large messages
+    16384: 200    # Jumbo messages
+  max_buffer_size: 65536
+  buffer_preallocation: true
+  
+  # SIMD Optimization
+  enable_simd: true
+  simd_instruction_set: "auto"  # auto, avx2, avx512, neon
+  
+  # Batch Processing
+  batch_size: 200                     # Optimized for throughput
+  batch_timeout_ms: 5                 # Low latency batching
+  
+  # Performance Targets
+  target_latency_ns: 8000000         # 8ms in nanoseconds
+  target_throughput_mps: 20000       # Messages per second
+
+# Connection Pool Management
+connection_management:
+  # E2 Connection Settings
+  max_e2_connections: 250            # Support 200+ with buffer
+  connection_pool_size: 1500         # 6x max connections
+  connection_timeout: "30s"
+  keep_alive_timeout: "60s"
+  idle_connection_timeout: "300s"
+  
+  # WebSocket Settings
+  max_ws_connections: 2000
+  ws_read_buffer_size: 8192
+  ws_write_buffer_size: 8192
+  ws_ping_interval: "30s"
+  ws_pong_timeout: "10s"
+  
+  # TCP Optimization
+  tcp_no_delay: true
+  tcp_keep_alive: true
+  tcp_keep_alive_idle: "60s"
+  tcp_keep_alive_interval: "10s"
+  tcp_keep_alive_count: 9
+
+# CPU Affinity and NUMA Optimization
+cpu_optimization:
+  enable_cpu_affinity: true
+  enable_numa_awareness: true
+  preferred_numa_node: 0
+  
+  # Core Assignment Strategy
+  critical_path_cores: [0, 1, 2, 3, 4, 5, 6, 7]  # First 8 cores for critical paths
+  isolated_cores: [8, 9, 10, 11]                 # Isolated cores for RT processing
+  
+  # Thread Priorities
+  e2_processing_priority: "high"
+  indication_processing_priority: "critical"
+  control_processing_priority: "realtime"
+  management_priority: "normal"
+
+# Memory Pool Management  
+memory_management:
+  # Pool Configuration
+  memory_pool_size_mb: 2048          # 2GB memory pool
+  enable_numa_allocation: true
+  allocation_strategy: "local_first"  # local_first, round_robin, least_used
+  
+  # Garbage Collection Optimization
+  gc_target_percent: 75              # More aggressive GC for lower latency
+  gc_max_pause_ms: 2                 # Maximum GC pause time
+  
+  # Memory Pressure Handling
+  memory_pressure_threshold: 0.8     # 80% utilization threshold
+  enable_memory_pressure_shedding: true
+  
+  # NUMA Node Configuration
+  numa_nodes:
+    - id: 0
+      memory_mb: 1024
+      cpu_cores: [0, 1, 2, 3, 4, 5, 6, 7, 16, 17, 18, 19, 20, 21, 22, 23]
+    - id: 1  
+      memory_mb: 1024
+      cpu_cores: [8, 9, 10, 11, 12, 13, 14, 15, 24, 25, 26, 27, 28, 29, 30, 31]
+
+# Enhanced Dashboard API Configuration
+dashboard_api:
+  # Server Settings
+  listen_address: "0.0.0.0"
+  listen_port: 8080
+  tls_enabled: true
+  cert_file: "/certs/dashboard.crt"
+  key_file: "/certs/dashboard.key"
+  
+  # Performance Settings
+  max_concurrent_connections: 2000    # Handle 100+ E2 nodes + WebSocket clients
+  request_timeout: "30s"
+  keep_alive_timeout: "60s"
+  read_header_timeout: "10s"
+  write_timeout: "30s"
+  idle_timeout: "120s"
+  max_header_bytes: 65536
+  
+  # Rate Limiting
+  rate_limit_rps: 2000               # 2000 requests per second
+  burst_size: 4000                   # Burst capacity
+  adaptive_rate_limiting: true       # Adjust based on system load
+  rate_limit_window: "60s"
+  
+  # Response Caching
+  enable_response_cache: true
+  cache_ttl: "5m"
+  max_cache_size: 20000              # Cache entries
+  cache_compression: true
+  
+  # Compression  
+  enable_compression: true
+  compression_level: 6               # Balance between CPU and compression ratio
+  min_compression_size: 1024         # Only compress responses > 1KB
+  compression_types: ["application/json", "text/plain", "text/html"]
+
+# Load Balancing and Circuit Breaking
+reliability:
+  # Circuit Breaker Configuration
+  circuit_breaker_enabled: true
+  failure_threshold: 50              # Failures before opening circuit
+  recovery_timeout: "30s"            # Time before attempting recovery
+  half_open_max_requests: 10         # Max requests during half-open state
+  
+  # Health Checking
+  health_check_interval: "10s"
+  health_check_timeout: "5s"
+  health_check_retries: 3
+  unhealthy_threshold: 3             # Consecutive failures to mark unhealthy
+  healthy_threshold: 2               # Consecutive successes to mark healthy
+  
+  # Load Balancing
+  load_balancing_algorithm: "weighted_least_connections"
+  session_affinity: true
+  session_affinity_timeout: "300s"
+
+# Monitoring and Observability
+monitoring:
+  # Metrics Configuration
+  enable_prometheus_metrics: true
+  metrics_port: 9090
+  metrics_path: "/metrics"
+  
+  # Custom Metrics
+  enable_custom_metrics: true
+  metric_collection_interval: "5s"
+  high_resolution_metrics: true
+  
+  # Metric Categories
+  enable_e2_metrics: true
+  enable_processing_metrics: true  
+  enable_resource_metrics: true
+  enable_smo_metrics: true
+  enable_nephio_metrics: true
+  
+  # Tracing
+  enable_distributed_tracing: true
+  jaeger_endpoint: "http://jaeger:14268/api/traces"
+  trace_sample_rate: 0.1             # 10% sampling for production
+  
+  # Logging
+  log_level: "info"                  # debug, info, warn, error
+  structured_logging: true
+  log_format: "json"
+  enable_audit_logging: true
+  audit_log_file: "/logs/audit.log"
+
+# Security Configuration  
+security:
+  # Authentication
+  enable_jwt_auth: true
+  jwt_secret: "${JWT_SECRET}"
+  jwt_expiry: "24h"
+  
+  # Authorization
+  enable_rbac: true
+  admin_roles: ["admin", "operator"]
+  readonly_roles: ["viewer", "monitor"]
+  
+  # CORS
+  cors_enabled: true
+  cors_origins: ["https://dashboard.oran.local", "https://monitoring.oran.local"]
+  cors_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+  cors_headers: ["Authorization", "Content-Type", "X-Requested-With"]
+  
+  # Security Headers
+  enable_security_headers: true
+  hsts_max_age: 31536000             # 1 year
+  content_security_policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+  
+  # Rate Limiting for Security
+  enable_security_rate_limiting: true
+  max_requests_per_ip: 1000          # Per hour
+  max_login_attempts: 5              # Per 15 minutes
+  
+# Performance Testing Configuration
+performance_testing:
+  # Test Execution Settings
+  enable_performance_tests: true
+  test_data_path: "/test-data"
+  test_results_path: "/test-results"
+  
+  # Load Test Configuration  
+  load_test_scenarios:
+    - name: "gradual_ramp_200_nodes"
+      target_e2_nodes: 200
+      ramp_up_duration: "10m"
+      sustain_duration: "15m"
+      concurrent_subscriptions: 3000
+      
+    - name: "burst_load_100_nodes"
+      target_e2_nodes: 100
+      ramp_up_duration: "45s"
+      sustain_duration: "8m"
+      concurrent_subscriptions: 1500
+      
+    - name: "extreme_stress_250_nodes"
+      target_e2_nodes: 250
+      ramp_up_duration: "2m"
+      sustain_duration: "5m"
+      concurrent_subscriptions: 6000
+  
+  # Throughput Test Configuration
+  throughput_test_scenarios:
+    - name: "sustained_20k_ips"
+      target_throughput: 20000
+      ramp_up_duration: "5m"  
+      sustain_duration: "15m"
+      
+    - name: "peak_burst_30k_ips"
+      target_throughput: 30000
+      ramp_up_duration: "1m"
+      sustain_duration: "5m"
+      
+    - name: "variable_load_test"
+      min_throughput: 10000
+      max_throughput: 25000
+      variation_interval: "2m"
+      test_duration: "20m"
+  
+  # Latency Test Configuration
+  latency_test_scenarios:
+    - name: "e2_setup_latency"
+      operation_type: "e2_setup"
+      target_latency_ms: 10
+      operations_per_second: 20
+      test_duration: "8m"
+      
+    - name: "indication_processing_latency"
+      operation_type: "indication"
+      target_latency_ms: 5
+      operations_per_second: 2000
+      test_duration: "10m"
+      
+    - name: "end_to_end_latency"
+      operation_type: "end_to_end"
+      target_latency_ms: 15
+      operations_per_second: 75
+      test_duration: "18m"
+
+# Resource Limits and Quotas
+resource_management:
+  # CPU Limits
+  cpu_request: "4"
+  cpu_limit: "16"
+  cpu_quota: "1600000"               # 16 CPU * 100000 microseconds
+  
+  # Memory Limits
+  memory_request: "4Gi"
+  memory_limit: "16Gi"
+  memory_swap_limit: "0"             # Disable swap
+  
+  # Network Limits
+  network_bandwidth_limit: "10Gbps"
+  connection_limit: 10000
+  
+  # Storage Limits
+  storage_request: "50Gi"
+  storage_limit: "200Gi"
+  iops_limit: 10000
+  
+  # Process Limits
+  max_processes: 1000
+  max_open_files: 65536
+  max_threads: 4000
+
+# Environment-Specific Overrides
+environments:
+  development:
+    log_level: "debug"
+    enable_performance_tests: true
+    smo_integration.enabled: false
+    nephio_integration.enabled: false
+    tls_enabled: false
+    
+  staging:
+    log_level: "info"
+    enable_performance_tests: true
+    max_e2_nodes: 100
+    target_throughput_ips: 15000
+    
+  production:
+    log_level: "warn"
+    enable_performance_tests: false
+    security.enable_security_headers: true
+    monitoring.trace_sample_rate: 0.01  # 1% sampling for production
+    
+    # Production-specific optimizations
+    tcp_no_delay: true
+    tcp_cork: false
+    tcp_quickack: true
+    so_reuseport: true
+    
+    # Production monitoring
+    enable_health_checks: true
+    enable_readiness_probe: true
+    enable_liveness_probe: true
+    
+    health_check_path: "/health"
+    readiness_check_path: "/ready" 
+    liveness_check_path: "/alive"
+    
+    probe_initial_delay: "30s"
+    probe_period: "10s"
+    probe_timeout: "5s"
+    probe_failure_threshold: 3
+    probe_success_threshold: 1

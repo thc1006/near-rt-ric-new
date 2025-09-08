@@ -167,6 +167,20 @@ type SubscriptionManagerServer interface {
 	mustEmbedUnimplementedSubscriptionManagerServer()
 }
 
+// SubscriptionManager_StreamIndicationsServer is the server API for StreamIndications streaming method.
+type SubscriptionManager_StreamIndicationsServer interface {
+	Send(*IndicationMessage) error
+	grpc.ServerStream
+}
+
+type subscriptionManagerStreamIndicationsServer struct {
+	grpc.ServerStream
+}
+
+func (x *subscriptionManagerStreamIndicationsServer) Send(m *IndicationMessage) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // UnimplementedSubscriptionManagerServer must be embedded to have forward compatible implementations.
 type UnimplementedSubscriptionManagerServer struct {
 }
@@ -211,6 +225,158 @@ func RegisterSubscriptionManagerServer(s grpc.ServiceRegistrar, srv Subscription
 	s.RegisterService(&SubscriptionManager_ServiceDesc, srv)
 }
 
+func _SubscriptionManager_CreateSubscription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateSubscriptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SubscriptionManagerServer).CreateSubscription(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/submgr.SubscriptionManager/CreateSubscription",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SubscriptionManagerServer).CreateSubscription(ctx, req.(*CreateSubscriptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SubscriptionManager_GetSubscriptions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSubscriptionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SubscriptionManagerServer).GetSubscriptions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/submgr.SubscriptionManager/GetSubscriptions",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SubscriptionManagerServer).GetSubscriptions(ctx, req.(*GetSubscriptionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SubscriptionManager_GetSubscription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSubscriptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SubscriptionManagerServer).GetSubscription(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/submgr.SubscriptionManager/GetSubscription",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SubscriptionManagerServer).GetSubscription(ctx, req.(*GetSubscriptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SubscriptionManager_UpdateSubscription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateSubscriptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SubscriptionManagerServer).UpdateSubscription(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/submgr.SubscriptionManager/UpdateSubscription",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SubscriptionManagerServer).UpdateSubscription(ctx, req.(*UpdateSubscriptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SubscriptionManager_DeleteSubscription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteSubscriptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SubscriptionManagerServer).DeleteSubscription(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/submgr.SubscriptionManager/DeleteSubscription",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SubscriptionManagerServer).DeleteSubscription(ctx, req.(*DeleteSubscriptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SubscriptionManager_GetIndications_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetIndicationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SubscriptionManagerServer).GetIndications(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/submgr.SubscriptionManager/GetIndications",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SubscriptionManagerServer).GetIndications(ctx, req.(*GetIndicationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SubscriptionManager_StreamIndications_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamIndicationsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(SubscriptionManagerServer).StreamIndications(m, &subscriptionManagerStreamIndicationsServer{stream})
+}
+
+func _SubscriptionManager_GetStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetStatsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SubscriptionManagerServer).GetStats(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/submgr.SubscriptionManager/GetStats",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SubscriptionManagerServer).GetStats(ctx, req.(*GetStatsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SubscriptionManager_GetSubscriptionHealth_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSubscriptionHealthRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SubscriptionManagerServer).GetSubscriptionHealth(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/submgr.SubscriptionManager/GetSubscriptionHealth",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SubscriptionManagerServer).GetSubscriptionHealth(ctx, req.(*GetSubscriptionHealthRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SubscriptionManager_ServiceDesc is the grpc.ServiceDesc for SubscriptionManager service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -220,14 +386,41 @@ var SubscriptionManager_ServiceDesc = grpc.ServiceDesc{
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "CreateSubscription",
-			Handler:    nil, // Handler implementation would be here
+			Handler:    _SubscriptionManager_CreateSubscription_Handler,
 		},
-		// Additional method descriptors would be here in real implementation
+		{
+			MethodName: "GetSubscriptions",
+			Handler:    _SubscriptionManager_GetSubscriptions_Handler,
+		},
+		{
+			MethodName: "GetSubscription",
+			Handler:    _SubscriptionManager_GetSubscription_Handler,
+		},
+		{
+			MethodName: "UpdateSubscription",
+			Handler:    _SubscriptionManager_UpdateSubscription_Handler,
+		},
+		{
+			MethodName: "DeleteSubscription",
+			Handler:    _SubscriptionManager_DeleteSubscription_Handler,
+		},
+		{
+			MethodName: "GetIndications",
+			Handler:    _SubscriptionManager_GetIndications_Handler,
+		},
+		{
+			MethodName: "GetStats",
+			Handler:    _SubscriptionManager_GetStats_Handler,
+		},
+		{
+			MethodName: "GetSubscriptionHealth",
+			Handler:    _SubscriptionManager_GetSubscriptionHealth_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "StreamIndications",
-			Handler:       nil, // Handler implementation would be here
+			Handler:       _SubscriptionManager_StreamIndications_Handler,
 			ServerStreams: true,
 		},
 	},

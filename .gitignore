@@ -56,3 +56,35 @@ vulnerability_report.json
 vulnerability_summary.txt
 security_compliance_report.yaml
 security_test_report.yaml
+
+# Large files (>100MB) - Add patterns for files that could exceed 100MB
+*.zip
+*.tar
+*.tar.gz
+*.iso
+*.dmg
+*.pkg
+*.deb
+*.rpm
+*.msi
+*.war
+*.ear
+*.nar
+
+# Database files that could be large
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# Media files that could be large
+*.mp4
+*.avi
+*.mov
+*.mp3
+*.wav
+*.flac

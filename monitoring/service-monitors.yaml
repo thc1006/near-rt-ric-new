@@ -1,0 +1,66 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: oran-components
+  labels:
+    oran-monitoring: enabled
+spec:
+  namespaceSelector:
+    matchNames:
+      - near-rt-ric
+      - nephio
+  selector:
+    matchLabels:
+      oran.component: metrics
+  endpoints:
+    - port: metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      path: /metrics
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_service_label_oran_component]
+          targetLabel: oran_component
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: kubernetes_namespace
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: e2-service-monitor
+  labels:
+    oran-monitoring: enabled
+spec:
+  selector:
+    matchLabels:
+      oran.component: e2
+  endpoints:
+    - port: metrics
+      interval: 15s
+      path: /metrics/e2
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'e2_(.+)'
+          replacement: '$1'
+          targetLabel: __name__
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: a1-service-monitor
+  labels:
+    oran-monitoring: enabled
+spec:
+  selector:
+    matchLabels:
+      oran.component: a1
+  endpoints:
+    - port: metrics
+      interval: 15s
+      path: /metrics/a1
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'a1_(.+)'
+          replacement: '$1'
+          targetLabel: __name__

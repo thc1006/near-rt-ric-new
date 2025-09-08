@@ -1,0 +1,78 @@
+groups:
+- name: oran-critical-alerts
+  rules:
+  # E2 Interface Alerts
+  - alert: E2ConnectionDropRate
+    expr: >
+      rate(e2_connection_failures_total[5m]) / 
+      rate(e2_connection_attempts_total[5m]) > 0.1
+    for: 10m
+    labels:
+      severity: critical
+      oran_component: e2
+    annotations:
+      summary: "High E2 Connection Failure Rate"
+      description: "E2 interface connection failure rate exceeds 10% for 10 minutes"
+
+  # A1 Policy Management Alerts  
+  - alert: A1PolicyEnforcementLatency
+    expr: a1_policy_enforcement_latency_seconds > 2
+    for: 5m
+    labels:
+      severity: warning
+      oran_component: a1
+    annotations:
+      summary: "Slow A1 Policy Enforcement"
+      description: "A1 policy enforcement latency exceeds 2 seconds"
+
+  # O1 Configuration Management Alerts
+  - alert: O1ConfigurationFailures
+    expr: >
+      rate(o1_configuration_changes_total{status="failed"}[15m]) /
+      rate(o1_configuration_changes_total[15m]) > 0.05
+    for: 15m
+    labels:
+      severity: high
+      oran_component: o1
+    annotations:
+      summary: "High O1 Configuration Change Failure Rate"
+      description: "More than 5% of O1 configuration changes are failing"
+
+  # Resource Utilization Alerts
+  - alert: HighCPUUtilization
+    expr: >
+      sum(rate(node_cpu_seconds_total{mode!="idle"}[5m])) by (instance) 
+      / sum(node_cpu_seconds_total{mode="idle"}[5m]) by (instance) * 100 > 90
+    for: 10m
+    labels:
+      severity: critical
+      resource: cpu
+    annotations:
+      summary: "High CPU Utilization"
+      description: "CPU utilization exceeds 90% for 10 minutes"
+
+  # Memory Pressure Alerts  
+  - alert: HighMemoryPressure
+    expr: >
+      (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) 
+      / node_memory_MemTotal_bytes * 100 > 85
+    for: 15m
+    labels:
+      severity: warning
+      resource: memory
+    annotations:
+      summary: "High Memory Utilization"
+      description: "Memory usage exceeds 85% for 15 minutes"
+
+  # Network Performance Alerts
+  - alert: HighNetworkDropRate
+    expr: >
+      rate(node_network_receive_drop_total[5m]) +
+      rate(node_network_transmit_drop_total[5m]) > 100
+    for: 5m
+    labels:
+      severity: high
+      resource: network
+    annotations:
+      summary: "High Network Packet Drop Rate"
+      description: "Network packet drop rate exceeds acceptable threshold"

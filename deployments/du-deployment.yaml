@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: du
+  namespace: oran-network-functions
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: du
+  template:
+    metadata:
+      labels:
+        app: du
+    spec:
+      containers:
+      - name: du
+        image: oaisoftwarealliance/oai-du:latest
+        resources:
+          requests:
+            cpu: 4
+            memory: 8Gi
+          limits:
+            cpu: 8
+            memory: 16Gi
+        env:
+        - name: DU_ID
+          value: "1"
+        - name: CU_IP
+          value: "cu-service.oran-network-functions.svc.cluster.local"
+        - name: CELL_ID
+          value: "1"
+        ports:
+        - containerPort: 38472  # F1 interface
+        - containerPort: 29090  # RRC interface

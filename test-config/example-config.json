@@ -1,0 +1,482 @@
+{
+  "e2eConfig": {
+    "e2TermEndpoint": "http://e2term.oran:36421",
+    "e2MgrEndpoint": "http://e2mgr.oran:3800",
+    "subMgrEndpoint": "http://submgr.oran:3801",
+    "a1MediatorURL": "http://a1mediator.nonrtric:9001",
+    "o1MediatorURL": "http://o1mediator.oran:8080",
+    "o2CloudAPI": "http://ocloud.nephio:8080",
+    "porchEndpoint": "http://porch-server.porch-system:7007",
+    "kptEndpoint": "http://kpt-server.porch-system:8080",
+    "packageRegistryURL": "https://github.com/nephio-project/catalog",
+    "gitOpsRepoURL": "https://github.com/nephio-project/deployments",
+    "maxConcurrentE2Nodes": 100,
+    "testDuration": "30m",
+    "loadTestProfile": "standard",
+    "coverageThreshold": 80.0,
+    "kubernetesConfig": "/etc/kubeconfig",
+    "namespace": "oran",
+    "testDataDir": "./test-data",
+    "reportOutputDir": "./test-results"
+  },
+  "loadTestConfig": {
+    "maxConcurrentE2Nodes": 150,
+    "testDuration": "20m",
+    "rampUpDuration": "5m",
+    "rampDownDuration": "3m",
+    "requestsPerSecond": 1500,
+    "maxBurstSize": 3000,
+    "maxLatencyP99": "100ms",
+    "maxLatencyP95": "50ms",
+    "minThroughputMbps": 1200.0,
+    "maxErrorRate": 0.5,
+    "maxCpuUtilization": 75.0,
+    "maxMemoryUtilization": 80.0,
+    "e2TermEndpoint": "http://e2term.oran:36421",
+    "e2MgrEndpoint": "http://e2mgr.oran:3800",
+    "subMgrEndpoint": "http://submgr.oran:3801",
+    "a1MediatorEndpoint": "http://a1mediator.nonrtric:9001",
+    "dashboardEndpoint": "http://dashboard.oran:3000",
+    "testScenarios": [
+      {
+        "name": "E2 Node Connection",
+        "description": "Test E2 node setup and connection establishment",
+        "weight": 0.3,
+        "requestTemplate": {
+          "method": "POST",
+          "endpoint": "/api/v1/e2nodes",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer test-token"
+          },
+          "body": {
+            "nodeId": "gnb-{random}",
+            "plmnId": "001001",
+            "globalGnbId": "{random-12-digit}",
+            "supportedFunctions": [1, 2, 3]
+          },
+          "timeout": "30s"
+        },
+        "expectedLatency": "200ms",
+        "expectedThroughput": 100.0
+      },
+      {
+        "name": "Subscription Management",
+        "description": "Test E2 subscription creation and management",
+        "weight": 0.25,
+        "requestTemplate": {
+          "method": "POST",
+          "endpoint": "/api/v1/subscriptions",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "e2nodeId": "gnb-{node-id}",
+            "ranFunctionId": 1,
+            "ricActionDefinitions": [
+              {
+                "ricActionId": 1,
+                "ricActionType": "report"
+              }
+            ]
+          },
+          "timeout": "15s"
+        },
+        "expectedLatency": "150ms",
+        "expectedThroughput": 80.0
+      },
+      {
+        "name": "A1 Policy Management",
+        "description": "Test A1 policy creation and enforcement",
+        "weight": 0.2,
+        "requestTemplate": {
+          "method": "POST",
+          "endpoint": "/a1-p/v2/policies",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "policyTypeId": 20000,
+            "policyId": "policy-{random}",
+            "policyData": {
+              "scope": {
+                "ueId": "test-ue-{random}"
+              },
+              "qosObjectives": {
+                "gfbrUl": 1000000,
+                "gfbrDl": 2000000,
+                "pdb": 100
+              }
+            }
+          },
+          "timeout": "10s"
+        },
+        "expectedLatency": "100ms",
+        "expectedThroughput": 50.0
+      },
+      {
+        "name": "xApp Deployment",
+        "description": "Test xApp lifecycle management",
+        "weight": 0.15,
+        "requestTemplate": {
+          "method": "POST",
+          "endpoint": "/api/v1/xapps",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "name": "test-xapp-{random}",
+            "version": "1.0.0",
+            "image": "test-xapp:latest",
+            "configuration": {
+              "logLevel": "info",
+              "metricsPort": 8080
+            }
+          },
+          "timeout": "60s"
+        },
+        "expectedLatency": "2s",
+        "expectedThroughput": 10.0
+      },
+      {
+        "name": "Dashboard API",
+        "description": "Test dashboard API endpoints",
+        "weight": 0.1,
+        "requestTemplate": {
+          "method": "GET",
+          "endpoint": "/api/v1/health",
+          "headers": {
+            "Accept": "application/json"
+          },
+          "timeout": "5s"
+        },
+        "expectedLatency": "50ms",
+        "expectedThroughput": 200.0
+      }
+    ],
+    "reportPath": "./test-results/load-test-report.json",
+    "metricsOutputPath": "./test-results/load-test-metrics.json"
+  },
+  "nephioR5Config": {
+    "porchAPIEndpoint": "http://porch-server.porch-system:7007",
+    "packageRegistryURL": "https://github.com/nephio-project/catalog",
+    "gitOpsRepoURL": "https://github.com/nephio-project/deployments",
+    "configSyncEndpoint": "http://config-sync.config-management-system:8080",
+    "kubeConfig": "/etc/kubeconfig",
+    "targetNamespace": "nephio-system",
+    "workloadClusters": [
+      {
+        "name": "edge-cluster-west",
+        "endpoint": "https://edge-west.example.com",
+        "region": "us-west-2",
+        "provider": "aws",
+        "capabilities": ["5g-ran", "edge-compute", "gpu-acceleration"],
+        "labels": {
+          "cluster-type": "edge",
+          "region": "us-west-2",
+          "provider": "aws",
+          "gpu-enabled": "true"
+        },
+        "resourceQuotas": {
+          "cpu": "64",
+          "memory": "256Gi",
+          "storage": "2Ti",
+          "maxPods": 2000,
+          "maxServices": 200
+        }
+      },
+      {
+        "name": "edge-cluster-east",
+        "endpoint": "https://edge-east.example.com",
+        "region": "us-east-1",
+        "provider": "aws",
+        "capabilities": ["5g-ran", "edge-compute"],
+        "labels": {
+          "cluster-type": "edge",
+          "region": "us-east-1",
+          "provider": "aws"
+        },
+        "resourceQuotas": {
+          "cpu": "32",
+          "memory": "128Gi",
+          "storage": "1Ti",
+          "maxPods": 1000,
+          "maxServices": 100
+        }
+      },
+      {
+        "name": "core-cluster",
+        "endpoint": "https://core.example.com",
+        "region": "us-central-1",
+        "provider": "gcp",
+        "capabilities": ["5g-core", "data-analytics", "ai-ml"],
+        "labels": {
+          "cluster-type": "core",
+          "region": "us-central-1",
+          "provider": "gcp",
+          "ai-enabled": "true"
+        },
+        "resourceQuotas": {
+          "cpu": "128",
+          "memory": "512Gi",
+          "storage": "10Ti",
+          "maxPods": 5000,
+          "maxServices": 500
+        }
+      }
+    ],
+    "packageRepository": "oci://registry.nephio.org/packages",
+    "packageCatalogURL": "https://catalog.nephio.org",
+    "testPackages": [
+      {
+        "name": "oran-du-cnf",
+        "repository": "catalog",
+        "version": "v2.0.0",
+        "dependencies": [
+          "free5gc-upf",
+          "oran-cu-cp"
+        ],
+        "configurationData": {
+          "cellCount": 3,
+          "maxUes": 1000,
+          "transmitPower": 43,
+          "antennaGain": 18
+        },
+        "targetClusters": ["edge-cluster-west", "edge-cluster-east"],
+        "validationRules": [
+          {
+            "type": "resource",
+            "rule": "cpu.limits <= 16",
+            "parameters": {
+              "container": "du-main"
+            },
+            "severity": "error"
+          },
+          {
+            "type": "compliance",
+            "rule": "security.runAsNonRoot == true",
+            "parameters": {},
+            "severity": "warning"
+          }
+        ]
+      },
+      {
+        "name": "oran-cu-cp-cnf",
+        "repository": "catalog",
+        "version": "v1.5.0",
+        "dependencies": [
+          "free5gc-amf",
+          "oran-cu-up"
+        ],
+        "configurationData": {
+          "maxConnections": 10000,
+          "loadBalancing": "round-robin",
+          "healthCheck": {
+            "enabled": true,
+            "interval": "30s"
+          }
+        },
+        "targetClusters": ["edge-cluster-west", "core-cluster"],
+        "validationRules": [
+          {
+            "type": "networking",
+            "rule": "ports.containerPort in [8080, 9090]",
+            "parameters": {},
+            "severity": "error"
+          }
+        ]
+      },
+      {
+        "name": "free5gc-core-cnf",
+        "repository": "catalog",
+        "version": "v3.2.1",
+        "dependencies": [
+          "mongodb-operator",
+          "redis-cluster"
+        ],
+        "configurationData": {
+          "databaseReplicas": 3,
+          "cacheSize": "2Gi",
+          "logging": {
+            "level": "info",
+            "format": "json"
+          }
+        },
+        "targetClusters": ["core-cluster"],
+        "validationRules": [
+          {
+            "type": "storage",
+            "rule": "persistentVolumeClaim.size >= 10Gi",
+            "parameters": {
+              "component": "database"
+            },
+            "severity": "error"
+          }
+        ]
+      }
+    ],
+    "gitProvider": "github",
+    "gitUsername": "nephio-ci",
+    "gitToken": "${GITHUB_TOKEN}",
+    "testTimeout": "45m",
+    "packageValidationTimeout": "5m",
+    "deploymentTimeout": "15m"
+  },
+  "complianceConfig": {
+    "e2TermEndpoint": "http://e2term.oran:36421",
+    "e2MgrEndpoint": "http://e2mgr.oran:3800",
+    "subMgrEndpoint": "http://submgr.oran:3801",
+    "a1MediatorURL": "http://a1mediator.nonrtric:9001",
+    "o1MediatorURL": "http://o1mediator.oran:8080",
+    "tlsConfig": null,
+    "timeout": "60s",
+    "retryAttempts": 5,
+    "testDataPath": "./test-data",
+    "reportOutputPath": "./test-results/compliance-report.json",
+    "customConfig": {
+      "strictMode": true,
+      "validateASN1": true,
+      "validateYANG": true,
+      "validateOAuth2": true,
+      "securityChecks": ["tls", "authentication", "authorization", "encryption"]
+    }
+  },
+  "parallelExecution": true,
+  "continueOnFailure": false,
+  "maxRetries": 3,
+  "testTimeout": "3h",
+  "minCoveragePercent": 85.0,
+  "maxFailureRate": 2.0,
+  "qualityGates": [
+    {
+      "name": "Critical Test Pass Rate",
+      "type": "threshold",
+      "metric": "overall_pass_rate",
+      "threshold": 98.0,
+      "operator": ">=",
+      "severity": "critical",
+      "failureAction": "fail_build"
+    },
+    {
+      "name": "Test Coverage Gate",
+      "type": "threshold",
+      "metric": "coverage_percent",
+      "threshold": 85.0,
+      "operator": ">=",
+      "severity": "critical",
+      "failureAction": "fail_build"
+    },
+    {
+      "name": "Error Rate Gate",
+      "type": "threshold",
+      "metric": "error_rate",
+      "threshold": 0.5,
+      "operator": "<=",
+      "severity": "high",
+      "failureAction": "warning"
+    },
+    {
+      "name": "P99 Latency Gate",
+      "type": "threshold",
+      "metric": "p99_latency_ms",
+      "threshold": 100.0,
+      "operator": "<=",
+      "severity": "high",
+      "failureAction": "warning"
+    },
+    {
+      "name": "P95 Latency Gate",
+      "type": "threshold",
+      "metric": "p95_latency_ms",
+      "threshold": 50.0,
+      "operator": "<=",
+      "severity": "medium",
+      "failureAction": "warning"
+    },
+    {
+      "name": "Throughput Gate",
+      "type": "threshold",
+      "metric": "throughput_rps",
+      "threshold": 1000.0,
+      "operator": ">=",
+      "severity": "medium",
+      "failureAction": "warning"
+    },
+    {
+      "name": "CPU Utilization Gate",
+      "type": "threshold",
+      "metric": "peak_cpu_utilization",
+      "threshold": 80.0,
+      "operator": "<=",
+      "severity": "medium",
+      "failureAction": "warning"
+    },
+    {
+      "name": "Memory Utilization Gate",
+      "type": "threshold",
+      "metric": "peak_memory_utilization",
+      "threshold": 85.0,
+      "operator": "<=",
+      "severity": "medium",
+      "failureAction": "warning"
+    },
+    {
+      "name": "E2 Connection Success Rate",
+      "type": "threshold",
+      "metric": "e2_setup_success_rate",
+      "threshold": 99.0,
+      "operator": ">=",
+      "severity": "high",
+      "failureAction": "warning"
+    },
+    {
+      "name": "Subscription Success Rate",
+      "type": "threshold",
+      "metric": "subscription_success_rate",
+      "threshold": 98.0,
+      "operator": ">=",
+      "severity": "high",
+      "failureAction": "warning"
+    }
+  ],
+  "outputDirectory": "./test-results",
+  "reportFormats": ["json", "html", "xml", "junit"],
+  "artifactRetention": "720h",
+  "environmentType": "integration",
+  "testLabels": {
+    "release": "o-ran-l",
+    "nephio": "r5",
+    "environment": "integration",
+    "compliance": "wg3-e2ap-r003",
+    "go-version": "1.24.6",
+    "fips": "enabled"
+  },
+  "customProperties": {
+    "jenkins": {
+      "buildNumber": "${BUILD_NUMBER}",
+      "buildUrl": "${BUILD_URL}",
+      "gitCommit": "${GIT_COMMIT}",
+      "gitBranch": "${GIT_BRANCH}"
+    },
+    "infrastructure": {
+      "kubernetesVersion": "v1.28.2",
+      "containerRuntime": "containerd",
+      "cni": "cilium",
+      "storageClass": "fast-ssd"
+    },
+    "features": {
+      "fips140Compliance": true,
+      "mtlsEnabled": true,
+      "rbacEnabled": true,
+      "networkPoliciesEnabled": true,
+      "podSecurityStandardsEnabled": true
+    },
+    "monitoring": {
+      "prometheusEnabled": true,
+      "grafanaEnabled": true,
+      "alertManagerEnabled": true,
+      "jaegerEnabled": true,
+      "elasticsearchEnabled": true
+    }
+  }
+}

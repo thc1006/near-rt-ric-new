@@ -1,0 +1,272 @@
+syntax = "proto3";
+
+package slicemgr;
+
+option go_package = "github.com/your-org/near-rt-ric/api/proto/slicemgr";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+// Slice Service for Network Slice Management
+service SliceManagementService {
+  // Slice Lifecycle Management
+  rpc CreateSlice(CreateSliceRequest) returns (CreateSliceResponse) {}
+  rpc GetSlice(GetSliceRequest) returns (Slice) {}
+  rpc ListSlices(ListSlicesRequest) returns (ListSlicesResponse) {}
+  rpc UpdateSlice(UpdateSliceRequest) returns (Slice) {}
+  rpc DeleteSlice(DeleteSliceRequest) returns (DeleteSliceResponse) {}
+  
+  // Slice Policy Management
+  rpc CreateSlicePolicy(CreatePolicyRequest) returns (SlicePolicy) {}
+  rpc GetSlicePolicy(GetPolicyRequest) returns (SlicePolicy) {}
+  rpc UpdateSlicePolicy(UpdatePolicyRequest) returns (SlicePolicy) {}
+  rpc DeleteSlicePolicy(DeletePolicyRequest) returns (DeletePolicyResponse) {}
+  
+  // E2 Node Integration
+  rpc RegisterE2Node(RegisterE2NodeRequest) returns (RegisterE2NodeResponse) {}
+  rpc ConfigureSliceOnNode(ConfigureSliceRequest) returns (ConfigureSliceResponse) {}
+  rpc GetE2NodeCapabilities(E2NodeCapabilitiesRequest) returns (E2NodeCapabilitiesResponse) {}
+}
+
+// Slice Definition
+message Slice {
+  string id = 1;
+  string name = 2;
+  SliceType type = 3;
+  SliceState state = 4;
+  string tenant = 5;
+  ServiceProfile service_profile = 6;
+  ResourceQuota resource_quota = 7;
+  SliceSLA sla = 8;
+  PlacementPolicy placement = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+}
+
+// Enums for Slice Types and States
+enum SliceType {
+  EMBB = 0;
+  URLLC = 1;
+  MMTC = 2;
+}
+
+enum SliceState {
+  CREATED = 0;
+  ACTIVE = 1;
+  INACTIVE = 2;
+  SCALING = 3;
+  FAILED = 4;
+  TERMINATING = 5;
+}
+
+// Detailed Slice Structures
+message ServiceProfile {
+  DataRate max_data_rate = 1;
+  int32 latency = 2;
+  float reliability = 3;
+  int32 max_concurrent_ues = 4;
+}
+
+message DataRate {
+  int32 downlink = 1;
+  int32 uplink = 2;
+}
+
+message ResourceQuota {
+  ComputeResources compute = 1;
+  NetworkResources network = 2;
+  StorageResources storage = 3;
+}
+
+message ComputeResources {
+  CPUResource cpu = 1;
+  MemoryResource memory = 2;
+}
+
+message CPUResource {
+  int32 min = 1;
+  int32 max = 2;
+}
+
+message MemoryResource {
+  int32 min = 1;
+  int32 max = 2;
+}
+
+message NetworkResources {
+  Bandwidth bandwidth = 1;
+  repeated int32 vlans = 2;
+}
+
+message Bandwidth {
+  int32 min = 1;
+  int32 guaranteed = 2;
+  int32 max = 3;
+}
+
+message StorageResources {
+  int32 capacity = 1;
+  int32 iops = 2;
+}
+
+message SliceSLA {
+  SLAObjectives objectives = 1;
+  MonitoringConfig monitoring = 2;
+}
+
+message SLAObjectives {
+  Throughput throughput = 1;
+  Latency latency = 2;
+  float reliability = 3;
+  float packet_loss = 4;
+}
+
+message Throughput {
+  DataRate downlink = 1;
+  DataRate uplink = 2;
+}
+
+message Latency {
+  E2ELatency e2e = 1;
+  RANLatency ran = 2;
+}
+
+message E2ELatency {
+  int32 target = 1;
+  int32 maximum = 2;
+}
+
+message RANLatency {
+  int32 target = 1;
+  int32 maximum = 2;
+}
+
+message MonitoringConfig {
+  int32 interval = 1;
+  repeated string metrics = 2;
+}
+
+message PlacementPolicy {
+  repeated RegionPlacement regions = 1;
+  repeated AffinityRule affinity = 2;
+  repeated AffinityRule anti_affinity = 3;
+}
+
+message RegionPlacement {
+  string name = 1;
+  repeated string zones = 2;
+}
+
+message AffinityRule {
+  string key = 1;
+  repeated string values = 2;
+  string operator = 3;
+}
+
+// Request/Response Messages for Slice Management
+message CreateSliceRequest {
+  Slice slice = 1;
+}
+
+message CreateSliceResponse {
+  Slice slice = 1;
+  string message = 2;
+}
+
+message GetSliceRequest {
+  string slice_id = 1;
+}
+
+message ListSlicesRequest {
+  string tenant = 1;
+  SliceType type = 2;
+}
+
+message ListSlicesResponse {
+  repeated Slice slices = 1;
+}
+
+message UpdateSliceRequest {
+  string slice_id = 1;
+  Slice updated_slice = 2;
+}
+
+message DeleteSliceRequest {
+  string slice_id = 1;
+}
+
+message DeleteSliceResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Policy Management Messages
+message CreatePolicyRequest {
+  string slice_id = 1;
+  PolicyType type = 2;
+  google.protobuf.Struct policy_data = 3;
+}
+
+message SlicePolicy {
+  string id = 1;
+  string slice_id = 2;
+  PolicyType type = 3;
+  google.protobuf.Struct policy_instance = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+enum PolicyType {
+  QOS = 0;
+  RAN_SLICE = 1;
+  RESOURCE_UTILIZATION = 2;
+}
+
+message GetPolicyRequest {
+  string policy_id = 1;
+}
+
+message UpdatePolicyRequest {
+  string policy_id = 1;
+  google.protobuf.Struct updated_policy = 2;
+}
+
+message DeletePolicyRequest {
+  string policy_id = 1;
+}
+
+message DeletePolicyResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// E2 Node Integration Messages
+message RegisterE2NodeRequest {
+  string node_id = 1;
+  string ip_address = 2;
+  repeated string capabilities = 3;
+}
+
+message RegisterE2NodeResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ConfigureSliceRequest {
+  string slice_id = 1;
+  string node_id = 2;
+  Slice slice_config = 3;
+}
+
+message ConfigureSliceResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message E2NodeCapabilitiesRequest {
+  string node_id = 1;
+}
+
+message E2NodeCapabilitiesResponse {
+  repeated string capabilities = 1;
+}

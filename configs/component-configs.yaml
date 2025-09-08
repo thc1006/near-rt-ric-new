@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oran-component-configs
+  namespace: oran-config
+data:
+  a1_mediator_config: |
+    {
+      "service_port": 9080,
+      "policy_types": [
+        "QoS_OPTIMIZATION",
+        "LOAD_BALANCING"
+      ],
+      "max_concurrent_policies": 100,
+      "policy_validation_timeout_ms": 5000
+    }
+  
+  o1_mediator_config: |
+    {
+      "netconf_port": 830,
+      "notification_interval_ms": 60000,
+      "retry_config": {
+        "max_retries": 3,
+        "backoff_factor": 2
+      }
+    }
+  
+  e2_manager_config: |
+    {
+      "node_connection_timeout_ms": 10000,
+      "max_concurrent_nodes": 50,
+      "subscription_modes": [
+        "PERIODIC",
+        "IMMEDIATE"
+      ]
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oran-dynamic-config-webhook
+  namespace: oran-config
+data:
+  config_webhook.yaml: |
+    apiVersion: admissionregistration.k8s.io/v1
+    kind: ValidatingWebhookConfiguration
+    metadata:
+      name: oran-config-validator
+    webhooks:
+    - name: config-validation.oran.nephio.org
+      rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["configmaps"]
+      admissionReviewVersions: ["v1"]
+      sideEffects: None
+      clientConfig:
+        service:
+          namespace: oran-config
+          name: config-validator-service

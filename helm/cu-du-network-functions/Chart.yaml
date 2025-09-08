@@ -1,0 +1,34 @@
+apiVersion: v2
+name: cu-du-network-functions
+description: O-RAN CU/DU Network Functions with F1/E1 Interfaces
+type: application
+version: 1.0.0
+appVersion: "2.0.0"
+
+keywords:
+  - o-ran
+  - cu-cp
+  - cu-up
+  - du
+  - f1
+  - e1
+  - e2
+  - 5g-nr
+
+maintainers:
+  - name: O-RAN Integration Team
+    email: oran-team@company.com
+
+dependencies:
+  - name: prometheus
+    version: "15.x.x"
+    repository: "https://prometheus-community.github.io/helm-charts"
+    condition: monitoring.prometheus.enabled
+  - name: grafana
+    version: "6.x.x"  
+    repository: "https://grafana.github.io/helm-charts"
+    condition: monitoring.grafana.enabled
+
+annotations:
+  category: RAN
+  licenses: Apache-2.0

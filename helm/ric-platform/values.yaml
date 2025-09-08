@@ -1,0 +1,124 @@
+global:
+  imageRegistry: nexus3.o-ran-sc.org:10002
+  imagePullPolicy: IfNotPresent
+  namespace: ricplt
+
+components:
+  e2term:
+    enabled: true
+    replicas: 2
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2
+        memory: 4Gi
+    livenessProbe:
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      failureThreshold: 3
+
+  e2mgr:
+    enabled: true
+    replicas: 2
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1
+        memory: 2Gi
+
+  submgr:
+    enabled: true
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+  rtmgr:
+    enabled: true
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+  a1mediator:
+    enabled: true
+    replicas: 2
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+  dbaas:
+    enabled: true
+    persistence:
+      enabled: true
+      storageClass: standard
+      size: 10Gi
+
+  rmr:
+    enabled: true
+    configMapName: rmr-routes
+    logLevel: info
+
+security:
+  enabled: true
+  tls:
+    enabled: true
+    secretName: ric-tls-secret
+  
+  networkPolicy:
+    enabled: true
+    ingressRules:
+      - ports:
+        - port: 36421
+          protocol: SCTP
+        - port: 4560
+          protocol: TCP
+
+monitoring:
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      interval: 15s
+  
+  logging:
+    level: info
+    format: json
+    retention:
+      days: 7
+
+rmr:
+  routes:
+    - type: E2_SETUP_REQUEST
+      endpoints:
+        - e2term
+        - e2mgr
+    - type: SUBSCRIPTION_REQUEST
+      endpoints:
+        - submgr
+        - e2mgr
+    - type: INDICATION_MESSAGE
+      endpoints:
+        - rtmgr
+        - xapps
+
+# Environment-specific configurations
+environment:
+  type: production
+  profile: standard-large
+  scalingMode: horizontal

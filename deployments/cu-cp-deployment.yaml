@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cu-cp
+  namespace: oran-network-functions
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cu-cp
+  template:
+    metadata:
+      labels:
+        app: cu-cp
+    spec:
+      containers:
+      - name: cu-cp
+        image: oaisoftwarealliance/oai-cu-cp:latest
+        resources:
+          requests:
+            cpu: 2
+            memory: 4Gi
+          limits:
+            cpu: 4
+            memory: 8Gi
+        env:
+        - name: CU_CP_ID
+          value: "1"
+        - name: AMF_IP
+          value: "10.0.0.1"
+        ports:
+        - containerPort: 38472  # F1 interface
+        - containerPort: 38412  # N2 interface

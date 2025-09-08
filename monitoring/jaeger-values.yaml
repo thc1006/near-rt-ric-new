@@ -1,0 +1,61 @@
+jaeger:
+  # Sampling strategies
+  sampling:
+    default_strategy:
+      type: probabilistic
+      param: 0.5  # Sample 50% of traces
+    
+  # Storage backend
+  storage:
+    type: elasticsearch
+    elasticsearch:
+      host: elasticsearch.monitoring.svc
+      port: 9200
+      index_prefix: oran-traces
+      max_doc_count: 10000
+      max_age: 72h  # Retain traces for 3 days
+  
+  # Agent configuration
+  agent:
+    strategy: DaemonSet
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  
+  # Collector configuration
+  collector:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 1
+        memory: 1Gi
+  
+  # Query service
+  query:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  
+  # Trace sampling for different components
+  component_sampling:
+    e2_service:
+      sampling_rate: 0.8
+    a1_service:
+      sampling_rate: 0.6
+    o1_service:
+      sampling_rate: 0.4
+
+  # Automatic trace pruning
+  trace_pruning:
+    max_traces_per_service: 10000
+    max_trace_age_hours: 72

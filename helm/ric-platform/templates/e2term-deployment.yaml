@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-e2term
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: e2term
+    release: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.components.e2term.replicas }}
+  selector:
+    matchLabels:
+      app: e2term
+  template:
+    metadata:
+      labels:
+        app: e2term
+    spec:
+      containers:
+      - name: e2term
+        image: {{ .Values.global.imageRegistry }}/o-ran-sc/ric-plt-e2term:{{ .Chart.AppVersion }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        resources:
+          requests:
+            cpu: {{ .Values.components.e2term.resources.requests.cpu }}
+            memory: {{ .Values.components.e2term.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.components.e2term.resources.limits.cpu }}
+            memory: {{ .Values.components.e2term.resources.limits.memory }}
+        ports:
+        - containerPort: 36421
+          protocol: SCTP
+        - containerPort: 4560
+          protocol: TCP
+        livenessProbe:
+          tcpSocket:
+            port: 36421
+          initialDelaySeconds: {{ .Values.components.e2term.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.components.e2term.livenessProbe.periodSeconds }}
+          failureThreshold: {{ .Values.components.e2term.livenessProbe.failureThreshold }}
+        env:
+        - name: RMR_ROUTE_FILE
+          value: /etc/ric/rmr/routes.yaml
+        volumeMounts:
+        - name: rmr-routes
+          mountPath: /etc/ric/rmr
+      volumes:
+      - name: rmr-routes
+        configMap:
+          name: rmr-routes
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-e2term
+  namespace: {{ .Values.global.namespace }}
+spec:
+  selector:
+    app: e2term
+  ports:
+  - name: sctp
+    port: 36421
+    protocol: SCTP
+  - name: rmr
+    port: 4560
+    protocol: TCP

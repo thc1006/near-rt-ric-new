@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: interface-config
+  namespace: oran-network-functions
+data:
+  f1_config.json: |
+    {
+      "f1_interface": {
+        "local_ip": "192.168.1.10",
+        "remote_ip": "192.168.1.11",
+        "port": 38472,
+        "gNB_id": 1
+      }
+    }
+  e1_config.json: |
+    {
+      "e1_interface": {
+        "local_ip": "192.168.2.10", 
+        "remote_ip": "192.168.2.11",
+        "port": 38463,
+        "cu_cp_id": 1,
+        "cu_up_id": 1
+      }
+    }

@@ -109,7 +109,7 @@ func (x *CreateSubscriptionRequest) GetTimeoutMs() uint32 {
 	return 0
 }
 
-// CreateSubscriptionResponse represents the response to a subscription creation request
+// CreateSubscriptionResponse represents response from creating a subscription
 type CreateSubscriptionResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -117,7 +117,7 @@ type CreateSubscriptionResponse struct {
 
 	SubscriptionId string `protobuf:"bytes,1,opt,name=subscription_id,json=subscriptionId,proto3" json:"subscription_id,omitempty"`
 	Success        bool   `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
-	Message        string `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	ErrorMessage   string `protobuf:"bytes,3,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
 }
 
 func (x *CreateSubscriptionResponse) Reset() {
@@ -166,14 +166,870 @@ func (x *CreateSubscriptionResponse) GetSuccess() bool {
 	return false
 }
 
-func (x *CreateSubscriptionResponse) GetMessage() string {
+func (x *CreateSubscriptionResponse) GetErrorMessage() string {
 	if x != nil {
-		return x.Message
+		return x.ErrorMessage
 	}
 	return ""
 }
 
-// Subscription represents a subscription in the system
+// GetSubscriptionsRequest represents request to get all subscriptions
+type GetSubscriptionsRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	E2NodeId string `protobuf:"bytes,1,opt,name=e2_node_id,json=e2NodeId,proto3" json:"e2_node_id,omitempty"`
+	XappId   string `protobuf:"bytes,2,opt,name=xapp_id,json=xappId,proto3" json:"xapp_id,omitempty"`
+}
+
+func (x *GetSubscriptionsRequest) Reset() {
+	*x = GetSubscriptionsRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_api_proto_submgr_submgr_proto_msgTypes[6]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetSubscriptionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSubscriptionsRequest) ProtoMessage() {}
+
+func (x *GetSubscriptionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_submgr_submgr_proto_msgTypes[6]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSubscriptionsRequest.ProtoReflect.Descriptor instead.
+func (*GetSubscriptionsRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_submgr_submgr_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetSubscriptionsRequest) GetE2NodeId() string {
+	if x != nil {
+		return x.E2NodeId
+	}
+	return ""
+}
+
+func (x *GetSubscriptionsRequest) GetXappId() string {
+	if x != nil {
+		return x.XappId
+	}
+	return ""
+}
+
+// GetSubscriptionsResponse represents response with all subscriptions
+type GetSubscriptionsResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Subscriptions []*Subscription `protobuf:"bytes,1,rep,name=subscriptions,proto3" json:"subscriptions,omitempty"`
+}
+
+func (x *GetSubscriptionsResponse) Reset() {
+	*x = GetSubscriptionsResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_api_proto_submgr_submgr_proto_msgTypes[7]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetSubscriptionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSubscriptionsResponse) ProtoMessage() {}
+
+func (x *GetSubscriptionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_submgr_submgr_proto_msgTypes[7]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSubscriptionsResponse.ProtoReflect.Descriptor instead.
+func (*GetSubscriptionsResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_submgr_submgr_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetSubscriptionsResponse) GetSubscriptions() []*Subscription {
+	if x != nil {
+		return x.Subscriptions
+	}
+	return nil
+}
+
+// GetSubscriptionRequest represents request to get a specific subscription
+type GetSubscriptionRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	SubscriptionId string `protobuf:"bytes,1,opt,name=subscription_id,json=subscriptionId,proto3" json:"subscription_id,omitempty"`
+}
+
+func (x *GetSubscriptionRequest) Reset() {
+	*x = GetSubscriptionRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_api_proto_submgr_submgr_proto_msgTypes[8]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetSubscriptionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSubscriptionRequest) ProtoMessage() {}
+
+func (x *GetSubscriptionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_submgr_submgr_proto_msgTypes[8]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSubscriptionRequest.ProtoReflect.Descriptor instead.
+func (*GetSubscriptionRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_submgr_submgr_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetSubscriptionRequest) GetSubscriptionId() string {
+	if x != nil {
+		return x.SubscriptionId
+	}
+	return ""
+}
+
+// GetSubscriptionResponse represents response with a specific subscription
+type GetSubscriptionResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Subscription *Subscription `protobuf:"bytes,1,opt,name=subscription,proto3" json:"subscription,omitempty"`
+}
+
+func (x *GetSubscriptionResponse) Reset() {
+	*x = GetSubscriptionResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_api_proto_submgr_submgr_proto_msgTypes[9]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetSubscriptionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSubscriptionResponse) ProtoMessage() {}
+
+func (x *GetSubscriptionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_submgr_submgr_proto_msgTypes[9]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSubscriptionResponse.ProtoReflect.Descriptor instead.
+func (*GetSubscriptionResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_submgr_submgr_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetSubscriptionResponse) GetSubscription() *Subscription {
+	if x != nil {
+		return x.Subscription
+	}
+	return nil
+}
+
+// UpdateSubscriptionRequest represents request to update a subscription
+type UpdateSubscriptionRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	SubscriptionId string        `protobuf:"bytes,1,opt,name=subscription_id,json=subscriptionId,proto3" json:"subscription_id,omitempty"`
+	EventTrigger   *EventTrigger `protobuf:"bytes,2,opt,name=event_trigger,json=eventTrigger,proto3" json:"event_trigger,omitempty"`
+	Actions        []*Action     `protobuf:"bytes,3,rep,name=actions,proto3" json:"actions,omitempty"`
+}
+
+func (x *UpdateSubscriptionRequest) Reset() {
+	*x = UpdateSubscriptionRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_api_proto_submgr_submgr_proto_msgTypes[10]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *UpdateSubscriptionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateSubscriptionRequest) ProtoMessage() {}
+
+func (x *UpdateSubscriptionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_submgr_submgr_proto_msgTypes[10]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateSubscriptionRequest.ProtoReflect.Descriptor instead.
+func (*UpdateSubscriptionRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_submgr_submgr_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *UpdateSubscriptionRequest) GetSubscriptionId() string {
+	if x != nil {
+		return x.SubscriptionId
+	}
+	return ""
+}
+
+func (x *UpdateSubscriptionRequest) GetEventTrigger() *EventTrigger {
+	if x != nil {
+		return x.EventTrigger
+	}
+	return nil
+}
+
+func (x *UpdateSubscriptionRequest) GetActions() []*Action {
+	if x != nil {
+		return x.Actions
+	}
+	return nil
+}
+
+// UpdateSubscriptionResponse represents response from updating a subscription
+type UpdateSubscriptionResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Success      bool   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	ErrorMessage string `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+}
+
+func (x *UpdateSubscriptionResponse) Reset() {
+	*x = UpdateSubscriptionResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_api_proto_submgr_submgr_proto_msgTypes[11]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *UpdateSubscriptionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateSubscriptionResponse) ProtoMessage() {}
+
+func (x *UpdateSubscriptionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_submgr_submgr_proto_msgTypes[11]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateSubscriptionResponse.ProtoReflect.Descriptor instead.
+func (*UpdateSubscriptionResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_submgr_submgr_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *UpdateSubscriptionResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *UpdateSubscriptionResponse) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+// DeleteSubscriptionRequest represents request to delete a subscription
+type DeleteSubscriptionRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	SubscriptionId string `protobuf:"bytes,1,opt,name=subscription_id,json=subscriptionId,proto3" json:"subscription_id,omitempty"`
+}
+
+func (x *DeleteSubscriptionRequest) Reset() {
+	*x = DeleteSubscriptionRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_api_proto_submgr_submgr_proto_msgTypes[12]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DeleteSubscriptionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteSubscriptionRequest) ProtoMessage() {}
+
+func (x *DeleteSubscriptionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_submgr_submgr_proto_msgTypes[12]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteSubscriptionRequest.ProtoReflect.Descriptor instead.
+func (*DeleteSubscriptionRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_submgr_submgr_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *DeleteSubscriptionRequest) GetSubscriptionId() string {
+	if x != nil {
+		return x.SubscriptionId
+	}
+	return ""
+}
+
+// DeleteSubscriptionResponse represents response from deleting a subscription
+type DeleteSubscriptionResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Success      bool   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	ErrorMessage string `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+}
+
+func (x *DeleteSubscriptionResponse) Reset() {
+	*x = DeleteSubscriptionResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_api_proto_submgr_submgr_proto_msgTypes[13]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DeleteSubscriptionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteSubscriptionResponse) ProtoMessage() {}
+
+func (x *DeleteSubscriptionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_submgr_submgr_proto_msgTypes[13]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteSubscriptionResponse.ProtoReflect.Descriptor instead.
+func (*DeleteSubscriptionResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_submgr_submgr_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *DeleteSubscriptionResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *DeleteSubscriptionResponse) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+// GetIndicationsRequest represents request to get indications
+type GetIndicationsRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	SubscriptionId string `protobuf:"bytes,1,opt,name=subscription_id,json=subscriptionId,proto3" json:"subscription_id,omitempty"`
+}
+
+func (x *GetIndicationsRequest) Reset() {
+	*x = GetIndicationsRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_api_proto_submgr_submgr_proto_msgTypes[14]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetIndicationsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetIndicationsRequest) ProtoMessage() {}
+
+func (x *GetIndicationsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_submgr_submgr_proto_msgTypes[14]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetIndicationsRequest.ProtoReflect.Descriptor instead.
+func (*GetIndicationsRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_submgr_submgr_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *GetIndicationsRequest) GetSubscriptionId() string {
+	if x != nil {
+		return x.SubscriptionId
+	}
+	return ""
+}
+
+// GetIndicationsResponse represents response with indications
+type GetIndicationsResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Indications []string `protobuf:"bytes,1,rep,name=indications,proto3" json:"indications,omitempty"`
+}
+
+func (x *GetIndicationsResponse) Reset() {
+	*x = GetIndicationsResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_api_proto_submgr_submgr_proto_msgTypes[15]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetIndicationsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetIndicationsResponse) ProtoMessage() {}
+
+func (x *GetIndicationsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_submgr_submgr_proto_msgTypes[15]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetIndicationsResponse.ProtoReflect.Descriptor instead.
+func (*GetIndicationsResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_submgr_submgr_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *GetIndicationsResponse) GetIndications() []string {
+	if x != nil {
+		return x.Indications
+	}
+	return nil
+}
+
+// StreamIndicationsRequest represents request to stream indications
+type StreamIndicationsRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	SubscriptionId string `protobuf:"bytes,1,opt,name=subscription_id,json=subscriptionId,proto3" json:"subscription_id,omitempty"`
+}
+
+func (x *StreamIndicationsRequest) Reset() {
+	*x = StreamIndicationsRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_api_proto_submgr_submgr_proto_msgTypes[16]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *StreamIndicationsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamIndicationsRequest) ProtoMessage() {}
+
+func (x *StreamIndicationsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_submgr_submgr_proto_msgTypes[16]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamIndicationsRequest.ProtoReflect.Descriptor instead.
+func (*StreamIndicationsRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_submgr_submgr_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *StreamIndicationsRequest) GetSubscriptionId() string {
+	if x != nil {
+		return x.SubscriptionId
+	}
+	return ""
+}
+
+// GetStatsRequest represents request to get statistics
+type GetStatsRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	E2NodeId string `protobuf:"bytes,1,opt,name=e2_node_id,json=e2NodeId,proto3" json:"e2_node_id,omitempty"`
+}
+
+func (x *GetStatsRequest) Reset() {
+	*x = GetStatsRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_api_proto_submgr_submgr_proto_msgTypes[17]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetStatsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetStatsRequest) ProtoMessage() {}
+
+func (x *GetStatsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_submgr_submgr_proto_msgTypes[17]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetStatsRequest.ProtoReflect.Descriptor instead.
+func (*GetStatsRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_submgr_submgr_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *GetStatsRequest) GetE2NodeId() string {
+	if x != nil {
+		return x.E2NodeId
+	}
+	return ""
+}
+
+// GetStatsResponse represents response with statistics
+type GetStatsResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	TotalSubscriptions int32             `protobuf:"varint,1,opt,name=total_subscriptions,json=totalSubscriptions,proto3" json:"total_subscriptions,omitempty"`
+	ActiveSubscriptions int32            `protobuf:"varint,2,opt,name=active_subscriptions,json=activeSubscriptions,proto3" json:"active_subscriptions,omitempty"`
+	NodeStats          map[string]int32  `protobuf:"bytes,3,rep,name=node_stats,json=nodeStats,proto3" json:"node_stats,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
+}
+
+func (x *GetStatsResponse) Reset() {
+	*x = GetStatsResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_api_proto_submgr_submgr_proto_msgTypes[18]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetStatsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetStatsResponse) ProtoMessage() {}
+
+func (x *GetStatsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_submgr_submgr_proto_msgTypes[18]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetStatsResponse.ProtoReflect.Descriptor instead.
+func (*GetStatsResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_submgr_submgr_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *GetStatsResponse) GetTotalSubscriptions() int32 {
+	if x != nil {
+		return x.TotalSubscriptions
+	}
+	return 0
+}
+
+func (x *GetStatsResponse) GetActiveSubscriptions() int32 {
+	if x != nil {
+		return x.ActiveSubscriptions
+	}
+	return 0
+}
+
+func (x *GetStatsResponse) GetNodeStats() map[string]int32 {
+	if x != nil {
+		return x.NodeStats
+	}
+	return nil
+}
+
+// GetSubscriptionHealthRequest represents request to get subscription health
+type GetSubscriptionHealthRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	SubscriptionId string `protobuf:"bytes,1,opt,name=subscription_id,json=subscriptionId,proto3" json:"subscription_id,omitempty"`
+}
+
+func (x *GetSubscriptionHealthRequest) Reset() {
+	*x = GetSubscriptionHealthRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_api_proto_submgr_submgr_proto_msgTypes[19]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetSubscriptionHealthRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSubscriptionHealthRequest) ProtoMessage() {}
+
+func (x *GetSubscriptionHealthRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_submgr_submgr_proto_msgTypes[19]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSubscriptionHealthRequest.ProtoReflect.Descriptor instead.
+func (*GetSubscriptionHealthRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_submgr_submgr_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *GetSubscriptionHealthRequest) GetSubscriptionId() string {
+	if x != nil {
+		return x.SubscriptionId
+	}
+	return ""
+}
+
+// GetSubscriptionHealthResponse represents response with subscription health
+type GetSubscriptionHealthResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	SubscriptionId string `protobuf:"bytes,1,opt,name=subscription_id,json=subscriptionId,proto3" json:"subscription_id,omitempty"`
+	HealthStatus   string `protobuf:"bytes,2,opt,name=health_status,json=healthStatus,proto3" json:"health_status,omitempty"`
+	LastUpdate     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=last_update,json=lastUpdate,proto3" json:"last_update,omitempty"`
+}
+
+func (x *GetSubscriptionHealthResponse) Reset() {
+	*x = GetSubscriptionHealthResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_api_proto_submgr_submgr_proto_msgTypes[20]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetSubscriptionHealthResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSubscriptionHealthResponse) ProtoMessage() {}
+
+func (x *GetSubscriptionHealthResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_submgr_submgr_proto_msgTypes[20]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSubscriptionHealthResponse.ProtoReflect.Descriptor instead.
+func (*GetSubscriptionHealthResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_submgr_submgr_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *GetSubscriptionHealthResponse) GetSubscriptionId() string {
+	if x != nil {
+		return x.SubscriptionId
+	}
+	return ""
+}
+
+func (x *GetSubscriptionHealthResponse) GetHealthStatus() string {
+	if x != nil {
+		return x.HealthStatus
+	}
+	return ""
+}
+
+func (x *GetSubscriptionHealthResponse) GetLastUpdate() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastUpdate
+	}
+	return nil
+}
+
+// IndicationMessage represents an indication message
+type IndicationMessage struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	SubscriptionId string    `protobuf:"bytes,1,opt,name=subscription_id,json=subscriptionId,proto3" json:"subscription_id,omitempty"`
+	Payload        []byte    `protobuf:"bytes,2,opt,name=payload,proto3" json:"payload,omitempty"`
+	Timestamp      *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+}
+
+func (x *IndicationMessage) Reset() {
+	*x = IndicationMessage{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_api_proto_submgr_submgr_proto_msgTypes[21]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *IndicationMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IndicationMessage) ProtoMessage() {}
+
+func (x *IndicationMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_submgr_submgr_proto_msgTypes[21]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IndicationMessage.ProtoReflect.Descriptor instead.
+func (*IndicationMessage) Descriptor() ([]byte, []int) {
+	return file_api_proto_submgr_submgr_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *IndicationMessage) GetSubscriptionId() string {
+	if x != nil {
+		return x.SubscriptionId
+	}
+	return ""
+}
+
+func (x *IndicationMessage) GetPayload() []byte {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *IndicationMessage) GetTimestamp() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Timestamp
+	}
+	return nil
+}
+
+// Subscription represents a subscription
 type Subscription struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -186,9 +1042,8 @@ type Subscription struct {
 	EventTrigger   *EventTrigger          `protobuf:"bytes,5,opt,name=event_trigger,json=eventTrigger,proto3" json:"event_trigger,omitempty"`
 	Actions        []*Action              `protobuf:"bytes,6,rep,name=actions,proto3" json:"actions,omitempty"`
 	Status         string                 `protobuf:"bytes,7,opt,name=status,proto3" json:"status,omitempty"`
-	ErrorMessage   string                 `protobuf:"bytes,8,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
-	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt      *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt      *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 }
 
 func (x *Subscription) Reset() {
@@ -272,13 +1127,6 @@ func (x *Subscription) GetStatus() string {
 	return ""
 }
 
-func (x *Subscription) GetErrorMessage() string {
-	if x != nil {
-		return x.ErrorMessage
-	}
-	return ""
-}
-
 func (x *Subscription) GetCreatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreatedAt
@@ -293,15 +1141,15 @@ func (x *Subscription) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
-// EventTrigger represents an event trigger for subscriptions
+// EventTrigger represents an event trigger
 type EventTrigger struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Type       string  `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
-	Definition []byte  `protobuf:"bytes,2,opt,name=definition,proto3" json:"definition,omitempty"`
-	PeriodMs   *uint32 `protobuf:"varint,3,opt,name=period_ms,json=periodMs,proto3,oneof" json:"period_ms,omitempty"`
+	InterfaceId       uint32 `protobuf:"varint,1,opt,name=interface_id,json=interfaceId,proto3" json:"interface_id,omitempty"`
+	InterfaceDirection uint32 `protobuf:"varint,2,opt,name=interface_direction,json=interfaceDirection,proto3" json:"interface_direction,omitempty"`
+	InterfaceMessageId uint32 `protobuf:"varint,3,opt,name=interface_message_id,json=interfaceMessageId,proto3" json:"interface_message_id,omitempty"`
 }
 
 func (x *EventTrigger) Reset() {
@@ -336,28 +1184,28 @@ func (*EventTrigger) Descriptor() ([]byte, []int) {
 	return file_api_proto_submgr_submgr_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *EventTrigger) GetType() string {
+func (x *EventTrigger) GetInterfaceId() uint32 {
 	if x != nil {
-		return x.Type
-	}
-	return ""
-}
-
-func (x *EventTrigger) GetDefinition() []byte {
-	if x != nil {
-		return x.Definition
-	}
-	return nil
-}
-
-func (x *EventTrigger) GetPeriodMs() uint32 {
-	if x != nil && x.PeriodMs != nil {
-		return *x.PeriodMs
+		return x.InterfaceId
 	}
 	return 0
 }
 
-// Action represents an action in a subscription
+func (x *EventTrigger) GetInterfaceDirection() uint32 {
+	if x != nil {
+		return x.InterfaceDirection
+	}
+	return 0
+}
+
+func (x *EventTrigger) GetInterfaceMessageId() uint32 {
+	if x != nil {
+		return x.InterfaceMessageId
+	}
+	return 0
+}
+
+// Action represents an action
 type Action struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -366,7 +1214,7 @@ type Action struct {
 	Id               uint32            `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	Type             string            `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
 	Definition       []byte            `protobuf:"bytes,3,opt,name=definition,proto3" json:"definition,omitempty"`
-	SubsequentAction *SubsequentAction `protobuf:"bytes,4,opt,name=subsequent_action,json=subsequentAction,proto3,oneof" json:"subsequent_action,omitempty"`
+	SubsequentAction *SubsequentAction `protobuf:"bytes,4,opt,name=subsequent_action,json=subsequentAction,proto3" json:"subsequent_action,omitempty"`
 }
 
 func (x *Action) Reset() {
@@ -503,15 +1351,31 @@ func file_api_proto_submgr_submgr_proto_rawDescGZIP() []byte {
 	return file_api_proto_submgr_submgr_proto_rawDescData
 }
 
-var file_api_proto_submgr_submgr_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_api_proto_submgr_submgr_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_api_proto_submgr_submgr_proto_goTypes = []interface{}{
-	(*CreateSubscriptionRequest)(nil),  // 0: submgr.CreateSubscriptionRequest
-	(*CreateSubscriptionResponse)(nil), // 1: submgr.CreateSubscriptionResponse
-	(*Subscription)(nil),               // 2: submgr.Subscription
-	(*EventTrigger)(nil),               // 3: submgr.EventTrigger
-	(*Action)(nil),                     // 4: submgr.Action
-	(*SubsequentAction)(nil),           // 5: submgr.SubsequentAction
-	(*timestamppb.Timestamp)(nil),      // 6: google.protobuf.Timestamp
+	(*CreateSubscriptionRequest)(nil),       // 0: submgr.CreateSubscriptionRequest
+	(*CreateSubscriptionResponse)(nil),      // 1: submgr.CreateSubscriptionResponse
+	(*Subscription)(nil),                    // 2: submgr.Subscription
+	(*EventTrigger)(nil),                    // 3: submgr.EventTrigger
+	(*Action)(nil),                          // 4: submgr.Action
+	(*SubsequentAction)(nil),                // 5: submgr.SubsequentAction
+	(*GetSubscriptionsRequest)(nil),         // 6: submgr.GetSubscriptionsRequest
+	(*GetSubscriptionsResponse)(nil),        // 7: submgr.GetSubscriptionsResponse
+	(*GetSubscriptionRequest)(nil),          // 8: submgr.GetSubscriptionRequest
+	(*GetSubscriptionResponse)(nil),         // 9: submgr.GetSubscriptionResponse
+	(*UpdateSubscriptionRequest)(nil),       // 10: submgr.UpdateSubscriptionRequest
+	(*UpdateSubscriptionResponse)(nil),      // 11: submgr.UpdateSubscriptionResponse
+	(*DeleteSubscriptionRequest)(nil),       // 12: submgr.DeleteSubscriptionRequest
+	(*DeleteSubscriptionResponse)(nil),      // 13: submgr.DeleteSubscriptionResponse
+	(*GetIndicationsRequest)(nil),           // 14: submgr.GetIndicationsRequest
+	(*GetIndicationsResponse)(nil),          // 15: submgr.GetIndicationsResponse
+	(*StreamIndicationsRequest)(nil),        // 16: submgr.StreamIndicationsRequest
+	(*GetStatsRequest)(nil),                 // 17: submgr.GetStatsRequest
+	(*GetStatsResponse)(nil),                // 18: submgr.GetStatsResponse
+	(*GetSubscriptionHealthRequest)(nil),    // 19: submgr.GetSubscriptionHealthRequest
+	(*GetSubscriptionHealthResponse)(nil),   // 20: submgr.GetSubscriptionHealthResponse
+	(*IndicationMessage)(nil),               // 21: submgr.IndicationMessage
+	(*timestamppb.Timestamp)(nil),           // 22: google.protobuf.Timestamp
 }
 
 var file_api_proto_submgr_submgr_proto_depIdxs = []int32{
@@ -519,14 +1383,20 @@ var file_api_proto_submgr_submgr_proto_depIdxs = []int32{
 	4, // 1: submgr.CreateSubscriptionRequest.actions:type_name -> submgr.Action
 	3, // 2: submgr.Subscription.event_trigger:type_name -> submgr.EventTrigger
 	4, // 3: submgr.Subscription.actions:type_name -> submgr.Action
-	6, // 4: submgr.Subscription.created_at:type_name -> google.protobuf.Timestamp
-	6, // 5: submgr.Subscription.updated_at:type_name -> google.protobuf.Timestamp
+	22, // 4: submgr.Subscription.created_at:type_name -> google.protobuf.Timestamp
+	22, // 5: submgr.Subscription.updated_at:type_name -> google.protobuf.Timestamp
 	5, // 6: submgr.Action.subsequent_action:type_name -> submgr.SubsequentAction
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	2, // 7: submgr.GetSubscriptionsResponse.subscriptions:type_name -> submgr.Subscription
+	2, // 8: submgr.GetSubscriptionResponse.subscription:type_name -> submgr.Subscription
+	3, // 9: submgr.UpdateSubscriptionRequest.event_trigger:type_name -> submgr.EventTrigger
+	4, // 10: submgr.UpdateSubscriptionRequest.actions:type_name -> submgr.Action
+	22, // 11: submgr.GetSubscriptionHealthResponse.last_update:type_name -> google.protobuf.Timestamp
+	22, // 12: submgr.IndicationMessage.timestamp:type_name -> google.protobuf.Timestamp
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0, // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_api_proto_submgr_submgr_proto_init() }
@@ -547,7 +1417,258 @@ func file_api_proto_submgr_submgr_proto_init() {
 				return nil
 			}
 		}
-		// Additional message type exporters would be here in real implementation
+		file_api_proto_submgr_submgr_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CreateSubscriptionResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_submgr_submgr_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Subscription); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_submgr_submgr_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*EventTrigger); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_submgr_submgr_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Action); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_submgr_submgr_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*SubsequentAction); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_submgr_submgr_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetSubscriptionsRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_submgr_submgr_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetSubscriptionsResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_submgr_submgr_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetSubscriptionRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_submgr_submgr_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetSubscriptionResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_submgr_submgr_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*UpdateSubscriptionRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_submgr_submgr_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*UpdateSubscriptionResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_submgr_submgr_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*DeleteSubscriptionRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_submgr_submgr_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*DeleteSubscriptionResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_submgr_submgr_proto_msgTypes[14].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetIndicationsRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_submgr_submgr_proto_msgTypes[15].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetIndicationsResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_submgr_submgr_proto_msgTypes[16].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*StreamIndicationsRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_submgr_submgr_proto_msgTypes[17].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetStatsRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_submgr_submgr_proto_msgTypes[18].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetStatsResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_submgr_submgr_proto_msgTypes[19].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetSubscriptionHealthRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_submgr_submgr_proto_msgTypes[20].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetSubscriptionHealthResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_submgr_submgr_proto_msgTypes[21].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*IndicationMessage); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -555,7 +1676,7 @@ func file_api_proto_submgr_submgr_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_api_proto_submgr_submgr_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -1,0 +1,306 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: e1-interface-config
+  namespace: oran-network-functions
+  labels:
+    interface: e1
+    component: interface-config
+data:
+  e1ap.conf: |
+    # E1 Application Protocol Configuration
+    e1ap:
+      version: "16.8.0"
+      
+      # Timer Configuration
+      timer_values:
+        t_e1_setup: 3000         # E1 setup timeout (ms)
+        t_bearer_setup: 5000     # Bearer setup timeout (ms)
+        t_bearer_modify: 3000    # Bearer modify timeout (ms)
+        t_bearer_release: 3000   # Bearer release timeout (ms)
+        t_cu_up_status: 10000    # CU-UP status timeout (ms)
+      
+      # Retry Configuration
+      max_retry: 3
+      retry_interval: 1000
+      
+      # SCTP Configuration for E1
+      sctp:
+        heartbeat_interval: 30
+        path_max_retrans: 5
+        max_init_retrans: 8
+        rto_initial: 3000
+        rto_min: 1000
+        rto_max: 60000
+        sack_timeout: 200
+        sack_freq: 2
+        
+      # Message Priorities
+      message_priority:
+        e1_setup_request: 1
+        e1_setup_response: 1
+        e1_setup_failure: 1
+        bearer_context_setup_request: 2
+        bearer_context_setup_response: 2
+        bearer_context_setup_failure: 2
+        bearer_context_modification_request: 3
+        bearer_context_modification_response: 3
+        bearer_context_modification_failure: 3
+        bearer_context_release_command: 2
+        bearer_context_release_complete: 2
+        reset: 1
+        reset_acknowledge: 1
+        
+  e1_interface.yaml: |
+    # E1 Interface Specification
+    e1_interface:
+      protocol: "E1AP"
+      transport: "SCTP"
+      port: 38462
+      
+      # Supported procedures
+      procedures:
+        - name: "E1 Setup"
+          initiated_by: "CU-UP"
+          purpose: "Setup E1 interface between CU-CP and CU-UP"
+        - name: "gNB-CU-CP E1 Configuration Update"
+          initiated_by: "CU-CP"
+          purpose: "Update CU-CP configuration"
+        - name: "gNB-CU-UP E1 Configuration Update"
+          initiated_by: "CU-UP"
+          purpose: "Update CU-UP configuration"
+        - name: "gNB-CU-UP Status Indication"
+          initiated_by: "CU-UP"
+          purpose: "Indicate CU-UP status"
+        - name: "Bearer Context Setup"
+          initiated_by: "CU-CP"
+          purpose: "Setup bearer context in CU-UP"
+        - name: "Bearer Context Modification"
+          initiated_by: "CU-CP"
+          purpose: "Modify bearer context in CU-UP"
+        - name: "Bearer Context Release"
+          initiated_by: "CU-CP"
+          purpose: "Release bearer context from CU-UP"
+        - name: "Connection Update"
+          initiated_by: "CU-CP"
+          purpose: "Update connection parameters"
+        - name: "Error Indication"
+          initiated_by: "CU-CP/CU-UP"
+          purpose: "Indicate error conditions"
+        - name: "Reset"
+          initiated_by: "CU-CP/CU-UP"
+          purpose: "Reset E1 interface"
+        - name: "Private Message"
+          initiated_by: "CU-CP/CU-UP"
+          purpose: "Vendor specific messaging"
+          
+      # Bearer Context Management
+      bearer_context:
+        max_bearers_per_ue: 16
+        bearer_id_range: "1-255"
+        qos_flow_id_range: "1-63"
+        
+        # Supported QoS characteristics
+        qos_characteristics:
+          - type: "non-GBR"
+            description: "Non-Guaranteed Bit Rate flows"
+            qci_range: "5-9"
+          - type: "GBR"
+            description: "Guaranteed Bit Rate flows"
+            qci_range: "1-4"
+          - type: "delay_critical_GBR"
+            description: "Delay Critical GBR flows"
+            qci_range: "82-85"
+            
+        # PDCP Configuration
+        pdcp_config:
+          sn_size_ul: 18
+          sn_size_dl: 18
+          discard_timer: 100
+          t_reordering: 100
+          
+        # RLC Configuration
+        rlc_config:
+          mode: "AM"  # Acknowledged Mode
+          sn_field_length: 18
+          t_poll_retransmit: 45
+          poll_pdu: 64
+          poll_byte: "125kB"
+          max_retx_threshold: 32
+          
+  bearer_management.yaml: |
+    # Bearer Management Configuration
+    bearer_management:
+      # Default Bearer Configuration
+      default_bearer:
+        qci: 9
+        arp:
+          priority_level: 15
+          pre_emption_capability: false
+          pre_emption_vulnerability: false
+        gbr_qos_info:
+          max_flow_bit_rate_dl: "1Mbps"
+          max_flow_bit_rate_ul: "1Mbps"
+          guaranteed_flow_bit_rate_dl: "1Mbps"
+          guaranteed_flow_bit_rate_ul: "1Mbps"
+          
+      # QoS Flow Templates
+      qos_flow_templates:
+        - id: 1
+          qci: 1
+          priority: 20
+          packet_delay_budget: 100
+          packet_error_loss_rate: "1e-2"
+          gbr_dl: "150Mbps"
+          gbr_ul: "150Mbps"
+          
+        - id: 2
+          qci: 2
+          priority: 40
+          packet_delay_budget: 150
+          packet_error_loss_rate: "1e-3"
+          gbr_dl: "100Mbps"
+          gbr_ul: "100Mbps"
+          
+        - id: 5
+          qci: 5
+          priority: 10
+          packet_delay_budget: 100
+          packet_error_loss_rate: "1e-6"
+          
+        - id: 9
+          qci: 9
+          priority: 90
+          packet_delay_budget: 300
+          packet_error_loss_rate: "1e-6"
+          
+      # Network Slice Templates
+      slice_templates:
+        - sst: 1
+          sd: "0x000001"
+          description: "eMBB slice"
+          qos_flows: [1, 2, 9]
+          
+        - sst: 2
+          sd: "0x000002"
+          description: "URLLC slice"
+          qos_flows: [1]
+          
+        - sst: 3
+          sd: "0x000003"
+          description: "mMTC slice"
+          qos_flows: [9]
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: e1-interface-service
+  namespace: oran-network-functions
+  labels:
+    interface: e1
+    component: interface-service
+spec:
+  type: ClusterIP
+  ports:
+  - name: e1
+    port: 38462
+    targetPort: 38462
+    protocol: SCTP
+  selector:
+    interface: e1
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: e1-interface-policy
+  namespace: oran-network-functions
+spec:
+  podSelector:
+    matchLabels:
+      interface: e1
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: cu-cp
+    - podSelector:
+        matchLabels:
+          app: cu-up
+    ports:
+    - protocol: SCTP
+      port: 38462
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: cu-cp
+    - podSelector:
+        matchLabels:
+          app: cu-up
+    ports:
+    - protocol: SCTP
+      port: 38462
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: e1-monitoring-config
+  namespace: oran-network-functions
+  labels:
+    interface: e1
+    component: monitoring
+data:
+  prometheus-rules.yaml: |
+    groups:
+    - name: e1_interface_rules
+      rules:
+      - alert: E1SetupFailure
+        expr: increase(e1_setup_failures_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "E1 setup failure detected"
+          description: "E1 setup between CU-CP and CU-UP has failed"
+          
+      - alert: E1ConnectionLoss
+        expr: e1_connection_status == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "E1 connection lost"
+          description: "E1 connection between CU-CP and CU-UP is down"
+          
+      - alert: BearerSetupFailure
+        expr: increase(e1_bearer_setup_failures_total[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High bearer setup failure rate"
+          description: "Bearer setup failure rate is above threshold on E1 interface"
+          
+      - alert: E1HighLatency
+        expr: e1_message_latency_seconds > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High E1 message latency"
+          description: "E1 message latency is above 50ms"
+          
+      - alert: E1MessageErrors
+        expr: increase(e1_message_errors_total[5m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High E1 message error rate"
+          description: "E1 message error rate is above threshold"

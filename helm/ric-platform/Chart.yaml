@@ -1,0 +1,25 @@
+apiVersion: v2
+name: ric-platform
+description: O-RAN RIC Platform Deployment
+version: 3.0.0
+appVersion: "1.0.0"
+type: application
+keywords:
+  - o-ran
+  - ric
+  - near-rt-ric
+  - 5g
+  - telecom
+home: https://o-ran-sc.org/
+sources:
+  - https://gerrit.o-ran-sc.org/r/ric-plt
+maintainers:
+  - name: O-RAN Software Community
+    email: oran-sc@o-ran.org
+dependencies:
+  - name: rmr
+    version: "~1.0.0"
+    repository: "file://../rmr"
+  - name: e2ap
+    version: "~1.0.0"
+    repository: "file://../e2ap"

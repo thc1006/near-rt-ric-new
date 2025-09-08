@@ -1,0 +1,412 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: e2-service-models-enhanced
+  namespace: oran-network-functions
+  labels:
+    component: e2-service-models
+data:
+  e2sm-kpm.yaml: |
+    # E2SM-KPM (Key Performance Metrics) Service Model v3.0.0
+    e2sm_kmp:
+      version: "3.0.0"
+      oid: "1.3.6.1.4.1.53148.1.2.2.2"
+      
+      # Service Model Definition
+      service_model_definition:
+        name: "ORAN-E2SM-KPM"
+        description: "KPM service model for performance monitoring and reporting"
+        
+        # RAN Function Definition
+        ran_function_definition:
+          function_shortname: "KPM"
+          function_e2sm_oid: "1.3.6.1.4.1.53148.1.2.2.2"
+          function_description: "KPM monitoring service"
+          function_instance: 1
+          
+          # Measurement Types
+          measurement_types:
+            - measurement_type_id: 1
+              measurement_type_name: "DRB.RlcSduDelayDl"
+              measurement_description: "DL RLC SDU delay"
+              measurement_unit: "ms"
+              measurement_scope: "UE"
+              
+            - measurement_type_id: 2
+              measurement_type_name: "DRB.PdcpSduVolumeDL"
+              measurement_description: "DL PDCP SDU volume"
+              measurement_unit: "KB"
+              measurement_scope: "UE"
+              
+            - measurement_type_id: 3
+              measurement_type_name: "DRB.PdcpSduVolumeUL"
+              measurement_description: "UL PDCP SDU volume"
+              measurement_unit: "KB"
+              measurement_scope: "UE"
+              
+            - measurement_type_id: 4
+              measurement_type_name: "RRU.PrbTotDl"
+              measurement_description: "Total DL PRB usage"
+              measurement_unit: "PRB"
+              measurement_scope: "CELL"
+              
+            - measurement_type_id: 5
+              measurement_type_name: "RRU.PrbTotUl"
+              measurement_description: "Total UL PRB usage"
+              measurement_unit: "PRB"
+              measurement_scope: "CELL"
+              
+            - measurement_type_id: 6
+              measurement_type_name: "TB.TotNbrDl"
+              measurement_description: "Total number of DL TBs"
+              measurement_unit: "count"
+              measurement_scope: "CELL"
+              
+            - measurement_type_id: 7
+              measurement_type_name: "TB.TotNbrUl"
+              measurement_description: "Total number of UL TBs"
+              measurement_unit: "count"
+              measurement_scope: "CELL"
+              
+            - measurement_type_id: 8
+              measurement_type_name: "QosFlow.PdcpPduVolumeDL"
+              measurement_description: "DL PDCP PDU volume per QoS flow"
+              measurement_unit: "KB"
+              measurement_scope: "QOS_FLOW"
+              
+          # Report Styles
+          report_styles:
+            - report_style_type: 1
+              report_style_name: "O-CU-CP Measurement"
+              measurement_info_actions:
+                - measurement_type_id: 1
+                - measurement_type_id: 2
+                - measurement_type_id: 3
+                - measurement_type_id: 8
+                
+            - report_style_type: 2
+              report_style_name: "O-CU-UP Measurement"
+              measurement_info_actions:
+                - measurement_type_id: 2
+                - measurement_type_id: 3
+                - measurement_type_id: 8
+                
+            - report_style_type: 3
+              report_style_name: "O-DU Measurement"
+              measurement_info_actions:
+                - measurement_type_id: 4
+                - measurement_type_id: 5
+                - measurement_type_id: 6
+                - measurement_type_id: 7
+                
+      # Subscription Configuration
+      subscription_config:
+        supported_actions:
+          - action_id: 1
+            action_type: "REPORT"
+            action_definition:
+              granularity_period: 1000  # ms
+              subscription_id: 1
+              
+        reporting_periods:
+          - period: 1000   # 1 second
+          - period: 5000   # 5 seconds
+          - period: 10000  # 10 seconds
+          - period: 60000  # 1 minute
+          
+      # Indication Message Format
+      indication_message_format:
+        header_format: "Format 1"
+        message_format: "Format 1"
+        
+        format_1:
+          collective_measurements: true
+          measurement_data:
+            - measurement_record_id: 1
+              measurement_type_id: 1
+              measurement_value: "integer"
+            - measurement_record_id: 2
+              measurement_type_id: 2
+              measurement_value: "real"
+              
+  e2sm-rc.yaml: |
+    # E2SM-RC (RAN Control) Service Model v1.0.3
+    e2sm_rc:
+      version: "1.0.3"
+      oid: "1.3.6.1.4.1.53148.1.1.2.3"
+      
+      # Service Model Definition
+      service_model_definition:
+        name: "ORAN-E2SM-RC"
+        description: "RAN Control service model"
+        
+        # RAN Function Definition
+        ran_function_definition:
+          function_shortname: "RC"
+          function_e2sm_oid: "1.3.6.1.4.1.53148.1.1.2.3"
+          function_description: "RAN Control service"
+          function_instance: 2
+          
+          # Control Styles
+          control_styles:
+            - control_style_type: 1
+              control_style_name: "Radio Bearer Control"
+              control_action_id: 1
+              control_outcome_id: 1
+              
+            - control_style_type: 2
+              control_style_name: "Radio Resource Control"
+              control_action_id: 2
+              control_outcome_id: 2
+              
+            - control_style_type: 3
+              control_style_name: "UE Mobility Control"
+              control_action_id: 3
+              control_outcome_id: 3
+              
+            - control_style_type: 4
+              control_style_name: "QoS Control"
+              control_action_id: 4
+              control_outcome_id: 4
+              
+          # RAN Parameters
+          ran_parameters:
+            - ran_parameter_id: 1
+              ran_parameter_name: "DRB.ThpTimeDl"
+              ran_parameter_test: "EQUAL"
+              ran_parameter_value: "integer"
+              
+            - ran_parameter_id: 2
+              ran_parameter_name: "DRB.ThpTimeUl"
+              ran_parameter_test: "EQUAL"
+              ran_parameter_value: "integer"
+              
+            - ran_parameter_id: 3
+              ran_parameter_name: "QosFlow.ThpTimeDl"
+              ran_parameter_test: "GREATERTHAN"
+              ran_parameter_value: "real"
+              
+            - ran_parameter_id: 4
+              ran_parameter_name: "QosFlow.ThpTimeUl"
+              ran_parameter_test: "GREATERTHAN"
+              ran_parameter_value: "real"
+              
+            - ran_parameter_id: 5
+              ran_parameter_name: "RRC.ConnMax"
+              ran_parameter_test: "LESSTHAN"
+              ran_parameter_value: "integer"
+              
+            - ran_parameter_id: 6
+              ran_parameter_name: "RRC.ConnMean"
+              ran_parameter_test: "LESSTHAN"
+              ran_parameter_value: "integer"
+              
+      # Control Actions
+      control_actions:
+        - action_id: 1
+          action_type: "INSERT"
+          action_definition:
+            ric_style_type: 1
+            control_action_id: 1
+            ran_parameters:
+              - parameter_id: 1
+                parameter_value: 1000
+                
+        - action_id: 2
+          action_type: "INSERT"
+          action_definition:
+            ric_style_type: 2
+            control_action_id: 2
+            ran_parameters:
+              - parameter_id: 5
+                parameter_value: 100
+                
+      # Control Outcomes
+      control_outcomes:
+        - outcome_id: 1
+          outcome_definition:
+            control_outcome_format: "Format 1"
+            ran_parameters:
+              - parameter_id: 1
+                parameter_test_result: "SUCCESS"
+                
+        - outcome_id: 2
+          outcome_definition:
+            control_outcome_format: "Format 1"
+            ran_parameters:
+              - parameter_id: 5
+                parameter_test_result: "SUCCESS"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: e2-agent-config
+  namespace: oran-network-functions
+  labels:
+    component: e2-agent
+data:
+  e2_agent.conf: |
+    # E2 Agent Configuration
+    e2_agent:
+      # Basic Configuration
+      near_ric_ip_addr: "e2term-service.oran-system.svc.cluster.local"
+      near_ric_port: 36421
+      
+      # Local Configuration
+      local_ip_addr: "0.0.0.0"
+      local_port: 36421
+      
+      # SCTP Configuration
+      sctp_config:
+        heartbeat_interval: 30
+        path_max_retrans: 5
+        max_init_retrans: 8
+        rto_initial: 3000
+        rto_min: 1000
+        rto_max: 60000
+        
+      # Service Models
+      service_models:
+        - name: "ORAN-E2SM-KPM"
+          version: "3.0.0"
+          oid: "1.3.6.1.4.1.53148.1.2.2.2"
+          enabled: true
+          
+        - name: "ORAN-E2SM-RC"
+          version: "1.0.3"
+          oid: "1.3.6.1.4.1.53148.1.1.2.3"
+          enabled: true
+          
+      # Subscription Management
+      subscription_mgmt:
+        max_subscriptions: 100
+        max_actions_per_subscription: 10
+        default_report_period: 1000
+        
+      # Indication Configuration
+      indication_config:
+        max_indication_message_size: 9000
+        indication_header_format: "E2AP"
+        indication_message_format: "ASN1_PER"
+        
+      # Node Configuration
+      node_config:
+        global_gnb_id:
+          plmn_id:
+            mcc: "001"
+            mnc: "01"
+          gnb_id:
+            length: 22
+            value: 1
+            
+        ran_functions:
+          - function_id: 1
+            function_revision: 0
+            function_oid: "1.3.6.1.4.1.53148.1.2.2.2"
+            
+          - function_id: 2
+            function_revision: 0
+            function_oid: "1.3.6.1.4.1.53148.1.1.2.3"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: e2-measurements-config
+  namespace: oran-network-functions
+  labels:
+    component: e2-measurements
+data:
+  measurement_definitions.yaml: |
+    # E2 Measurement Definitions
+    measurements:
+      # CU-CP Measurements
+      cu_cp_measurements:
+        - name: "DRB.EstabSucc.5QI"
+          description: "DRB establishment success rate per 5QI"
+          unit: "percentage"
+          scope: "UE"
+          measurement_type: "MEAN"
+          
+        - name: "DRB.RelActNbr.5QI"
+          description: "Number of released active DRB per 5QI"
+          unit: "count"
+          scope: "UE"
+          measurement_type: "SUM"
+          
+        - name: "RRC.ConnEstabSucc"
+          description: "RRC connection establishment success rate"
+          unit: "percentage"
+          scope: "CELL"
+          measurement_type: "MEAN"
+          
+        - name: "RRC.ConnReestabSucc"
+          description: "RRC connection re-establishment success rate"
+          unit: "percentage"
+          scope: "CELL"
+          measurement_type: "MEAN"
+          
+      # CU-UP Measurements
+      cu_up_measurements:
+        - name: "DRB.PdcpSduVolumeDl"
+          description: "DL PDCP SDU volume"
+          unit: "KB"
+          scope: "UE"
+          measurement_type: "SUM"
+          
+        - name: "DRB.PdcpSduVolumeUl"
+          description: "UL PDCP SDU volume"
+          unit: "KB"
+          scope: "UE"
+          measurement_type: "SUM"
+          
+        - name: "DRB.PdcpSduBitRateDl"
+          description: "DL PDCP SDU bit rate"
+          unit: "kbps"
+          scope: "UE"
+          measurement_type: "MEAN"
+          
+        - name: "DRB.PdcpSduBitRateUl"
+          description: "UL PDCP SDU bit rate"
+          unit: "kbps"
+          scope: "UE"
+          measurement_type: "MEAN"
+          
+      # DU Measurements
+      du_measurements:
+        - name: "RRU.PrbTotDl"
+          description: "Total DL PRB usage"
+          unit: "PRB"
+          scope: "CELL"
+          measurement_type: "MEAN"
+          
+        - name: "RRU.PrbTotUl"
+          description: "Total UL PRB usage"
+          unit: "PRB"
+          scope: "CELL"
+          measurement_type: "MEAN"
+          
+        - name: "TB.ErrTotalNbrDl"
+          description: "Total number of DL TB errors"
+          unit: "count"
+          scope: "CELL"
+          measurement_type: "SUM"
+          
+        - name: "TB.ErrTotalNbrUl"
+          description: "Total number of UL TB errors"
+          unit: "count"
+          scope: "CELL"
+          measurement_type: "SUM"
+          
+        - name: "CARR.PDSCHMCSIndex"
+          description: "PDSCH MCS index"
+          unit: "index"
+          scope: "CELL"
+          measurement_type: "MEAN"
+          
+        - name: "CARR.PUSCHMCSIndex"
+          description: "PUSCH MCS index"
+          unit: "index"
+          scope: "CELL"
+          measurement_type: "MEAN"

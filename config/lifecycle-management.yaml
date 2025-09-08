@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: network-function-lifecycle
+  namespace: oran-network-functions
+data:
+  lifecycle_policies.json: |
+    {
+      "startup_policy": {
+        "max_startup_time": 300,
+        "health_check_interval": 30,
+        "restart_attempts": 3
+      },
+      "scaling_policy": {
+        "min_replicas": 1,
+        "max_replicas": 3,
+        "scale_up_threshold": 70,
+        "scale_down_threshold": 30
+      },
+      "shutdown_policy": {
+        "grace_period": 60,
+        "force_termination_timeout": 120
+      }
+    }
