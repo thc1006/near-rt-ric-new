@@ -224,7 +224,7 @@ func (s *Server) handleCreateConfiguration(w http.ResponseWriter, r *http.Reques
 		"message":         "Configuration created successfully",
 		"configurationId": configID,
 	}
-	
+
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Failed to encode configuration creation response: %v", err)
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
@@ -254,7 +254,7 @@ func (s *Server) handleUpdateConfiguration(w http.ResponseWriter, r *http.Reques
 		"message":         "Configuration updated successfully",
 		"configurationId": configID,
 	}
-	
+
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Failed to encode configuration update response: %v", err)
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
@@ -352,7 +352,7 @@ func (s *Server) handleAcknowledgeAlarm(w http.ResponseWriter, r *http.Request, 
 		"message": "Alarm acknowledged successfully",
 		"alarmId": alarmID,
 	}
-	
+
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Failed to encode alarm acknowledgment response: %v", err)
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
@@ -622,7 +622,7 @@ func (s *Server) handleDeleteBackup(w http.ResponseWriter, r *http.Request, ctx 
 		"message":  "Backup deleted successfully",
 		"backupId": backupID,
 	}
-	
+
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Failed to encode backup deletion response: %v", err)
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
@@ -711,7 +711,7 @@ func (s *Server) O1AlarmClearHandler(w http.ResponseWriter, r *http.Request) {
 		"message": "Alarm cleared successfully",
 		"alarmId": alarmID,
 	}
-	
+
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Failed to encode alarm clear response: %v", err)
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
@@ -848,7 +848,7 @@ func (s *Server) handleUpdateKPI(w http.ResponseWriter, r *http.Request, ctx con
 		"message": "KPI updated successfully",
 		"kpiId":   kpiID,
 	}
-	
+
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Failed to encode KPI update response: %v", err)
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
@@ -1011,7 +1011,7 @@ func (s *Server) handleRevokeCertificate(w http.ResponseWriter, r *http.Request,
 		"message":       "Certificate revoked successfully",
 		"certificateId": certID,
 	}
-	
+
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Failed to encode certificate revocation response: %v", err)
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
@@ -1151,8 +1151,9 @@ func (s *Server) handleCreateAccessControlPolicy(w http.ResponseWriter, r *http.
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
-}// O
-1AccessControlPolicyHandler handles requests for a specific access control policy
+}
+
+// O1AccessControlPolicyHandler handles requests for a specific access control policy
 func (s *Server) O1AccessControlPolicyHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	policyID := vars["policyId"]
@@ -1230,7 +1231,7 @@ func (s *Server) handleUpdateAccessControlPolicy(w http.ResponseWriter, r *http.
 		"message":  "Access control policy updated successfully",
 		"policyId": policyID,
 	}
-	
+
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Failed to encode access control policy update response: %v", err)
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
@@ -1247,7 +1248,7 @@ func (s *Server) handleDeleteAccessControlPolicy(w http.ResponseWriter, r *http.
 		"message":  "Access control policy deleted successfully",
 		"policyId": policyID,
 	}
-	
+
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Failed to encode access control policy deletion response: %v", err)
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
