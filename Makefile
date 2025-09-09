@@ -231,6 +231,46 @@ security-scan-k8s: ## Scan Kubernetes manifests for security issues
 		echo "$(YELLOW)kubesec not found, skipping K8s manifest scanning$(NC)"; \
 	fi
 
+.PHONY: security-help
+security-help: ## Show detailed security targets
+	@echo "$(BLUE)O-RAN Security Implementation Targets$(NC)"
+	@echo "$(BLUE)=====================================$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Core Security:$(NC)"
+	@echo "  $(GREEN)security-full$(NC)                 - Complete security implementation and validation"
+	@echo "  $(GREEN)security-enforce$(NC)              - Enforce all security policies"
+	@echo "  $(GREEN)security-validate$(NC)             - Validate security compliance"
+	@echo "  $(GREEN)security-test$(NC)                 - Run comprehensive security tests"
+	@echo ""
+	@echo "$(YELLOW)WG11 Compliance:$(NC)"
+	@echo "  $(GREEN)wg11-validate$(NC)                 - Validate WG11 interface security compliance"
+	@echo "  $(GREEN)wg11-deploy$(NC)                   - Deploy WG11 security policies"
+	@echo "  $(GREEN)wg11-test$(NC)                     - Test WG11 interface security"
+	@echo ""
+	@echo "$(YELLOW)FIPS 140-3:$(NC)"
+	@echo "  $(GREEN)fips-enable$(NC)                   - Enable FIPS 140-3 mode"
+	@echo "  $(GREEN)fips-validate$(NC)                 - Validate FIPS compliance"
+	@echo "  $(GREEN)fips-build$(NC)                    - Build with FIPS enforcement"
+	@echo ""
+	@echo "$(YELLOW)Certificates:$(NC)"
+	@echo "  $(GREEN)certs-generate$(NC)                - Generate all interface certificates"
+	@echo "  $(GREEN)certs-validate$(NC)                - Validate certificate status"
+	@echo "  $(GREEN)certs-rotate$(NC)                  - Rotate expiring certificates"
+	@echo ""
+	@echo "$(YELLOW)Vulnerability Scanning:$(NC)"
+	@echo "  $(GREEN)scan-containers$(NC)               - Scan all container images"
+	@echo "  $(GREEN)scan-configs$(NC)                  - Scan configuration files"
+	@echo "  $(GREEN)scan-dependencies$(NC)             - Scan Go dependencies"
+	@echo ""
+	@echo "$(YELLOW)Policy Enforcement:$(NC)"
+	@echo "  $(GREEN)policies-apply$(NC)                - Apply security policies"
+	@echo "  $(GREEN)policies-validate$(NC)             - Validate policy compliance"
+	@echo "  $(GREEN)network-policies$(NC)              - Apply zero-trust network policies"
+	@echo ""
+	@echo "$(YELLOW)Monitoring:$(NC)"
+	@echo "  $(GREEN)security-monitor$(NC)              - Setup security monitoring"
+	@echo "  $(GREEN)security-alerts$(NC)               - Check security alerts"
+
 .PHONY: security-certs
 security-certs: ## Generate security certificates for O-RAN interfaces
 	@echo "$(YELLOW)Generating security certificates...$(NC)"
