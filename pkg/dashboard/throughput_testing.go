@@ -33,15 +33,7 @@ type IndicationProcessor struct {
 	mu               sync.RWMutex
 }
 
-// Indication represents an E2 indication message
-type Indication struct {
-	ID            string
-	NodeID        string
-	SubscriptionID string
-	Timestamp     time.Time
-	Data          []byte
-	ProcessingStart time.Time
-}
+// Indication type is now defined in types.go to avoid redeclaration
 
 // ProcessedIndication represents a processed indication
 type ProcessedIndication struct {

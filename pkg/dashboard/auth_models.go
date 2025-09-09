@@ -11,14 +11,14 @@ import (
 
 // User represents a system user
 type User struct {
-	ID          string    `json:"id"`
-	Username    string    `json:"username"`
-	Email       string    `json:"email"`
-	FullName    string    `json:"fullName"`
-	Roles       []string  `json:"roles"`
-	IsActive    bool      `json:"isActive"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	ID          string     `json:"id"`
+	Username    string     `json:"username"`
+	Email       string     `json:"email"`
+	FullName    string     `json:"fullName"`
+	Roles       []string   `json:"roles"`
+	IsActive    bool       `json:"isActive"`
+	CreatedAt   time.Time  `json:"createdAt"`
+	UpdatedAt   time.Time  `json:"updatedAt"`
 	LastLoginAt *time.Time `json:"lastLoginAt,omitempty"`
 }
 
@@ -43,14 +43,14 @@ type Permission struct {
 
 // ServiceAccount represents a service account for component authentication
 type ServiceAccount struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	ClientID    string    `json:"clientId"`
-	Roles       []string  `json:"roles"`
-	IsActive    bool      `json:"isActive"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	ID          string     `json:"id"`
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	ClientID    string     `json:"clientId"`
+	Roles       []string   `json:"roles"`
+	IsActive    bool       `json:"isActive"`
+	CreatedAt   time.Time  `json:"createdAt"`
+	UpdatedAt   time.Time  `json:"updatedAt"`
 	LastUsedAt  *time.Time `json:"lastUsedAt,omitempty"`
 }
 
@@ -150,17 +150,17 @@ type UpdateServiceAccountRequest struct {
 
 // AuditEvent represents a security audit event
 type AuditEvent struct {
-	ID          string                 `json:"id"`
-	EventType   string                 `json:"eventType"`
-	UserID      string                 `json:"userId"`
-	Username    string                 `json:"username"`
-	Resource    string                 `json:"resource"`
-	Action      string                 `json:"action"`
-	Result      string                 `json:"result"`
-	IPAddress   string                 `json:"ipAddress"`
-	UserAgent   string                 `json:"userAgent"`
-	Details     map[string]interface{} `json:"details"`
-	Timestamp   time.Time              `json:"timestamp"`
+	ID        string                 `json:"id"`
+	EventType string                 `json:"eventType"`
+	UserID    string                 `json:"userId"`
+	Username  string                 `json:"username"`
+	Resource  string                 `json:"resource"`
+	Action    string                 `json:"action"`
+	Result    string                 `json:"result"`
+	IPAddress string                 `json:"ipAddress"`
+	UserAgent string                 `json:"userAgent"`
+	Details   map[string]interface{} `json:"details"`
+	Timestamp time.Time              `json:"timestamp"`
 }
 
 // Predefined system roles
@@ -233,19 +233,19 @@ var (
 
 // Event types for audit logging
 const (
-	EventTypeLogin              = "login"
-	EventTypeLogout             = "logout"
-	EventTypeLoginFailed        = "login_failed"
-	EventTypePasswordChanged    = "password_changed"
-	EventTypeUserCreated        = "user_created"
-	EventTypeUserUpdated        = "user_updated"
-	EventTypeUserDeleted        = "user_deleted"
-	EventTypeRoleCreated        = "role_created"
-	EventTypeRoleUpdated        = "role_updated"
-	EventTypeRoleDeleted        = "role_deleted"
-	EventTypePermissionGranted  = "permission_granted"
-	EventTypePermissionRevoked  = "permission_revoked"
-	EventTypeAccessDenied       = "access_denied"
+	EventTypeLogin                 = "login"
+	EventTypeLogout                = "logout"
+	EventTypeLoginFailed           = "login_failed"
+	EventTypePasswordChanged       = "password_changed"
+	EventTypeUserCreated           = "user_created"
+	EventTypeUserUpdated           = "user_updated"
+	EventTypeUserDeleted           = "user_deleted"
+	EventTypeRoleCreated           = "role_created"
+	EventTypeRoleUpdated           = "role_updated"
+	EventTypeRoleDeleted           = "role_deleted"
+	EventTypePermissionGranted     = "permission_granted"
+	EventTypePermissionRevoked     = "permission_revoked"
+	EventTypeAccessDenied          = "access_denied"
 	EventTypeServiceAccountCreated = "service_account_created"
 	EventTypeServiceAccountUpdated = "service_account_updated"
 	EventTypeServiceAccountDeleted = "service_account_deleted"

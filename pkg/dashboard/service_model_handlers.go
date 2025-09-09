@@ -250,8 +250,8 @@ func (s *Server) ProcessControlHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-//
- ServiceModelOperationsHandler handles requests for supported operations
+
+// ServiceModelOperationsHandler handles requests for supported operations
 func (s *Server) ServiceModelOperationsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -345,7 +345,7 @@ func (s *Server) ValidateMessageHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	err := s.serviceModelAPIManager.ValidateMessage(request.ServiceModelType, request.MessageType, request.Data)
-	
+
 	var status string
 	var errorMsg string
 	if err != nil {

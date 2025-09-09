@@ -1,0 +1,65 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: near-rt-ric-monitors
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      monitoring.oran.io/scrape: "true"
+  namespaceSelector:
+    matchNames:
+      - near-rt-ric
+      - monitoring
+  endpoints:
+    - port: metrics
+      interval: 15s
+      path: /metrics
+      scheme: http
+      scrapeTimeout: 10s
+      honorLabels: true
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_service_label_component]
+          targetLabel: component
+        - sourceLabels: [__meta_kubernetes_service_label_release]
+          targetLabel: release
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: e2-interface-monitor
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      component: e2-service
+  endpoints:
+    - port: metrics
+      interval: 15s
+      path: /e2-metrics
+      scrapeTimeout: 10s
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'near_rt_ric_e2_(.+)'
+          action: keep
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: a1-interface-monitor
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      component: a1-service
+  endpoints:
+    - port: metrics
+      interval: 15s
+      path: /a1-metrics
+      scrapeTimeout: 10s
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'near_rt_ric_a1_(.+)'
+          action: keep

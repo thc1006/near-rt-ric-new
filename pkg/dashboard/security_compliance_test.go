@@ -3,7 +3,6 @@ package dashboard
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"net/http"
 	"strings"
@@ -74,16 +73,6 @@ type CertificateTestData struct {
 	CAChain            []string          `json:"caChain"`
 }
 
-// CertificateInfo represents certificate information
-type CertificateInfo struct {
-	Subject    string    `json:"subject"`
-	Issuer     string    `json:"issuer"`
-	NotBefore  time.Time `json:"notBefore"`
-	NotAfter   time.Time `json:"notAfter"`
-	KeyUsage   []string  `json:"keyUsage"`
-	PEM        string    `json:"pem"`
-}
-
 // EncryptionTestData contains encryption-related test data
 type EncryptionTestData struct {
 	Algorithms       []string `json:"algorithms"`
@@ -98,16 +87,6 @@ type AuditTestData struct {
 	TestEvents     []AuditEvent `json:"testEvents"`
 }
 
-// AuditEvent represents an audit event
-type AuditEvent struct {
-	Type        string    `json:"type"`
-	User        string    `json:"user"`
-	Action      string    `json:"action"`
-	Resource    string    `json:"resource"`
-	Timestamp   time.Time `json:"timestamp"`
-	Result      string    `json:"result"`
-}
-
 // NewSecurityComplianceTest creates a new security compliance test instance
 func NewSecurityComplianceTest(runner *ComplianceTestRunner) *SecurityComplianceTest {
 	return &SecurityComplianceTest{
@@ -117,39 +96,7 @@ func NewSecurityComplianceTest(runner *ComplianceTestRunner) *SecurityCompliance
 	}
 }
 
-// runSecurityTest executes security compliance tests
-func (r *ComplianceTestRunner) runSecurityTest(ctx context.Context, test ComplianceTest) TestResult {
-	secTest := NewSecurityComplianceTest(r)
-	
-	switch test.ID {
-	case "sec-001":
-		return secTest.testTLSCompliance(ctx, test)
-	case "sec-002":
-		return secTest.testCipherSuiteCompliance(ctx, test)
-	case "sec-003":
-		return secTest.testCertificateValidation(ctx, test)
-	case "sec-004":
-		return secTest.testMutualTLSAuthentication(ctx, test)
-	case "sec-005":
-		return secTest.testJWTTokenSecurity(ctx, test)
-	case "sec-006":
-		return secTest.testRBACImplementation(ctx, test)
-	case "sec-007":
-		return secTest.testEncryptionCompliance(ctx, test)
-	case "sec-008":
-		return secTest.testSecurityAuditing(ctx, test)
-	case "sec-009":
-		return secTest.testVulnerabilityProtection(ctx, test)
-	case "sec-010":
-		return secTest.testSecurityHeaders(ctx, test)
-	default:
-		return TestResult{
-			TestID:  test.ID,
-			Status:  StatusError,
-			Message: fmt.Sprintf("Unknown security test: %s", test.ID),
-		}
-	}
-}
+// NOTE: runSecurityTest function is removed from here - it's kept in compliance_testing.go line 325
 
 // testTLSCompliance validates TLS implementation compliance
 func (t *SecurityComplianceTest) testTLSCompliance(ctx context.Context, test ComplianceTest) TestResult {
@@ -655,7 +602,7 @@ func (t *SecurityComplianceTest) testVulnerabilityProtection(ctx context.Context
 	}
 	
 	for _, vuln := range vulnerabilities {
-		if err := t.testVulnerabilityProtection(ctx, vuln); err != nil {
+		if err := t.testSpecificVulnerabilityProtection(ctx, vuln); err != nil {
 			result.Status = StatusFailed
 			result.Message = fmt.Sprintf("Vulnerability protection test failed for %s: %v", vuln, err)
 			result.Evidence = append(result.Evidence, Evidence{
@@ -847,7 +794,7 @@ func (t *SecurityComplianceTest) testAuditLogIntegrity(ctx context.Context) erro
 	return nil
 }
 
-func (t *SecurityComplianceTest) testVulnerabilityProtection(ctx context.Context, vulnerability string) error {
+func (t *SecurityComplianceTest) testSpecificVulnerabilityProtection(ctx context.Context, vulnerability string) error {
 	// This would test vulnerability protection in a real implementation
 	return nil
 }

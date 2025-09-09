@@ -1,0 +1,436 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: du-1
+  namespace: oran-network-functions
+  labels:
+    app: du
+    du-id: "1"
+    component: distributed-unit
+    interface: f1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: du
+      du-id: "1"
+  template:
+    metadata:
+      labels:
+        app: du
+        du-id: "1"
+        component: distributed-unit
+        interface: f1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9092"
+        k8s.v1.cni.cncf.io/networks: |
+          [{
+            "name": "fronthaul-net",
+            "interface": "fh0",
+            "ips": ["10.10.1.1/24"]
+          }]
+    spec:
+      serviceAccountName: du-sa
+      containers:
+      - name: du
+        image: oaisoftwarealliance/oai-gnb:v2.0.0
+        command: ["/opt/oai-gnb/bin/nr-softmodem"]
+        args: ["-O", "/etc/oai/du.conf", "--sa", "--du"]
+        resources:
+          requests:
+            cpu: 8
+            memory: 16Gi
+            hugepages-1Gi: 4Gi
+            intel.com/intel_sriov_netdevice: "2"
+          limits:
+            cpu: 16
+            memory: 32Gi
+            hugepages-1Gi: 4Gi
+            intel.com/intel_sriov_netdevice: "2"
+        env:
+        - name: DU_ID
+          value: "1"
+        - name: CELL_ID
+          value: "1"
+        - name: PHYSICAL_CELL_ID
+          value: "0"
+        - name: CU_IP
+          valueFrom:
+            configMapKeyRef:
+              name: du-config
+              key: cu.cp.address
+        - name: E2_TERMINATION_IP
+          valueFrom:
+            configMapKeyRef:
+              name: du-config
+              key: e2term.address
+        - name: TZ
+          value: "UTC"
+        ports:
+        - containerPort: 38472  # F1-C interface
+          name: f1-c
+          protocol: SCTP
+        - containerPort: 2152   # F1-U interface
+          name: f1-u
+          protocol: UDP
+        - containerPort: 36421  # E2 interface
+          name: e2
+          protocol: SCTP
+        - containerPort: 4043   # eCPRI
+          name: ecpri
+          protocol: UDP
+        - containerPort: 9092   # Metrics
+          name: metrics
+          protocol: TCP
+        volumeMounts:
+        - name: config
+          mountPath: /etc/oai
+        - name: hugepage
+          mountPath: /dev/hugepages
+        - name: shared-data
+          mountPath: /shared
+        - name: radio-config
+          mountPath: /radio
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 9092
+          initialDelaySeconds: 90
+          periodSeconds: 30
+          timeoutSeconds: 15
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 9092
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 5
+        securityContext:
+          capabilities:
+            add: ["IPC_LOCK", "NET_ADMIN", "SYS_NICE", "SYS_ADMIN"]
+          runAsUser: 0
+      volumes:
+      - name: config
+        configMap:
+          name: du-config
+      - name: hugepage
+        emptyDir:
+          medium: HugePages
+      - name: shared-data
+        emptyDir: {}
+      - name: radio-config
+        configMap:
+          name: radio-config
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-role.kubernetes.io/du
+                operator: In
+                values: ["true"]
+      tolerations:
+      - key: dedicated
+        operator: Equal
+        value: du
+        effect: NoSchedule
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: du-2
+  namespace: oran-network-functions
+  labels:
+    app: du
+    du-id: "2"
+    component: distributed-unit
+    interface: f1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: du
+      du-id: "2"
+  template:
+    metadata:
+      labels:
+        app: du
+        du-id: "2"
+        component: distributed-unit
+        interface: f1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9092"
+        k8s.v1.cni.cncf.io/networks: |
+          [{
+            "name": "fronthaul-net",
+            "interface": "fh0",
+            "ips": ["10.10.2.1/24"]
+          }]
+    spec:
+      serviceAccountName: du-sa
+      containers:
+      - name: du
+        image: oaisoftwarealliance/oai-gnb:v2.0.0
+        command: ["/opt/oai-gnb/bin/nr-softmodem"]
+        args: ["-O", "/etc/oai/du.conf", "--sa", "--du"]
+        resources:
+          requests:
+            cpu: 8
+            memory: 16Gi
+            hugepages-1Gi: 4Gi
+            intel.com/intel_sriov_netdevice: "2"
+          limits:
+            cpu: 16
+            memory: 32Gi
+            hugepages-1Gi: 4Gi
+            intel.com/intel_sriov_netdevice: "2"
+        env:
+        - name: DU_ID
+          value: "2"
+        - name: CELL_ID
+          value: "2"
+        - name: PHYSICAL_CELL_ID
+          value: "1"
+        - name: CU_IP
+          valueFrom:
+            configMapKeyRef:
+              name: du-config
+              key: cu.cp.address
+        - name: E2_TERMINATION_IP
+          valueFrom:
+            configMapKeyRef:
+              name: du-config
+              key: e2term.address
+        - name: TZ
+          value: "UTC"
+        ports:
+        - containerPort: 38472
+          name: f1-c
+          protocol: SCTP
+        - containerPort: 2152
+          name: f1-u
+          protocol: UDP
+        - containerPort: 36421
+          name: e2
+          protocol: SCTP
+        - containerPort: 4043
+          name: ecpri
+          protocol: UDP
+        - containerPort: 9092
+          name: metrics
+          protocol: TCP
+        volumeMounts:
+        - name: config
+          mountPath: /etc/oai
+        - name: hugepage
+          mountPath: /dev/hugepages
+        - name: shared-data
+          mountPath: /shared
+        - name: radio-config
+          mountPath: /radio
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 9092
+          initialDelaySeconds: 90
+          periodSeconds: 30
+          timeoutSeconds: 15
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 9092
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 5
+        securityContext:
+          capabilities:
+            add: ["IPC_LOCK", "NET_ADMIN", "SYS_NICE", "SYS_ADMIN"]
+          runAsUser: 0
+      volumes:
+      - name: config
+        configMap:
+          name: du-config
+      - name: hugepage
+        emptyDir:
+          medium: HugePages
+      - name: shared-data
+        emptyDir: {}
+      - name: radio-config
+        configMap:
+          name: radio-config
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-role.kubernetes.io/du
+                operator: In
+                values: ["true"]
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: du-service
+  namespace: oran-network-functions
+  labels:
+    app: du
+    component: distributed-unit
+spec:
+  selector:
+    app: du
+  ports:
+  - name: f1-c
+    port: 38472
+    targetPort: 38472
+    protocol: SCTP
+  - name: f1-u
+    port: 2152
+    targetPort: 2152
+    protocol: UDP
+  - name: e2
+    port: 36421
+    targetPort: 36421
+    protocol: SCTP
+  - name: ecpri
+    port: 4043
+    targetPort: 4043
+    protocol: UDP
+  - name: metrics
+    port: 9092
+    targetPort: 9092
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: du-config
+  namespace: oran-network-functions
+data:
+  cu.cp.address: "cu-cp-service.oran-network-functions.svc.cluster.local"
+  e2term.address: "e2term-service.oran-system.svc.cluster.local"
+  du.conf: |
+    Active_gNBs = ( "du-01" );
+    gNBs = (
+      {
+        gNB_ID = 1;
+        gNB_name = "DU-01";
+        
+        # DU Configuration
+        gNB_DU_ID = 1;
+        enable_cu_cp = "no";
+        enable_cu_up = "no";
+        enable_du = "yes";
+        
+        # Cell Configuration
+        nr_cellid = 1;
+        physical_cellId = 0;
+        tac = 1;
+        
+        # Carrier Configuration
+        dl_carrierBandwidth = 106;  # 20 MHz
+        ul_carrierBandwidth = 106;  # 20 MHz
+        dl_frequencyBand = 78;      # n78
+        ul_frequencyBand = 78;      # n78
+        dl_absoluteFrequencySSB = 633280;  # 3.5 GHz
+        dl_absoluteFrequencyPointA = 632628;
+        ul_absoluteFrequencyPointA = 632628;
+        
+        # F1 Interface Configuration
+        f1_cu_cp_ipv4_address = "cu-cp-service.oran-network-functions.svc.cluster.local";
+        f1_cu_cp_port = 38472;
+        f1_du_ipv4_address = "0.0.0.0";
+        f1_du_port = 38472;
+        
+        # E2 Interface Configuration
+        e2_agent = {
+          near_ric_ip_addr = "e2term-service.oran-system.svc.cluster.local";
+          sm_dir = "/usr/local/lib/flexric/";
+        };
+        
+        # TDD Configuration
+        tdd_config = {
+          dl_ul_periodicity = "ms2p5";
+          nrofDownlinkSlots = 7;
+          nrofDownlinkSymbols = 6;
+          nrofUplinkSlots = 2;
+          nrofUplinkSymbols = 4;
+        };
+        
+        # BWP Configuration
+        initialDLBWPk0 = 0;
+        initialDLBWPlocationAndBandwidth = 14025;
+        initialDLBWPsubcarrierSpacing = "kHz30";
+        initialDLBWPmappingType = 0;
+        initialDLBWPk2 = 0;
+        
+        # PRACH Configuration
+        prach_configuration = {
+          prach_sequence_length = "L839";
+          prach_sub_c_spacing = "kHz30";
+          prach_config_common = {
+            prach_config_index = 159;
+            prach_msg1_fdm = "one";
+            prach_msg1_frequency_start = 0;
+            zero_correlation_zone_config = 13;
+            preamble_received_target_power = -104;
+            preamble_trans_max = 10;
+            power_ramping_step = "dB2";
+            ra_response_window = "sf20";
+            ssb_per_rach_occasion_and_cb_preambles_per_ssb = "one";
+          };
+        };
+        
+        # PDSCH Configuration
+        pdsch_time_domain_allocation = (
+          {k0=0; mapping_type="typeA"; start_symbol=2; length=12;},
+          {k0=0; mapping_type="typeA"; start_symbol=3; length=11;},
+          {k0=1; mapping_type="typeA"; start_symbol=2; length=12;}
+        );
+        
+        # PUSCH Configuration
+        pusch_time_domain_allocation = (
+          {k2=4; mapping_type="typeA"; start_symbol=2; length=12;},
+          {k2=5; mapping_type="typeA"; start_symbol=2; length=12;},
+          {k2=6; mapping_type="typeA"; start_symbol=2; length=12;}
+        );
+        
+        # MAC Configuration
+        mac_config = {
+          ul_sch_scheduling = "dynamic";
+          pusch_target_snrx10 = 200;
+          pucch_target_snrx10 = 200;
+          ulsch_max_frame_inactivity = 1;
+        };
+        
+        # Physical Layer Configuration
+        L1_CC = (
+          {
+            dl_antenna_ports = 1;
+            ul_antenna_ports = 1;
+            pdsch_antenna_ports = 1;
+            pusch_antenna_ports = 1;
+            pdcch_antenna_ports = 1;
+            pucch_antenna_ports = 1;
+          }
+        );
+      }
+    );
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: du-sa
+  namespace: oran-network-functions

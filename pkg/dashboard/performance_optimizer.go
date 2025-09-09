@@ -7,6 +7,7 @@ package dashboard
 
 import (
 	"context"
+	"runtime/debug"
 	"fmt"
 	"runtime"
 	"sync"
@@ -70,64 +71,19 @@ type ThreadPool struct {
 	running    int32
 }
 
-// Worker represents a high-performance worker thread
-type Worker struct {
-	id       int
-	coreID   int
-	workChan chan WorkItem
-	quit     chan bool
-	stats    WorkerStats
-}
+// Worker type is now defined in types.go to avoid redeclaration
 
-// WorkItem represents work to be processed
-type WorkItem struct {
-	ID        uint64
-	Type      WorkType
-	Data      unsafe.Pointer // Zero-copy data pointer
-	Size      int
-	Priority  Priority
-	Timestamp time.Time
-	Callback  func(result WorkResult)
-}
+// WorkItem type is now defined in types.go to avoid redeclaration
 
-// WorkResult contains processing results
-type WorkResult struct {
-	ID        uint64
-	Success   bool
-	Data      unsafe.Pointer
-	Size      int
-	Duration  time.Duration
-	Error     error
-}
+// WorkResult type is now defined in types.go to avoid redeclaration
 
-// WorkType defines the type of work
-type WorkType int
+// WorkType type is now defined in types.go to avoid redeclaration
 
-const (
-	WorkTypeE2APMessage WorkType = iota
-	WorkTypeSubscription
-	WorkTypeIndication
-	WorkTypeControl
-	WorkTypePolicyUpdate
-)
+// WorkType constants are now defined in types.go to avoid redeclaration
 
-// Priority defines work priority levels
-type Priority int
+// Priority type and constants are now defined in types.go to avoid redeclaration
 
-const (
-	PriorityLow Priority = iota
-	PriorityNormal
-	PriorityHigh
-	PriorityCritical
-)
-
-// WorkerStats tracks worker performance
-type WorkerStats struct {
-	ProcessedItems uint64
-	TotalDuration  time.Duration
-	ErrorCount     uint64
-	LastActive     time.Time
-}
+// WorkerStats type is now defined in types.go to avoid redeclaration
 
 // MemoryPool manages memory allocation optimization
 type MemoryPool struct {
@@ -136,14 +92,7 @@ type MemoryPool struct {
 	mu    sync.RWMutex
 }
 
-// MemoryStats tracks memory usage
-type MemoryStats struct {
-	AllocatedBytes   uint64
-	PoolHits         uint64
-	PoolMisses       uint64
-	GCPauses         uint64
-	LastGCDuration   time.Duration
-}
+// MemoryStats type is now defined in types.go to avoid redeclaration
 
 // GCOptimizer manages garbage collection optimization
 type GCOptimizer struct {
@@ -191,15 +140,8 @@ type BottleneckAlert struct {
 	Suggestions []string
 }
 
-// AlertSeverity defines alert severity levels
-type AlertSeverity int
-
-const (
-	SeverityInfo AlertSeverity = iota
-	SeverityWarning
-	SeverityError
-	SeverityCritical
-)
+// AlertSeverity and severity constants are now defined in types.go to avoid redeclaration
+type AlertSeverity = TestSeverity // Use alias to existing type
 
 // NewPerformanceOptimizer creates a new performance optimizer
 func NewPerformanceOptimizer() *PerformanceOptimizer {
@@ -381,7 +323,7 @@ func (tp *ThreadPool) Start(ctx context.Context, cpuManager *CPUAffinityManager)
 	// Start workers
 	for i, worker := range tp.workers {
 		// Assign CPU core
-		threadID := runtime.Goid() // Get goroutine ID
+		threadID := uint64(i) // Get goroutine ID
 		coreID := cpuManager.AssignCore(string(rune(threadID)), i < len(tp.workers)/2) // First half are critical
 		worker.coreID = coreID
 		
@@ -532,6 +474,7 @@ func (w *Worker) processItem(item WorkItem) WorkResult {
 func (w *Worker) processE2APMessage(data unsafe.Pointer, size int) (unsafe.Pointer, int, error) {
 	// Zero-copy processing - work directly with the memory
 	bytes := (*[1 << 30]byte)(data)[:size:size]
+	_ = bytes // Use the variable to avoid unused variable error
 	
 	// Process message in-place
 	// This is a placeholder for actual E2AP message processing
@@ -646,7 +589,7 @@ func (gco *GCOptimizer) OptimizeGC() {
 		gco.targetGCPercent = 200
 	}
 	
-	runtime.SetGCPercent(gco.targetGCPercent)
+	debug.SetGCPercent(gco.targetGCPercent)
 	gco.lastOptimization = time.Now()
 }
 
@@ -896,15 +839,6 @@ func (po *PerformanceOptimizer) GetMetrics() PerformanceMetrics {
 	}
 }
 
-// PerformanceMetrics contains performance metrics
-type PerformanceMetrics struct {
-	ProcessedMessages uint64
-	AverageLatency    time.Duration
-	Throughput        uint64
-	MemoryStats       MemoryStats
-	GCStats           runtime.MemStats
-	ProfileData       map[string]*ProfileData
-}
 
 // Start starts the performance optimizer
 func (po *PerformanceOptimizer) Start(ctx context.Context) error {

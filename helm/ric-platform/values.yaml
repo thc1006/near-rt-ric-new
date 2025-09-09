@@ -1,0 +1,39 @@
+global:
+  image:
+    registry: nexus3.o-ran-sc.org:10002
+    pullPolicy: IfNotPresent
+
+dashboard:
+  enabled: true
+  frontend:
+    image: o-ran-sc/ric-dashboard-frontend
+    tag: 1.0.0
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  backend:
+    image: o-ran-sc/ric-dashboard-backend
+    tag: 1.0.0
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1
+        memory: 1Gi
+
+  config:
+    platformEndpoint: "http://ricplt-service:8080"
+    logLevel: INFO
+    
+  networking:
+    type: LoadBalancer
+    frontend:
+      port: 4200
+    backend:
+      port: 8080

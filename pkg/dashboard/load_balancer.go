@@ -13,49 +13,20 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
 )
 
 // LoadBalancer manages load distribution across multiple instances
 type LoadBalancer struct {
 	algorithm    LoadBalancingAlgorithm
 	backends     []*Backend
-	healthChecker *HealthChecker
+	healthChecker *HealthCheckerImpl
 	metrics      *LoadBalancerMetrics
 	mu           sync.RWMutex
 }
 
-// LoadBalancingAlgorithm defines load balancing strategies
-type LoadBalancingAlgorithm int
-
-const (
-	RoundRobin LoadBalancingAlgorithm = iota
-	WeightedRoundRobin
-	LeastConnections
-	WeightedLeastConnections
-	ConsistentHashing
-	ResourceBased
-	LatencyBased
-)
-
-// Backend represents a backend service instance
-type Backend struct {
-	ID           string
-	Address      string
-	Port         int
-	Weight       int
-	MaxConns     int
-	CurrentConns int64
-	IsHealthy    int32 // atomic boolean
-	LastCheck    time.Time
-	ResponseTime time.Duration
-	ErrorRate    float64
-	CPUUsage     float64
-	MemoryUsage  float64
-	mu           sync.RWMutex
-}
-
-// HealthChecker monitors backend health
-type HealthChecker struct {
+// HealthCheckerImpl is the concrete implementation of HealthChecker interface
+type HealthCheckerImpl struct {
 	interval     time.Duration
 	timeout      time.Duration
 	retries      int
@@ -162,32 +133,12 @@ type FailoverPolicy struct {
 	AutoFailback    bool
 }
 
-// CircuitBreaker implements circuit breaker pattern
-type CircuitBreaker struct {
-	state         CircuitState
-	failures      int64
-	lastFailure   time.Time
-	nextRetry     time.Time
-	maxFailures   int64
-	timeout       time.Duration
-	mu            sync.RWMutex
-}
-
-// CircuitState represents circuit breaker states
-type CircuitState int
-
-const (
-	CircuitClosed CircuitState = iota
-	CircuitOpen
-	CircuitHalfOpen
-)
-
 // NewLoadBalancer creates a new load balancer
 func NewLoadBalancer(algorithm LoadBalancingAlgorithm) *LoadBalancer {
 	return &LoadBalancer{
 		algorithm:     algorithm,
 		backends:      make([]*Backend, 0),
-		healthChecker: NewHealthChecker(),
+		healthChecker: NewHealthCheckerImpl(),
 		metrics:       NewLoadBalancerMetrics(),
 	}
 }
@@ -406,9 +357,9 @@ func (lb *LoadBalancer) hash(key string) uint64 {
 	return h
 }
 
-// NewHealthChecker creates a new health checker
-func NewHealthChecker() *HealthChecker {
-	return &HealthChecker{
+// NewHealthCheckerImpl creates a new health checker implementation
+func NewHealthCheckerImpl() *HealthCheckerImpl {
+	return &HealthCheckerImpl{
 		interval:     time.Second * 30,
 		timeout:      time.Second * 5,
 		retries:      3,
@@ -417,7 +368,7 @@ func NewHealthChecker() *HealthChecker {
 }
 
 // AddBackend adds a backend for health checking
-func (hc *HealthChecker) AddBackend(backend *Backend) {
+func (hc *HealthCheckerImpl) AddBackend(backend *Backend) {
 	hc.mu.Lock()
 	defer hc.mu.Unlock()
 	
@@ -432,7 +383,7 @@ func (hc *HealthChecker) AddBackend(backend *Backend) {
 }
 
 // RemoveBackend removes a backend from health checking
-func (hc *HealthChecker) RemoveBackend(backendID string) {
+func (hc *HealthCheckerImpl) RemoveBackend(backendID string) {
 	hc.mu.Lock()
 	defer hc.mu.Unlock()
 	
@@ -440,7 +391,7 @@ func (hc *HealthChecker) RemoveBackend(backendID string) {
 }
 
 // checkBackendHealth continuously checks backend health
-func (hc *HealthChecker) checkBackendHealth(backend *Backend) {
+func (hc *HealthCheckerImpl) checkBackendHealth(backend *Backend) {
 	ticker := time.NewTicker(hc.interval)
 	defer ticker.Stop()
 	
@@ -466,12 +417,26 @@ func (hc *HealthChecker) checkBackendHealth(backend *Backend) {
 }
 
 // performHealthCheck performs actual health check
-func (hc *HealthChecker) performHealthCheck(backend *Backend, check *HealthCheck) bool {
+func (hc *HealthCheckerImpl) performHealthCheck(backend *Backend, check *HealthCheck) bool {
 	// This is a simplified health check
 	// In production, this would make actual HTTP requests
 	
 	// Simulate health check with some randomness
 	return rand.Float64() > 0.1 // 90% success rate
+}
+
+// CheckHealth implements HealthChecker interface
+func (hc *HealthCheckerImpl) CheckHealth(ctx context.Context) (*HealthCheckResult, error) {
+	// Simple health check implementation
+	return &HealthCheckResult{
+		Healthy:      true,
+		ResponseTime: time.Millisecond * 10,
+	}, nil
+}
+
+// GetServiceName implements HealthChecker interface
+func (hc *HealthCheckerImpl) GetServiceName() string {
+	return "load-balancer-health-checker"
 }
 
 // NewLoadBalancerMetrics creates new load balancer metrics
@@ -809,59 +774,5 @@ func (fm *FailoverManager) RecordFailure(backendID string) {
 	
 	if exists {
 		cb.RecordFailure()
-	}
-}
-
-// NewCircuitBreaker creates a new circuit breaker
-func NewCircuitBreaker(maxFailures int64, timeout time.Duration) *CircuitBreaker {
-	return &CircuitBreaker{
-		state:       CircuitClosed,
-		maxFailures: maxFailures,
-		timeout:     timeout,
-	}
-}
-
-// CanExecute checks if the circuit breaker allows execution
-func (cb *CircuitBreaker) CanExecute() bool {
-	cb.mu.RLock()
-	defer cb.mu.RUnlock()
-	
-	switch cb.state {
-	case CircuitClosed:
-		return true
-	case CircuitOpen:
-		return time.Now().After(cb.nextRetry)
-	case CircuitHalfOpen:
-		return true
-	default:
-		return false
-	}
-}
-
-// RecordSuccess records a successful operation
-func (cb *CircuitBreaker) RecordSuccess() {
-	cb.mu.Lock()
-	defer cb.mu.Unlock()
-	
-	if cb.state == CircuitHalfOpen {
-		cb.state = CircuitClosed
-		cb.failures = 0
-	}
-}
-
-// RecordFailure records a failed operation
-func (cb *CircuitBreaker) RecordFailure() {
-	cb.mu.Lock()
-	defer cb.mu.Unlock()
-	
-	cb.failures++
-	cb.lastFailure = time.Now()
-	
-	if cb.failures >= cb.maxFailures {
-		cb.state = CircuitOpen
-		cb.nextRetry = time.Now().Add(cb.timeout)
-	} else if cb.state == CircuitHalfOpen {
-		cb.state = CircuitOpen
-		cb.nextRetry = time.Now().Add(cb.timeout)
 	}
 }

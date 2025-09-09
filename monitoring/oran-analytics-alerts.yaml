@@ -1,0 +1,78 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: oran-l-release-alerts
+  namespace: monitoring
+spec:
+  groups:
+  - name: near-rt-ric-component-alerts
+    rules:
+    # E2 Interface Alerts
+    - alert: E2ConnectionLow
+      expr: near_rt_ric_e2_connection_total < 10
+      for: 5m
+      labels:
+        severity: warning
+        component: e2-interface
+      annotations:
+        summary: "Low E2 Interface Connections"
+        description: "Total E2 connections below threshold"
+
+    - alert: E2ConnectionDropRate
+      expr: rate(near_rt_ric_e2_connection_dropped_total[5m]) > 0.1
+      for: 10m
+      labels:
+        severity: critical
+        component: e2-interface
+      annotations:
+        summary: "High E2 Connection Drop Rate"
+        description: "More than 10% of E2 connections are dropping"
+
+    # A1 Interface Alerts
+    - alert: A1PolicyRequestFailure
+      expr: near_rt_ric_a1_policy_requests_total{status='failed'} / near_rt_ric_a1_policy_requests_total * 100 > 10
+      for: 5m
+      labels:
+        severity: warning
+        component: a1-interface
+      annotations:
+        summary: "High A1 Policy Request Failure Rate"
+        description: "More than 10% of A1 policy requests are failing"
+
+    # Near-RT RIC Controller Alerts
+    - alert: RICControllerHighCPUUsage
+      expr: process_cpu_seconds_total{job='near-rt-ric-controller'} > 80
+      for: 10m
+      labels:
+        severity: critical
+        component: ric-controller
+      annotations:
+        summary: "High CPU Usage in Near-RT RIC Controller"
+        description: "Near-RT RIC Controller CPU usage exceeding 80%"
+
+    - alert: RICControllerMemoryPressure
+      expr: process_resident_memory_bytes{job='near-rt-ric-controller'} / process_virtual_memory_bytes{job='near-rt-ric-controller'} > 0.9
+      for: 15m
+      labels:
+        severity: warning
+        component: ric-controller
+      annotations:
+        summary: "High Memory Pressure in Near-RT RIC Controller"
+        description: "Near-RT RIC Controller memory usage over 90%"
+
+  - name: service-level-objectives
+    rules:
+    - record: service:near_rt_ric_availability:ratio_rate5m
+      expr: |
+        sum(rate(near_rt_ric_health_ok_total[5m])) 
+        / 
+        sum(rate(near_rt_ric_health_total[5m]))
+
+    - alert: ServiceLevelObjectiveViolation
+      expr: service:near_rt_ric_availability:ratio_rate5m < 0.99
+      for: 30m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Service Level Objective Violation"
+        description: "Near-RT RIC availability below 99% for extended period"

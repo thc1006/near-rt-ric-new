@@ -7,11 +7,11 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/oran/near-rt-ric-new/pkg/dashboard"
-	"github.com/prometheus/client_golang/api"
 )
 
 // PerformanceTestExecutor orchestrates comprehensive performance testing
@@ -101,7 +101,7 @@ func NewPerformanceTestExecutor(config *TestExecutionConfig) (*PerformanceTestEx
 // ExecuteComprehensiveTests executes all performance tests based on configuration
 func (pte *PerformanceTestExecutor) ExecuteComprehensiveTests(ctx context.Context) error {
 	log.Println("Starting comprehensive performance testing...")
-	log.Println("="*80)
+	log.Println(strings.Repeat("=", 80))
 	
 	// Print test configuration
 	pte.printTestConfiguration()
@@ -136,7 +136,7 @@ func (pte *PerformanceTestExecutor) ExecuteComprehensiveTests(ctx context.Contex
 // printTestConfiguration prints the test configuration
 func (pte *PerformanceTestExecutor) printTestConfiguration() {
 	log.Println("TEST CONFIGURATION:")
-	log.Println("-"*40)
+	log.Println(strings.Repeat("-", 40))
 	log.Printf("Load Tests (100+ E2 nodes): %v", pte.config.RunLoadTests)
 	log.Printf("Throughput Tests (10,000+ IPS): %v", pte.config.RunThroughputTests)
 	log.Printf("Latency Tests (sub-10ms): %v", pte.config.RunLatencyTests)
@@ -145,7 +145,7 @@ func (pte *PerformanceTestExecutor) printTestConfiguration() {
 	log.Printf("Output Format: %s", pte.config.OutputFormat)
 	log.Printf("Verbose Logging: %v", pte.config.Verbose)
 	log.Printf("Continue on Failure: %v", pte.config.ContinueOnFailure)
-	log.Println("="*80)
+	log.Println(strings.Repeat("=", 80))
 }
 
 // generateTestReport generates and outputs the test report
@@ -193,9 +193,9 @@ func (pte *PerformanceTestExecutor) generateTextReport(report *dashboard.Compreh
 func (pte *PerformanceTestExecutor) generateDetailedTextReport(report *dashboard.ComprehensiveTestReport) string {
 	var output string
 
-	output += "\n" + "="*100 + "\n"
+	output += "\n" + strings.Repeat("=", 100) + "\n"
 	output += "COMPREHENSIVE PERFORMANCE TEST REPORT - DETAILED RESULTS\n"
-	output += "="*100 + "\n"
+	output += strings.Repeat("=", 100) + "\n"
 
 	// Test Summary
 	output += fmt.Sprintf("Test Start Time: %s\n", report.TestStartTime.Format(time.RFC3339))
@@ -206,7 +206,7 @@ func (pte *PerformanceTestExecutor) generateDetailedTextReport(report *dashboard
 
 	// Requirement Validation Details
 	output += "REQUIREMENT VALIDATION DETAILS:\n"
-	output += "-"*50 + "\n"
+	output += strings.Repeat("-", 50) + "\n"
 
 	if report.ValidationResults != nil {
 		output += pte.formatValidationResult("Load Testing (100+ E2 Nodes)", report.ValidationResults.ConcurrentE2NodesTest)
@@ -219,7 +219,7 @@ func (pte *PerformanceTestExecutor) generateDetailedTextReport(report *dashboard
 
 	// Detailed Performance Metrics
 	output += "\nDETAILED PERFORMANCE METRICS:\n"
-	output += "-"*50 + "\n"
+	output += strings.Repeat("-", 50) + "\n"
 
 	if report.DetailedMetrics != nil {
 		metrics := report.DetailedMetrics
@@ -237,7 +237,7 @@ func (pte *PerformanceTestExecutor) generateDetailedTextReport(report *dashboard
 	// Resource Exhaustion Points
 	if report.DetailedMetrics != nil && len(report.DetailedMetrics.ResourceExhaustionPoints) > 0 {
 		output += "\nRESOURCE EXHAUSTION POINTS:\n"
-		output += "-"*50 + "\n"
+		output += strings.Repeat("-", 50) + "\n"
 		for i, point := range report.DetailedMetrics.ResourceExhaustionPoints {
 			output += fmt.Sprintf("Exhaustion Point %d:\n", i+1)
 			output += fmt.Sprintf("  CPU: %.1f%%\n", point.CPUPercent)
@@ -251,7 +251,7 @@ func (pte *PerformanceTestExecutor) generateDetailedTextReport(report *dashboard
 	// Critical Issues
 	if len(report.CriticalIssues) > 0 {
 		output += "\nCRITICAL ISSUES:\n"
-		output += "-"*30 + "\n"
+		output += strings.Repeat("-", 30) + "\n"
 		for i, issue := range report.CriticalIssues {
 			output += fmt.Sprintf("%d. %s\n", i+1, issue)
 		}
@@ -260,7 +260,7 @@ func (pte *PerformanceTestExecutor) generateDetailedTextReport(report *dashboard
 	// Recommendations
 	if len(report.Recommendations) > 0 {
 		output += "\nRECOMMENDATIONS:\n"
-		output += "-"*30 + "\n"
+		output += strings.Repeat("-", 30) + "\n"
 		for i, rec := range report.Recommendations {
 			output += fmt.Sprintf("%d. %s\n", i+1, rec)
 		}
@@ -268,7 +268,7 @@ func (pte *PerformanceTestExecutor) generateDetailedTextReport(report *dashboard
 
 	// Requirement Compliance Summary
 	output += "\nREQUIREMENT COMPLIANCE SUMMARY:\n"
-	output += "-"*50 + "\n"
+	output += strings.Repeat("-", 50) + "\n"
 	if report.RequirementCompliance != nil {
 		compliance := report.RequirementCompliance
 		output += fmt.Sprintf("6.1 - Latency (sub-10ms): %s\n", pte.formatComplianceStatus(compliance.Requirement61_Latency))
@@ -279,7 +279,7 @@ func (pte *PerformanceTestExecutor) generateDetailedTextReport(report *dashboard
 		output += fmt.Sprintf("Overall Compliance: %.1f%%\n", compliance.OverallCompliance)
 	}
 
-	output += "\n" + "="*100 + "\n"
+	output += "\n" + strings.Repeat("=", 100) + "\n"
 
 	return output
 }

@@ -9,17 +9,7 @@ import (
 	"time"
 )
 
-// E2NodeConnectionStatus represents the connection status of an E2 node
-type E2NodeConnectionStatus string
-
-const (
-	E2NodeConnected    E2NodeConnectionStatus = "CONNECTED"
-	E2NodeDisconnected E2NodeConnectionStatus = "DISCONNECTED"
-	E2NodeConnecting   E2NodeConnectionStatus = "CONNECTING"
-	E2NodeShuttingDown E2NodeConnectionStatus = "SHUTTING_DOWN"
-	E2NodeAssociated   E2NodeConnectionStatus = "ASSOCIATED"
-	E2NodeSetupFailed  E2NodeConnectionStatus = "SETUP_FAILED"
-)
+// E2NodeConnectionStatus type is now defined in types.go to avoid redeclaration
 
 // E2NodeType represents the type of E2 node
 type E2NodeType string
@@ -34,29 +24,11 @@ const (
 )
 
 // GlobalE2NodeID represents the global E2 node identifier
-type GlobalE2NodeID struct {
-	PlmnID string `json:"plmnId"`
-	NodeID string `json:"nodeId"`
-	Type   E2NodeType `json:"type"`
-}
+// GlobalE2NodeID type is now defined in types.go to avoid redeclaration
 
-// RANFunction represents a RAN function supported by an E2 node
-type RANFunction struct {
-	ID          uint32 `json:"id"`
-	OID         string `json:"oid"`
-	Definition  []byte `json:"definition"`
-	Revision    uint32 `json:"revision"`
-	Description string `json:"description"`
-}
+// RANFunction type is now defined in types.go to avoid redeclaration
 
-// ServiceModel represents an E2 service model
-type ServiceModel struct {
-	OID         string        `json:"oid"`
-	Name        string        `json:"name"`
-	Version     string        `json:"version"`
-	Functions   []RANFunction `json:"functions"`
-	Description string        `json:"description"`
-}
+// ServiceModel type is now defined in types.go to avoid redeclaration
 
 // E2SetupRequest represents the E2 setup request information
 type E2SetupRequest struct {
@@ -73,21 +45,6 @@ type E2NodeComponentConfig struct {
 	E2NodeComponentConfiguration []byte `json:"e2NodeComponentConfiguration"`
 }
 
-// E2Node represents an E2 node in the system
-type E2Node struct {
-	ID                string                 `json:"id"`
-	GlobalE2NodeID    GlobalE2NodeID         `json:"globalE2NodeId"`
-	ConnectionStatus  E2NodeConnectionStatus `json:"connectionStatus"`
-	SetupRequest      *E2SetupRequest        `json:"setupRequest,omitempty"`
-	ServiceModels     []ServiceModel         `json:"serviceModels"`
-	RANFunctions      []RANFunction          `json:"ranFunctions"`
-	LastUpdate        time.Time              `json:"lastUpdate"`
-	Subscriptions     []SubscriptionInfo     `json:"subscriptions"`
-	IPAddress         string                 `json:"ipAddress"`
-	Port              uint32                 `json:"port"`
-	AssociationID     string                 `json:"associationId"`
-	SCTPStreams       uint32                 `json:"sctpStreams"`
-}
 
 // SubscriptionInfo represents subscription information for an E2 node
 type SubscriptionInfo struct {
@@ -127,12 +84,7 @@ type E2NodeListResponse struct {
 	Total uint32   `json:"total"`
 }
 
-// E2NodeConfigurationUpdate represents a configuration update for an E2 node
-type E2NodeConfigurationUpdate struct {
-	NodeID                           string                    `json:"nodeId"`
-	E2NodeComponentConfigUpdateList  []E2NodeComponentConfig   `json:"e2NodeComponentConfigUpdateList"`
-	E2NodeComponentConfigRemovalList []string                  `json:"e2NodeComponentConfigRemovalList"`
-}
+// E2NodeConfigurationUpdate type is now defined in types.go to avoid redeclaration
 
 // E2ConnectionUpdate represents a connection update event
 type E2ConnectionUpdate struct {

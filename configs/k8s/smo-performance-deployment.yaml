@@ -1,0 +1,651 @@
+# O-RAN L Release SMO Performance Optimizer Deployment
+# Production-ready Kubernetes deployment with Nephio R5 integration
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: oran-smo
+  labels:
+    nephio.org/site: edge
+    oran.org/release: l-release
+    app.kubernetes.io/name: oran-smo
+    app.kubernetes.io/version: "1.0.0"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: smo-performance-config
+  namespace: oran-smo
+  labels:
+    app.kubernetes.io/name: smo-performance-optimizer
+    app.kubernetes.io/component: config
+data:
+  config.yaml: |
+    # SMO Performance Configuration
+    smo_performance:
+      max_e2_nodes: 200
+      target_throughput_ips: 20000
+      max_processing_latency_ms: 8
+      smo_integration:
+        enabled: true
+        smo_endpoint: "https://smo.oran.local:8443"
+      nephio_integration:
+        enabled: true
+        porch_endpoint: "https://porch.nephio.local:7443"
+        ocloud_endpoint: "https://ocloud.nephio.local:8443"
+    
+    message_processing:
+      thread_pool_size: 32
+      enable_simd: true
+      batch_size: 200
+      
+    cpu_optimization:
+      enable_cpu_affinity: true
+      enable_numa_awareness: true
+      
+    memory_management:
+      memory_pool_size_mb: 2048
+      gc_target_percent: 75
+      
+    dashboard_api:
+      max_concurrent_connections: 2000
+      rate_limit_rps: 2000
+      enable_response_cache: true
+      
+    monitoring:
+      enable_prometheus_metrics: true
+      enable_distributed_tracing: true
+      log_level: "info"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: smo-performance-secrets
+  namespace: oran-smo
+  labels:
+    app.kubernetes.io/name: smo-performance-optimizer
+    app.kubernetes.io/component: secrets
+type: Opaque
+data:
+  smo-jwt-secret: ${SMO_JWT_SECRET_BASE64}
+  jwt-secret: ${JWT_SECRET_BASE64}
+  db-password: ${DB_PASSWORD_BASE64}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: smo-performance-optimizer
+  namespace: oran-smo
+  labels:
+    app.kubernetes.io/name: smo-performance-optimizer
+    app.kubernetes.io/component: api
+    nephio.org/service-type: oran-component
+spec:
+  selector:
+    app.kubernetes.io/name: smo-performance-optimizer
+  ports:
+    - name: api
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+    - name: e2-interface
+      port: 36421
+      targetPort: 36421
+      protocol: SCTP
+  type: ClusterIP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 300
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: smo-performance-optimizer-headless
+  namespace: oran-smo
+  labels:
+    app.kubernetes.io/name: smo-performance-optimizer
+    app.kubernetes.io/component: api
+spec:
+  selector:
+    app.kubernetes.io/name: smo-performance-optimizer
+  ports:
+    - name: api
+      port: 8080
+      targetPort: 8080
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smo-performance-optimizer
+  namespace: oran-smo
+  labels:
+    app.kubernetes.io/name: smo-performance-optimizer
+    app.kubernetes.io/component: optimizer
+    app.kubernetes.io/version: "1.0.0"
+    oran.org/release: l-release
+    nephio.org/site-type: edge
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: smo-performance-optimizer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: smo-performance-optimizer
+        app.kubernetes.io/component: optimizer
+        oran.org/release: l-release
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      # Security Context for production hardening
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      
+      # Node Selection for optimal performance
+      nodeSelector:
+        kubernetes.io/arch: amd64
+        node-role.kubernetes.io/worker: "true"
+        performance.oran.org/optimized: "true"
+      
+      # Affinity rules for optimal placement
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values: ["amd64"]
+              - key: performance.oran.org/cpu-model
+                operator: In
+                values: ["high-performance"]
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values: ["smo-performance-optimizer"]
+              topologyKey: kubernetes.io/hostname
+      
+      # Tolerations for dedicated nodes
+      tolerations:
+      - key: "performance.oran.org/dedicated"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
+      
+      containers:
+      - name: smo-performance-optimizer
+        image: oran/smo-performance-optimizer:latest
+        imagePullPolicy: IfNotPresent
+        
+        # Security Context
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+            add:
+              - NET_BIND_SERVICE
+              - SYS_NICE  # For CPU affinity and scheduling
+        
+        ports:
+        - name: api
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        - name: e2-interface
+          containerPort: 36421
+          protocol: SCTP
+        
+        # Environment Variables
+        env:
+        - name: CONFIG_PATH
+          value: "/etc/smo-optimizer/config.yaml"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: GOMAXPROCS
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu
+        - name: GOMEMLIMIT
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        - name: SMO_JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: smo-performance-secrets
+              key: smo-jwt-secret
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: smo-performance-secrets
+              key: jwt-secret
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        
+        # Resource Requirements (optimized for 100+ E2 nodes)
+        resources:
+          requests:
+            cpu: "4"                # 4 CPU cores minimum
+            memory: "8Gi"           # 8GB memory minimum
+            ephemeral-storage: "5Gi"
+          limits:
+            cpu: "16"               # Up to 16 CPU cores
+            memory: "32Gi"          # Up to 32GB memory
+            ephemeral-storage: "10Gi"
+        
+        # Health Checks
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+          successThreshold: 1
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 10
+          successThreshold: 1
+        
+        # Volume Mounts
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/smo-optimizer
+          readOnly: true
+        - name: tmp-volume
+          mountPath: /tmp
+        - name: cache-volume
+          mountPath: /cache
+        - name: logs-volume
+          mountPath: /logs
+        
+        # Lifecycle Hooks
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 15"]
+      
+      # Sidecar for metrics collection
+      - name: metrics-exporter
+        image: prom/node-exporter:latest
+        args:
+          - --web.listen-address=:9091
+          - --path.procfs=/host/proc
+          - --path.sysfs=/host/sys
+          - --collector.filesystem.ignored-mount-points
+          - "^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)"
+        ports:
+        - name: node-metrics
+          containerPort: 9091
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+        volumeMounts:
+        - name: proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: sys
+          mountPath: /host/sys
+          readOnly: true
+      
+      # Volumes
+      volumes:
+      - name: config-volume
+        configMap:
+          name: smo-performance-config
+          defaultMode: 0644
+      - name: tmp-volume
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: cache-volume
+        emptyDir:
+          sizeLimit: 2Gi
+      - name: logs-volume
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: proc
+        hostPath:
+          path: /proc
+      - name: sys
+        hostPath:
+          path: /sys
+      
+      # Service Account
+      serviceAccountName: smo-performance-optimizer
+      
+      # Termination Grace Period
+      terminationGracePeriodSeconds: 60
+      
+      # DNS Configuration
+      dnsPolicy: ClusterFirst
+      dnsConfig:
+        options:
+        - name: ndots
+          value: "2"
+        - name: edns0
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: smo-performance-optimizer
+  namespace: oran-smo
+  labels:
+    app.kubernetes.io/name: smo-performance-optimizer
+    app.kubernetes.io/component: rbac
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: smo-performance-optimizer
+  labels:
+    app.kubernetes.io/name: smo-performance-optimizer
+    app.kubernetes.io/component: rbac
+rules:
+# Permissions for Nephio Porch integration
+- apiGroups: ["porch.kpt.dev"]
+  resources: ["packagerevisions", "packagerevisionresources", "packagerepositories"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: ["config.porch.kpt.dev"]
+  resources: ["packagevariantsets", "packagevariants"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+# Permissions for O-Cloud resources
+- apiGroups: ["ocloud.nephio.org"]
+  resources: ["resourcepools", "energyprofiles", "scalingpolicies"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+# Standard Kubernetes resources
+- apiGroups: [""]
+  resources: ["nodes", "pods", "services", "endpoints", "configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: ["autoscaling"]
+  resources: ["horizontalpodautoscalers"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Metrics and monitoring
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["nodes", "pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: smo-performance-optimizer
+  labels:
+    app.kubernetes.io/name: smo-performance-optimizer
+    app.kubernetes.io/component: rbac
+subjects:
+- kind: ServiceAccount
+  name: smo-performance-optimizer
+  namespace: oran-smo
+roleRef:
+  kind: ClusterRole
+  name: smo-performance-optimizer
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: smo-performance-optimizer-hpa
+  namespace: oran-smo
+  labels:
+    app.kubernetes.io/name: smo-performance-optimizer
+    app.kubernetes.io/component: scaling
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: smo-performance-optimizer
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  # Custom metrics for E2 connections and throughput
+  - type: Pods
+    pods:
+      metric:
+        name: e2_connections_per_pod
+      target:
+        type: AverageValue
+        averageValue: "65"  # Scale when > 65 E2 connections per pod
+  - type: Pods
+    pods:
+      metric:
+        name: messages_per_second_per_pod
+      target:
+        type: AverageValue
+        averageValue: "6000"  # Scale when > 6000 MPS per pod
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300  # 5 minutes
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60   # 1 minute
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      - type: Pods
+        value: 2
+        periodSeconds: 30
+      selectPolicy: Max
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: smo-performance-metrics
+  namespace: oran-smo
+  labels:
+    app.kubernetes.io/name: smo-performance-optimizer
+    app.kubernetes.io/component: monitoring
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  selector:
+    app.kubernetes.io/name: smo-performance-optimizer
+  ports:
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: node-metrics
+    port: 9091
+    targetPort: 9091
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: smo-performance-optimizer-netpol
+  namespace: oran-smo
+  labels:
+    app.kubernetes.io/name: smo-performance-optimizer
+    app.kubernetes.io/component: security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: smo-performance-optimizer
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow API traffic
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: oran-dashboard
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow metrics scraping
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+    - protocol: TCP
+      port: 9091
+  # Allow E2 interface traffic
+  - from: []  # Allow from anywhere for E2 interface
+    ports:
+    - protocol: SCTP
+      port: 36421
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow HTTPS to SMO and Nephio endpoints
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 8443
+    - protocol: TCP
+      port: 7443
+  # Allow database connections
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: database
+    ports:
+    - protocol: TCP
+      port: 5432
+---
+# Pod Disruption Budget for high availability
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: smo-performance-optimizer-pdb
+  namespace: oran-smo
+  labels:
+    app.kubernetes.io/name: smo-performance-optimizer
+    app.kubernetes.io/component: availability
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: smo-performance-optimizer
+  maxUnavailable: 1
+---
+# Priority Class for critical workloads
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: oran-high-priority
+  labels:
+    app.kubernetes.io/name: smo-performance-optimizer
+    app.kubernetes.io/component: scheduling
+value: 1000
+globalDefault: false
+description: "Priority class for O-RAN critical components"
+---
+# Service Monitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: smo-performance-optimizer
+  namespace: oran-smo
+  labels:
+    app.kubernetes.io/name: smo-performance-optimizer
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: smo-performance-optimizer
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 15s
+    scrapeTimeout: 10s
+  - port: node-metrics
+    path: /metrics
+    interval: 15s
+    scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+    - oran-smo

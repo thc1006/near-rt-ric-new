@@ -89,7 +89,8 @@ func (mgr *E2SimulatorManager) CreateSimulator(config *E2NodeSimulatorConfig) er
 	
 	// Start the simulator if manager is running
 	if mgr.isRunning {
-		if err := simulator.Start(); err != nil {
+		// Fix: Add missing *E2NodeSimulatorConfig parameter
+		if err := simulator.Start(config); err != nil {
 			delete(mgr.simulators, config.NodeID)
 			return fmt.Errorf("failed to start simulator: %w", err)
 		}
@@ -151,6 +152,7 @@ func (mgr *E2SimulatorManager) GetSimulatorStatus() map[string]interface{} {
 	
 	status := make(map[string]interface{})
 	for nodeID, simulator := range mgr.simulators {
+		// Fix: Use correct method name GetStatus() 
 		status[nodeID] = simulator.GetStatus()
 	}
 	
@@ -184,7 +186,8 @@ func (mgr *E2SimulatorManager) DisconnectSimulator(nodeID string) error {
 		return fmt.Errorf("simulator with node ID %s not found", nodeID)
 	}
 	
-	return simulator.Disconnect()
+	// Fix: Use correct method name disconnect() (lowercase)
+	return simulator.disconnect()
 }
 
 // ConnectAllSimulators connects all simulators to RIC
@@ -229,9 +232,8 @@ func (mgr *E2SimulatorManager) DisconnectAllSimulators() error {
 	mgr.mu.RUnlock()
 	
 	for _, simulator := range simulators {
-		if err := simulator.Disconnect(); err != nil {
-			log.Printf("Failed to disconnect simulator %s: %v", simulator.nodeID, err)
-		}
+		// Fix: Use correct method name disconnect() (lowercase)  
+		simulator.disconnect()
 	}
 	
 	log.Printf("Disconnected all simulators")
@@ -243,18 +245,15 @@ func (mgr *E2SimulatorManager) CreateDefaultSimulators(ricAddress string, ricPor
 	defaultConfigs := []E2NodeSimulatorConfig{
 		{
 			NodeID:         "gnb-001",
-			NodeType:       E2NodeTypeGNB,
-			PlmnID:         "001001",
+			NodeType:       string(E2NodeTypeGNB),
+			PlmnID:         []byte("001001"),
 			RICAddress:     ricAddress,
 			RICPort:        ricPort,
 			LocalAddress:   "127.0.0.1",
 			LocalPort:      36421,
 			IndicationRate: 5 * time.Second,
 			AutoConnect:    true,
-			EnableKPM:      true,
-			EnableRC:       true,
-			EnableNI:       false,
-			RANFunctions: []RANFunctionConfig{
+			RANFunctions: []RANFunction{
 				{
 					ID:          1,
 					OID:         "1.3.6.1.4.1.53148.1.2.2.2",
@@ -271,18 +270,15 @@ func (mgr *E2SimulatorManager) CreateDefaultSimulators(ricAddress string, ricPor
 		},
 		{
 			NodeID:         "gnb-002",
-			NodeType:       E2NodeTypeGNB,
-			PlmnID:         "001001",
+			NodeType:       string(E2NodeTypeGNB),
+			PlmnID:         []byte("001001"),
 			RICAddress:     ricAddress,
 			RICPort:        ricPort,
 			LocalAddress:   "127.0.0.1",
 			LocalPort:      36422,
 			IndicationRate: 3 * time.Second,
 			AutoConnect:    true,
-			EnableKPM:      true,
-			EnableRC:       false,
-			EnableNI:       true,
-			RANFunctions: []RANFunctionConfig{
+			RANFunctions: []RANFunction{
 				{
 					ID:          1,
 					OID:         "1.3.6.1.4.1.53148.1.2.2.2",
@@ -299,18 +295,15 @@ func (mgr *E2SimulatorManager) CreateDefaultSimulators(ricAddress string, ricPor
 		},
 		{
 			NodeID:         "o-cu-001",
-			NodeType:       E2NodeTypeOCU,
-			PlmnID:         "001001",
+			NodeType:       string(E2NodeTypeOCU),
+			PlmnID:         []byte("001001"),
 			RICAddress:     ricAddress,
 			RICPort:        ricPort,
 			LocalAddress:   "127.0.0.1",
 			LocalPort:      36423,
 			IndicationRate: 10 * time.Second,
 			AutoConnect:    false, // Manual connection for testing
-			EnableKPM:      true,
-			EnableRC:       true,
-			EnableNI:       true,
-			RANFunctions: []RANFunctionConfig{
+			RANFunctions: []RANFunction{
 				{
 					ID:          1,
 					OID:         "1.3.6.1.4.1.53148.1.2.2.2",

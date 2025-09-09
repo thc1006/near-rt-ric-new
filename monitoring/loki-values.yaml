@@ -1,0 +1,51 @@
+loki:
+  # Storage configuration
+  storage:
+    type: pvc
+    size: 50Gi
+  
+  # Log retention and compaction
+  retention:
+    days: 30
+    strategy: delete
+
+  # Structured logging configuration
+  config:
+    schema_config:
+      configs:
+        - from: 2024-01-01
+          store: boltdb-shipper
+          object_store: filesystem
+          schema: v11
+          index:
+            prefix: index_
+            period: 24h
+
+    storage_config:
+      boltdb_shipper:
+        active_index_directory: /var/loki/index
+        cache_location: /var/loki/cache
+        cache_ttl: 168h
+
+    table_manager:
+      retention_deletes_enabled: true
+      retention_period: 720h  # 30 days
+
+  # Log parsing rules
+  rules:
+    - name: oran-log-parsing
+      groups:
+        - name: e2-logs
+          rules:
+            - record: oran_e2_log_error_total
+              expr: 'count_over_time({component="e2"} | logfmt | level="error" [1h])'
+        - name: a1-logs
+          rules:
+            - record: oran_a1_log_warning_total
+              expr: 'count_over_time({component="a1"} | logfmt | level="warn" [1h])'
+
+# Log rotation and compression
+log_rotation:
+  max_size_mb: 100
+  max_backups: 5
+  max_age_days: 30

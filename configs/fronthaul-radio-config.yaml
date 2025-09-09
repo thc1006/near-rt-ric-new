@@ -1,0 +1,373 @@
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: fronthaul-net
+  namespace: oran-network-functions
+  labels:
+    interface: fronthaul
+    component: network
+spec:
+  config: |
+    {
+      "cniVersion": "0.3.1",
+      "type": "sriov",
+      "capabilities": {
+        "mac": true
+      },
+      "master": "enp1s0f1",
+      "mode": "bridge",
+      "vlan": 100,
+      "ipam": {
+        "type": "host-local",
+        "subnet": "10.10.0.0/16",
+        "rangeStart": "10.10.1.1",
+        "rangeEnd": "10.10.255.254",
+        "routes": [
+          {
+            "dst": "0.0.0.0/0",
+            "gw": "10.10.1.1"
+          }
+        ]
+      }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: radio-config
+  namespace: oran-network-functions
+  labels:
+    component: radio-resource-management
+data:
+  radio_params.yaml: |
+    # Radio Resource Management Configuration
+    radio_configuration:
+      # Band Configuration
+      operating_bands:
+        - band: "n78"
+          frequency_range: "FR1"
+          dl_frequency: 3500000  # kHz
+          ul_frequency: 3500000  # kHz
+          channel_bandwidth: 100 # MHz
+          duplex_mode: "TDD"
+          
+        - band: "n79"
+          frequency_range: "FR1" 
+          dl_frequency: 4700000  # kHz
+          ul_frequency: 4700000  # kHz
+          channel_bandwidth: 100 # MHz
+          duplex_mode: "TDD"
+          
+      # TDD Configuration
+      tdd_ul_dl_config:
+        pattern1:
+          dl_ul_periodicity: "ms2p5"  # 2.5ms
+          nrofDownlinkSlots: 7
+          nrofDownlinkSymbols: 6
+          nrofUplinkSlots: 2  
+          nrofUplinkSymbols: 4
+          
+        pattern2:
+          dl_ul_periodicity: "ms5"    # 5ms
+          nrofDownlinkSlots: 3
+          nrofDownlinkSymbols: 0
+          nrofUplinkSlots: 1
+          nrofUplinkSymbols: 0
+          
+      # SSB Configuration
+      ssb_configuration:
+        ssb_periodicity: "ms20"
+        ssb_offset_point_a: 24
+        ssb_subcarrier_spacing: "kHz30"
+        case: "C"
+        L_max: 8
+        positions_in_burst:
+          position_map: "11000000"
+          
+      # CSI-RS Configuration
+      csi_rs_config:
+        nzp_csi_rs_resource_sets:
+          - resource_set_id: 0
+            trs_info: true
+            repetition: "on"
+            aperiodic_trigger_offset: 0
+            csi_rs_resources:
+              - resource_id: 0
+                start_rb: 0
+                nrof_rbs: 52
+                cdm_type: "fd_cdm2"
+                density: "three"
+                freq_band: 
+                  start_rb: 0
+                  nrof_rbs: 52
+                  
+      # PRACH Configuration
+      prach_config:
+        prach_config_index: 159
+        prach_msg1_fdm: "one"
+        prach_msg1_frequency_start: 0
+        zero_correlation_zone_config: 13
+        preamble_received_target_power: -104
+        preamble_trans_max: 10
+        power_ramping_step: "dB2"
+        ra_response_window: "sf20"
+        
+      # Physical Cell Configuration
+      physical_cell_config:
+        cells:
+          - cell_id: 1
+            physical_cell_id: 0
+            tac: 1
+            cell_barred: false
+            intra_freq_reselection: true
+            q_rx_lev_min: -70
+            q_qual_min: -20
+            s_intra_search: 31
+            s_non_intra_search: 0
+            thresh_serving_low: 7
+            cell_reselection_priority: 7
+            
+          - cell_id: 2
+            physical_cell_id: 1
+            tac: 1
+            cell_barred: false
+            intra_freq_reselection: true
+            q_rx_lev_min: -70
+            q_qual_min: -20
+            s_intra_search: 31
+            s_non_intra_search: 0
+            thresh_serving_low: 7
+            cell_reselection_priority: 7
+            
+  fronthaul_config.yaml: |
+    # Fronthaul Configuration
+    fronthaul:
+      # eCPRI Configuration
+      ecpri:
+        version: "2.0"
+        ethernet_type: 0xAEFE
+        message_types:
+          - type: 0  # IQ Data
+            description: "Real-time control data"
+          - type: 1  # Bit Sequence
+            description: "Real-time control data"
+          - type: 2  # Real-time control data
+            description: "Real-time control data"
+          - type: 3  # Generic data transfer
+            description: "Generic data transfer"
+          - type: 4  # Remote memory access
+            description: "Remote memory access"
+          - type: 5  # One-way delay measurement
+            description: "One-way delay measurement"
+          - type: 6  # Remote reset
+            description: "Remote reset"
+          - type: 7  # Event indication
+            description: "Event indication"
+            
+        # Compression Configuration
+        compression:
+          ul_compression: 9    # Block Floating Point
+          dl_compression: 9    # Block Floating Point
+          iq_width: 16        # bits
+          
+        # Flow Control
+        flow_control:
+          buffer_size: "10MB"
+          max_burst_size: "1MB"
+          
+      # RoE (Radio over Ethernet) Configuration  
+      roe:
+        version: "1.0"
+        subtype: 0x01
+        flowID: 0x0001
+        
+        # Timing Configuration
+        timing:
+          master_clock_accuracy: "±50ns"
+          sync_period: "125us"
+          
+        # Structure Configuration
+        structure:
+          antenna_c: 1
+          cc_id: 0
+          ru_port_id: 0
+          
+      # Network Timing
+      timing_sync:
+        ptp_enabled: true
+        ptp_domain: 24
+        sync_e_enabled: true
+        clock_class: 6
+        
+      # Quality of Service
+      qos:
+        dscp_marking: 
+          user_plane: "EF"      # 46 (101110)
+          control_plane: "AF41"  # 34 (100010)
+          sync: "CS7"           # 56 (111000)
+          
+        # Traffic Shaping
+        traffic_shaping:
+          committed_rate: "10Gbps"
+          burst_size: "1MB"
+          
+  antenna_config.yaml: |
+    # Antenna Configuration
+    antenna_configuration:
+      # Antenna Array Configuration
+      arrays:
+        - array_id: 0
+          num_rows: 8
+          num_columns: 8
+          num_polarizations: 2
+          element_spacing_v: 0.5  # wavelengths
+          element_spacing_h: 0.5  # wavelengths
+          
+          # Beamforming Configuration
+          beamforming:
+            capability: "digital"
+            max_layers: 8
+            codebook_subset_restriction: true
+            max_number_rx_beam: 8
+            max_number_tx_beam: 8
+            
+          # Calibration
+          calibration:
+            enabled: true
+            period: "1hour"
+            reference_signal: "CSI-RS"
+            
+      # RF Configuration
+      rf_configuration:
+        tx_power:
+          max_power: 43       # dBm
+          power_class: 3
+          
+        noise_figure: 3.5     # dB
+        
+        # PA (Power Amplifier) Configuration
+        pa_config:
+          efficiency: 0.4
+          linearity: "DPD"    # Digital Pre-Distortion
+          
+        # Filter Configuration
+        filters:
+          tx_filter:
+            type: "FIR"
+            taps: 128
+          rx_filter:
+            type: "FIR" 
+            taps: 128
+            
+      # MIMO Configuration
+      mimo:
+        transmission_mode: "closedLoop"
+        max_layers_dl: 8
+        max_layers_ul: 4
+        codebook_type: "type1SinglePanel"
+        
+        # CSI Configuration
+        csi_config:
+          reporting_mode: "periodic"
+          reporting_period: "ms80"
+          codebook_config: "type1"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: resource-allocation-config
+  namespace: oran-network-functions
+  labels:
+    component: resource-allocation
+data:
+  scheduler_config.yaml: |
+    # Radio Resource Scheduler Configuration
+    scheduler:
+      # Scheduling Algorithm
+      algorithm: "proportional_fair"
+      
+      # Time Domain Resource Allocation
+      pdsch_time_domain:
+        allocations:
+          - mapping_type: "typeA"
+            k0: 0
+            start_symbol: 2
+            length: 12
+          - mapping_type: "typeA" 
+            k0: 0
+            start_symbol: 3
+            length: 11
+          - mapping_type: "typeA"
+            k0: 1
+            start_symbol: 2
+            length: 12
+            
+      pusch_time_domain:
+        allocations:
+          - mapping_type: "typeA"
+            k2: 4
+            start_symbol: 2
+            length: 12
+          - mapping_type: "typeA"
+            k2: 5
+            start_symbol: 2  
+            length: 12
+          - mapping_type: "typeA"
+            k2: 6
+            start_symbol: 2
+            length: 12
+            
+      # Frequency Domain Resource Allocation
+      resource_block_allocation:
+        total_prbs: 106      # 20MHz bandwidth
+        reserved_prbs:
+          - start: 0
+            length: 5       # Guard band
+          - start: 101
+            length: 5       # Guard band
+            
+      # MCS Configuration
+      mcs_config:
+        adaptive_mcs: true
+        target_bler: 0.1
+        mcs_table: "qam256"
+        
+        # MCS Ranges
+        mcs_ranges:
+          qpsk: "0-9"
+          qam16: "10-16"
+          qam64: "17-28"
+          qam256: "29-31"
+          
+      # HARQ Configuration  
+      harq_config:
+        max_harq_processes: 16
+        harq_ack_codebook: "dynamic"
+        
+      # Power Control
+      power_control:
+        p0_nominal_pusch: -90    # dBm
+        alpha: 1.0
+        p0_nominal_pucch: -96    # dBm
+        delta_preamble: 6        # dB
+        
+        # TPC Configuration
+        tpc_accumulation: true
+        tpc_pusch_rnti: 0xFFF3
+        tpc_pucch_rnti: 0xFFF4
+        
+      # Load Balancing
+      load_balancing:
+        enabled: true
+        algorithm: "interference_aware"
+        threshold_high: 80       # %
+        threshold_low: 20        # %
+        
+        # Mobility Load Balancing
+        mlb_config:
+          enabled: true
+          measurement_gap: "ms40"
+          threshold_rsrp: -110     # dBm
+          threshold_rsrq: -15      # dB

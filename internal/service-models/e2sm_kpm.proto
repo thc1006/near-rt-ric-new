@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package e2sm_kpm;
+
+message KpmReport {
+  string cell_id = 1;
+  repeated Measurement measurements = 2;
+  Timestamp timestamp = 3;
+}
+
+message Measurement {
+  string name = 1;
+  double value = 2;
+  string unit = 3;
+}
+
+message Timestamp {
+  int64 seconds = 1;
+  int32 nanos = 2;
+}

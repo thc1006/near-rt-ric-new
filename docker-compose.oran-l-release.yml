@@ -1,0 +1,829 @@
+# O-RAN SC L Release Docker Compose Configuration
+# Following official O-RAN SC deployment standards for Near-RT RIC
+# Production-ready configuration with official O-RAN SC images
+
+version: '3.8'
+
+services:
+  # =============================================================================
+  # O-RAN SC Near-RT RIC Platform Components (L Release)
+  # =============================================================================
+
+  # Database for RIC Platform (Redis)
+  ricplt-dbaas:
+    image: redis:6.2-alpine
+    container_name: ricplt-dbaas
+    ports:
+      - "6379:6379"
+    command: 
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --save
+      - "900 1"
+      - --save
+      - "300 10"
+      - --save
+      - "60 10000"
+    volumes:
+      - dbaas-data:/data
+      - ./configs/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - ricplt-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+
+  # E2 Termination - Entry point for E2 interface
+  ricplt-e2term:
+    image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-plt-e2:6.0.0
+    container_name: ricplt-e2term
+    ports:
+      - "36421:36421/sctp"  # E2 SCTP interface (primary)
+      - "36422:36422/sctp"  # E2 SCTP interface (backup)
+      - "38000:38000"       # RMR data port
+      - "38001:38001"       # RMR route port
+    environment:
+      - RMR_RTG_SVC=4561
+      - RMR_SEED_RT=/opt/e2/router.txt
+      - DBAAS_SERVICE_HOST=ricplt-dbaas
+      - DBAAS_SERVICE_PORT=6379
+      - SCTP_PORT=36421
+      - LOG_LEVEL=INFO
+      - POD_NAME=ricplt-e2term
+    volumes:
+      - ./configs/e2term:/opt/e2/config:ro
+      - e2term-logs:/opt/e2/logs
+    networks:
+      - ricplt-network
+      - e2-network
+    depends_on:
+      ricplt-dbaas:
+        condition: service_healthy
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  # E2 Manager - Manages E2 node connections
+  ricplt-e2mgr:
+    image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-plt-e2mgr:5.4.13
+    container_name: ricplt-e2mgr
+    ports:
+      - "3800:3800"   # HTTP API
+      - "38000:38000" # RMR data port
+      - "38001:38001" # RMR route port
+    environment:
+      - RMR_RTG_SVC=4561
+      - RMR_SEED_RT=/opt/e2mgr/router.txt
+      - DBAAS_SERVICE_HOST=ricplt-dbaas
+      - DBAAS_SERVICE_PORT=6379
+      - LOG_LEVEL=INFO
+      - POD_NAME=ricplt-e2mgr
+    volumes:
+      - ./configs/e2mgr:/opt/e2mgr/config:ro
+      - e2mgr-logs:/opt/e2mgr/logs
+    networks:
+      - ricplt-network
+    depends_on:
+      ricplt-dbaas:
+        condition: service_healthy
+      ricplt-rtmgr:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3800/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.2'
+
+  # Subscription Manager - Manages RIC subscriptions
+  ricplt-submgr:
+    image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-plt-submgr:0.5.4
+    container_name: ricplt-submgr
+    ports:
+      - "3801:3800"   # HTTP API
+      - "38000:38000" # RMR data port
+      - "38001:38001" # RMR route port
+    environment:
+      - RMR_RTG_SVC=4561
+      - RMR_SEED_RT=/opt/submgr/router.txt
+      - DBAAS_SERVICE_HOST=ricplt-dbaas
+      - DBAAS_SERVICE_PORT=6379
+      - LOG_LEVEL=INFO
+      - POD_NAME=ricplt-submgr
+    volumes:
+      - ./configs/submgr:/opt/submgr/config:ro
+      - submgr-logs:/opt/submgr/logs
+    networks:
+      - ricplt-network
+    depends_on:
+      ricplt-dbaas:
+        condition: service_healthy
+      ricplt-rtmgr:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3800/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.2'
+
+  # Routing Manager - Manages RMR routing tables
+  ricplt-rtmgr:
+    image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-plt-rtmgr:0.8.0
+    container_name: ricplt-rtmgr
+    ports:
+      - "3802:3800"   # HTTP API
+      - "4561:4561"   # RTG service
+      - "38000:38000" # RMR data port
+      - "38001:38001" # RMR route port
+    environment:
+      - RMR_RTG_SVC=4561
+      - RMR_SEED_RT=/opt/rtmgr/router.txt
+      - DBAAS_SERVICE_HOST=ricplt-dbaas
+      - DBAAS_SERVICE_PORT=6379
+      - LOG_LEVEL=INFO
+      - POD_NAME=ricplt-rtmgr
+      - KUBE_NAMESPACE=ricplt
+    volumes:
+      - ./configs/rtmgr:/opt/rtmgr/config:ro
+      - rtmgr-logs:/opt/rtmgr/logs
+    networks:
+      - ricplt-network
+    depends_on:
+      ricplt-dbaas:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3800/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.2'
+
+  # A1 Mediator - A1 interface implementation
+  ricplt-a1mediator:
+    image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-plt-a1:2.10.4
+    container_name: ricplt-a1mediator
+    ports:
+      - "10000:10000" # A1 HTTP interface
+      - "38000:38000" # RMR data port
+      - "38001:38001" # RMR route port
+    environment:
+      - RMR_RTG_SVC=4561
+      - RMR_SEED_RT=/opt/a1mediator/router.txt
+      - DBAAS_SERVICE_HOST=ricplt-dbaas
+      - DBAAS_SERVICE_PORT=6379
+      - LOG_LEVEL=INFO
+      - POD_NAME=ricplt-a1mediator
+      - A1_RMR_RETRY_TIMES=4
+    volumes:
+      - ./configs/a1mediator:/opt/a1mediator/config:ro
+      - a1mediator-logs:/opt/a1mediator/logs
+    networks:
+      - ricplt-network
+      - a1-network
+    depends_on:
+      ricplt-dbaas:
+        condition: service_healthy
+      ricplt-rtmgr:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10000/a1-p/healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.2'
+
+  # O1 Mediator - O1 interface implementation (NETCONF)
+  ricplt-o1mediator:
+    image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-plt-o1:1.0.0
+    container_name: ricplt-o1mediator
+    ports:
+      - "830:830"     # NETCONF SSH
+      - "8181:8181"   # RESTCONF HTTP
+      - "38000:38000" # RMR data port
+      - "38001:38001" # RMR route port
+    environment:
+      - RMR_RTG_SVC=4561
+      - RMR_SEED_RT=/opt/o1mediator/router.txt
+      - DBAAS_SERVICE_HOST=ricplt-dbaas
+      - DBAAS_SERVICE_PORT=6379
+      - LOG_LEVEL=INFO
+      - POD_NAME=ricplt-o1mediator
+    volumes:
+      - ./configs/o1mediator:/opt/o1mediator/config:ro
+      - o1mediator-logs:/opt/o1mediator/logs
+    networks:
+      - ricplt-network
+      - o1-network
+    depends_on:
+      ricplt-dbaas:
+        condition: service_healthy
+      ricplt-rtmgr:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/restconf/data/ietf-yang-library:yang-library"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.2'
+
+  # xApp Onboarder - Manages xApp lifecycle
+  ricplt-xapp-onboarder:
+    image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-plt-xapp-onboarder:1.0.0
+    container_name: ricplt-xapp-onboarder
+    ports:
+      - "8888:8888"   # HTTP API
+    environment:
+      - LOG_LEVEL=INFO
+      - POD_NAME=ricplt-xapp-onboarder
+      - CHART_REPO_URL=http://localhost:8080
+    volumes:
+      - ./configs/xapp-onboarder:/opt/xapp-onboarder/config:ro
+      - xapp-charts:/opt/xapp-onboarder/charts
+    networks:
+      - ricplt-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.2'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+  # =============================================================================
+  # Sample xApp (for testing)
+  # =============================================================================
+
+  # Hello World xApp
+  ricxapp-hello-world:
+    image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-app-hw:1.0.0
+    container_name: ricxapp-hello-world
+    ports:
+      - "8080:8080"   # HTTP metrics
+    environment:
+      - RMR_RTG_SVC=4561
+      - RMR_SEED_RT=/opt/app/config/router.txt
+      - DBAAS_SERVICE_HOST=ricplt-dbaas
+      - DBAAS_SERVICE_PORT=6379
+      - LOG_LEVEL=INFO
+      - XAPP_NAME=hello-world
+    volumes:
+      - ./configs/xapp/hello-world:/opt/app/config:ro
+    networks:
+      - ricplt-network
+      - ricxapp-network
+    depends_on:
+      ricplt-dbaas:
+        condition: service_healthy
+      ricplt-rtmgr:
+        condition: service_started
+      ricplt-submgr:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.2'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+  # =============================================================================
+  # Network Function Components
+  # =============================================================================
+
+  # CU-CP (5G Centralized Unit - Control Plane)
+  cu-cp:
+    image: oaisoftwarealliance/oai-cu-cp:latest
+    container_name: cu-cp
+    ports:
+      - "38472:38472/sctp" # F1 interface
+      - "38412:38412/sctp" # N2 interface
+    environment:
+      - CU_CP_ID=1
+      - MCC=001
+      - MNC=01
+      - TAC=1
+      - SST=1
+      - AMF_IP=127.0.0.1
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./configs/cu-cp:/opt/oai-cu-cp/etc:ro
+    networks:
+      - ricplt-network
+      - f1-network
+      - n2-network
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
+
+  # CU-UP (5G Centralized Unit - User Plane)
+  cu-up:
+    image: oaisoftwarealliance/oai-cu-up:latest
+    container_name: cu-up
+    ports:
+      - "38473:38473/sctp" # E1 interface
+      - "2152:2152/udp"    # GTP-U
+    environment:
+      - CU_UP_ID=1
+      - MCC=001
+      - MNC=01
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./configs/cu-up:/opt/oai-cu-up/etc:ro
+    networks:
+      - ricplt-network
+      - e1-network
+      - n3-network
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
+
+  # DU (5G Distributed Unit)
+  du:
+    image: oaisoftwarealliance/oai-du:latest
+    container_name: du
+    ports:
+      - "38473:38473/sctp" # F1 interface
+    environment:
+      - DU_ID=1
+      - MCC=001
+      - MNC=01
+      - LOG_LEVEL=INFO
+      - CU_CP_IP=cu-cp
+    volumes:
+      - ./configs/du:/opt/oai-du/etc:ro
+    networks:
+      - ricplt-network
+      - f1-network
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    depends_on:
+      - cu-cp
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
+
+  # =============================================================================
+  # Monitoring & Observability Stack
+  # =============================================================================
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.retention.time=30d'
+    volumes:
+      - ./configs/prometheus:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+    networks:
+      - ricplt-network
+      - monitoring-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_INSTALL_PLUGINS=redis-datasource,prometheus-datasource
+      - GF_FEATURE_TOGGLES_ENABLE=publicDashboards
+    volumes:
+      - ./configs/grafana:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    networks:
+      - ricplt-network
+      - monitoring-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.2'
+
+  # Jaeger for distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.48
+    container_name: jaeger
+    ports:
+      - "5775:5775/udp"   # Agent accept zipkin.thrift
+      - "6831:6831/udp"   # Agent accept jaeger.thrift
+      - "6832:6832/udp"   # Agent accept jaeger.thrift binary
+      - "5778:5778"       # Agent serve configs
+      - "16686:16686"     # Query serve frontend
+      - "14268:14268"     # Collector accept jaeger.thrift
+      - "14250:14250"     # Collector accept gRPC
+      - "9411:9411"       # Collector accept zipkin
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+      - COLLECTOR_OTLP_ENABLED=true
+      - SPAN_STORAGE_TYPE=memory
+    networks:
+      - ricplt-network
+      - monitoring-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:14269/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.2'
+
+  # =============================================================================
+  # Message Router (for development)
+  # =============================================================================
+
+  message-router:
+    image: onap/dmaap/dmaap-mr:1.1.18
+    container_name: message-router
+    ports:
+      - "3904:3904"
+      - "3905:3905"
+    environment:
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+    volumes:
+      - ./configs/dmaap:/appl/dmaapMR1/bundleconfig/etc:ro
+    networks:
+      - ricplt-network
+    depends_on:
+      - zookeeper
+      - kafka
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3904/topics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Supporting services for Message Router
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-logs:/var/lib/zookeeper/log
+    networks:
+      - ricplt-network
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - ricplt-network
+    depends_on:
+      - zookeeper
+    restart: unless-stopped
+
+# =============================================================================
+# Networks - Separated for different O-RAN interfaces
+# =============================================================================
+
+networks:
+  ricplt-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+    labels:
+      - "oran.component=platform"
+  
+  ricxapp-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+    labels:
+      - "oran.component=xapp"
+  
+  e2-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.10.0/24
+    labels:
+      - "oran.interface=e2"
+  
+  a1-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.11.0/24
+    labels:
+      - "oran.interface=a1"
+  
+  o1-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.12.0/24
+    labels:
+      - "oran.interface=o1"
+  
+  f1-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.20.0/24
+    labels:
+      - "oran.interface=f1"
+  
+  e1-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.21.0/24
+    labels:
+      - "oran.interface=e1"
+  
+  n2-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.30.0/24
+    labels:
+      - "oran.interface=n2"
+  
+  n3-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.31.0/24
+    labels:
+      - "oran.interface=n3"
+  
+  monitoring-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+    labels:
+      - "oran.component=monitoring"
+
+# =============================================================================
+# Volumes - Persistent storage for all components
+# =============================================================================
+
+volumes:
+  # RIC Platform data
+  dbaas-data:
+    driver: local
+    labels:
+      - "oran.component=dbaas"
+  
+  # Component logs
+  e2term-logs:
+    driver: local
+    labels:
+      - "oran.component=e2term"
+  
+  e2mgr-logs:
+    driver: local
+    labels:
+      - "oran.component=e2mgr"
+  
+  submgr-logs:
+    driver: local
+    labels:
+      - "oran.component=submgr"
+  
+  rtmgr-logs:
+    driver: local
+    labels:
+      - "oran.component=rtmgr"
+  
+  a1mediator-logs:
+    driver: local
+    labels:
+      - "oran.component=a1mediator"
+  
+  o1mediator-logs:
+    driver: local
+    labels:
+      - "oran.component=o1mediator"
+  
+  # xApp data
+  xapp-charts:
+    driver: local
+    labels:
+      - "oran.component=xapp-onboarder"
+  
+  # Monitoring data
+  prometheus-data:
+    driver: local
+    labels:
+      - "oran.component=prometheus"
+  
+  grafana-data:
+    driver: local
+    labels:
+      - "oran.component=grafana"
+  
+  # Message Router data
+  zookeeper-data:
+    driver: local
+    labels:
+      - "oran.component=zookeeper"
+  
+  zookeeper-logs:
+    driver: local
+    labels:
+      - "oran.component=zookeeper"
+  
+  kafka-data:
+    driver: local
+    labels:
+      - "oran.component=kafka"

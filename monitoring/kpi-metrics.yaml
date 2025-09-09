@@ -1,0 +1,55 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: oran-kpi-metrics
+spec:
+  groups:
+  - name: oran-interface-kpis
+    interval: 30s
+    rules:
+    # E2 Interface KPIs
+    - record: oran_e2_connection_success_rate
+      expr: >
+        sum(rate(e2_connection_total{status="success"}[5m])) /
+        sum(rate(e2_connection_total[5m])) * 100
+
+    - record: oran_e2_connection_latency_seconds
+      expr: >
+        histogram_quantile(0.95, 
+          sum(rate(e2_connection_latency_bucket[5m])) by (le))
+
+    # A1 Policy Management KPIs  
+    - record: oran_a1_policy_update_rate
+      expr: >
+        sum(rate(a1_policy_updates_total[5m])) by (service)
+
+    - record: oran_a1_policy_enforcement_efficiency
+      expr: >
+        sum(rate(a1_policy_enforcement_success_total[5m])) /
+        sum(rate(a1_policy_updates_total[5m])) * 100
+
+    # O1 Configuration Management KPIs
+    - record: oran_o1_configuration_change_rate
+      expr: >
+        sum(rate(o1_configuration_changes_total[5m])) by (service)
+
+    - record: oran_o1_operational_state_stability
+      expr: >
+        count_values("state", o1_operational_state_changes) by (state)
+
+  # Resource Utilization KPIs
+  - name: oran-resource-kpis
+    interval: 1m
+    rules:
+    - record: oran_cpu_utilization_percentage
+      expr: >
+        100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])))
+
+    - record: oran_memory_utilization_percentage
+      expr: >
+        100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)
+
+    - record: oran_network_throughput_bytes
+      expr: >
+        sum(rate(node_network_receive_bytes_total[5m])) +
+        sum(rate(node_network_transmit_bytes_total[5m]))

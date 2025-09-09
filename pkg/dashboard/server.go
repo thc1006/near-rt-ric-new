@@ -20,48 +20,48 @@ import (
 
 // Config holds the configuration for the dashboard server
 type Config struct {
-	Port             int
-	E2MgrEndpoint    string
-	E2TermEndpoint   string
-	SubmgrEndpoint   string
-	AppmgrEndpoint   string
+	Port               int
+	E2MgrEndpoint      string
+	E2TermEndpoint     string
+	SubmgrEndpoint     string
+	AppmgrEndpoint     string
 	A1MediatorEndpoint string
 	O1MediatorEndpoint string
-	DbaasEndpoint    string
-	RtmgrEndpoint    string
+	DbaasEndpoint      string
+	RtmgrEndpoint      string
 }
 
 // Server represents the dashboard API gateway server
 type Server struct {
-	config                  *Config
-	httpServer              *http.Server
-	clients                 *ClientManager
-	discovery               *DiscoveryService
-	wsHub                   *WebSocketHub
-	serviceModelRegistry    *ServiceModelRegistry
-	serviceModelAPIManager  *ServiceModelAPIManager
-	policyManager           *PolicyManager
-	authService             *AuthService
-	rbacManager             *RBACManager
-	auditLogger             *AuditLogger
-	jwtManager              *JWTManager
-	serviceAccountManager   *ServiceAccountManager
-	authMiddleware          *AuthMiddleware
-	authHandlers            *AuthHandlers
-	serviceAccountHandlers  *ServiceAccountHandlers
-	securityMonitor         *SecurityMonitor
-	securityHandlers        *SecurityHandlers
-	tlsManager              *TLSManager
-	tlsHandlers             *TLSHandlers
-	metricsManager          *MetricsManager
-	tracingManager          *TracingManager
-	logger                  *Logger
-	performanceOptimizer    *PerformanceOptimizer
-	loadBalancer            *LoadBalancer
-	horizontalScaler        *HorizontalScaler
-	
+	config                 *Config
+	httpServer             *http.Server
+	clients                *ClientManager
+	discovery              *DiscoveryService
+	wsHub                  *WebSocketHub
+	serviceModelRegistry   *ServiceModelRegistry
+	serviceModelAPIManager *ServiceModelAPIManager
+	policyManager          *PolicyManager
+	authService            *AuthService
+	rbacManager            *RBACManager
+	auditLogger            *AuditLogger
+	jwtManager             *JWTManager
+	serviceAccountManager  *ServiceAccountManager
+	authMiddleware         *AuthMiddleware
+	authHandlers           *AuthHandlers
+	serviceAccountHandlers *ServiceAccountHandlers
+	securityMonitor        *SecurityMonitor
+	securityHandlers       *SecurityHandlers
+	tlsManager             *TLSManager
+	tlsHandlers            *TLSHandlers
+	metricsManager         *MetricsManager
+	tracingManager         *TracingManager
+	logger                 *Logger
+	performanceOptimizer   *PerformanceOptimizer
+	loadBalancer           *LoadBalancer
+	horizontalScaler       *HorizontalScaler
+
 	// Production Hardening Components
-	productionHardening     *ProductionHardeningManager
+	productionHardening         *ProductionHardeningManager
 	productionHardeningHandlers *ProductionHardeningHandlers
 }
 
@@ -69,26 +69,26 @@ type Server struct {
 func NewServer(config *Config) (*Server, error) {
 	// Initialize observability components first
 	logger := NewLogger("dashboard-server")
-	
+
 	// Initialize performance optimizer
 	performanceOptimizer := NewPerformanceOptimizer()
-	
+
 	// Initialize production hardening with comprehensive configuration
 	productionHardeningConfig := DefaultProductionHardeningConfig()
 	productionHardening := NewProductionHardeningManager(productionHardeningConfig)
-	
+
 	// Initialize metrics
 	metricsManager := NewMetricsManager()
-	
+
 	// Initialize tracing
 	tracingConfig := TracingConfig{
-		ServiceName:     "oran-ric-dashboard",
-		ServiceVersion:  "1.0.0",
-		JaegerEndpoint:  "http://jaeger-collector:14268/api/traces",
-		SamplingRate:    1.0, // 100% sampling for development
-		Environment:     "development",
+		ServiceName:    "oran-ric-dashboard",
+		ServiceVersion: "1.0.0",
+		JaegerEndpoint: "http://jaeger-collector:14268/api/traces",
+		SamplingRate:   1.0, // 100% sampling for development
+		Environment:    "development",
 	}
-	
+
 	tracingManager, err := NewTracingManager(tracingConfig)
 	if err != nil {
 		logger.WithError(err).Warn("Failed to initialize tracing, continuing without tracing")
@@ -106,7 +106,7 @@ func NewServer(config *Config) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client manager: %w", err)
 	}
-	
+
 	// Set TLS config for client connections
 	clientTLSConfig := tlsManager.GetClientTLSConfig()
 	if clientTLSConfig != nil {
@@ -138,7 +138,7 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	rbacManager := NewRBACManager()
-	
+
 	auditLogger, err := NewAuditLogger("audit.log", 10000)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create audit logger: %w", err)
@@ -149,55 +149,55 @@ func NewServer(config *Config) (*Server, error) {
 	authMiddleware := NewAuthMiddleware(authService, auditLogger)
 	authHandlers := NewAuthHandlers(authService, rbacManager, auditLogger)
 	serviceAccountHandlers := NewServiceAccountHandlers(serviceAccountManager, auditLogger)
-	
+
 	// Initialize security monitoring
 	securityMonitor := NewSecurityMonitor(auditLogger)
 	securityHandlers := NewSecurityHandlers(securityMonitor, auditLogger)
-	
+
 	// TLS handlers (tlsManager already initialized above)
 	tlsHandlers := NewTLSHandlers(tlsManager, auditLogger)
 
 	server := &Server{
-		config:                 config,
-		clients:                clients,
-		discovery:              discovery,
-		wsHub:                  wsHub,
-		serviceModelRegistry:   serviceModelRegistry,
-		serviceModelAPIManager: serviceModelAPIManager,
-		policyManager:          policyManager,
-		authService:            authService,
-		rbacManager:            rbacManager,
-		auditLogger:            auditLogger,
-		jwtManager:             jwtManager,
-		serviceAccountManager:  serviceAccountManager,
-		authMiddleware:         authMiddleware,
-		authHandlers:           authHandlers,
-		serviceAccountHandlers: serviceAccountHandlers,
-		securityMonitor:        securityMonitor,
-		securityHandlers:       securityHandlers,
-		tlsManager:             tlsManager,
-		tlsHandlers:            tlsHandlers,
-		metricsManager:         metricsManager,
-		tracingManager:         tracingManager,
-		logger:                 logger,
-		performanceOptimizer:   performanceOptimizer,
-		loadBalancer:           NewLoadBalancer(RoundRobin),
-		horizontalScaler:       NewHorizontalScaler(nil), // TODO: Add Kubernetes client
-		productionHardening:    productionHardening,
+		config:                      config,
+		clients:                     clients,
+		discovery:                   discovery,
+		wsHub:                       wsHub,
+		serviceModelRegistry:        serviceModelRegistry,
+		serviceModelAPIManager:      serviceModelAPIManager,
+		policyManager:               policyManager,
+		authService:                 authService,
+		rbacManager:                 rbacManager,
+		auditLogger:                 auditLogger,
+		jwtManager:                  jwtManager,
+		serviceAccountManager:       serviceAccountManager,
+		authMiddleware:              authMiddleware,
+		authHandlers:                authHandlers,
+		serviceAccountHandlers:      serviceAccountHandlers,
+		securityMonitor:             securityMonitor,
+		securityHandlers:            securityHandlers,
+		tlsManager:                  tlsManager,
+		tlsHandlers:                 tlsHandlers,
+		metricsManager:              metricsManager,
+		tracingManager:              tracingManager,
+		logger:                      logger,
+		performanceOptimizer:        performanceOptimizer,
+		loadBalancer:                NewLoadBalancer(RoundRobin),
+		horizontalScaler:            NewHorizontalScaler(nil), // TODO: Add Kubernetes client
+		productionHardening:         productionHardening,
 		productionHardeningHandlers: NewProductionHardeningHandlers(productionHardening),
 	}
 
 	// Setup HTTP router with observability middleware
 	router := server.setupRoutes()
-	
+
 	// Add metrics middleware
 	handler := metricsManager.HTTPMiddleware(router)
-	
+
 	// Add tracing middleware if available
 	if tracingManager != nil {
 		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			
+
 			// Extract trace context from headers
 			headers := make(map[string]string)
 			for k, v := range r.Header {
@@ -206,22 +206,22 @@ func NewServer(config *Config) (*Server, error) {
 				}
 			}
 			ctx = ExtractTraceContext(ctx, headers)
-			
+
 			// Add correlation ID
 			correlationID := r.Header.Get("X-Correlation-ID")
 			ctx = WithCorrelationID(ctx, correlationID)
-			
+
 			// Start HTTP span
 			ctx, span := tracingManager.StartHTTPSpan(ctx, r.Method, r.URL.Path)
 			defer span.End()
-			
+
 			// Update request context
 			r = r.WithContext(ctx)
-			
+
 			handler.ServeHTTP(w, r)
 		})
 	}
-	
+
 	// Configure HTTPS server with TLS
 	tlsConfig := tlsManager.GetServerTLSConfig()
 	server.httpServer = &http.Server{
@@ -238,20 +238,20 @@ func NewServer(config *Config) (*Server, error) {
 // Start starts the dashboard server
 func (s *Server) Start() error {
 	ctx := context.Background()
-	
+
 	// Start production hardening manager first
 	if err := s.productionHardening.Start(); err != nil {
 		s.logger.ErrorCtx(ctx, "Failed to start production hardening", "error", err)
 		return fmt.Errorf("failed to start production hardening: %w", err)
 	}
 	s.logger.InfoCtx(ctx, "Production hardening started successfully")
-	
+
 	// Initialize and start metrics WebSocket hub
 	InitializeMetricsWebSocket()
-	
+
 	// Start metrics collection goroutine
 	go s.startMetricsCollection(ctx)
-	
+
 	// Start WebSocket hub
 	go s.wsHub.Run()
 
@@ -286,14 +286,14 @@ func (s *Server) Start() error {
 // Shutdown gracefully shuts down the server
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.logger.InfoCtx(ctx, "Shutting down dashboard server")
-	
+
 	// Stop production hardening manager first
 	if s.productionHardening != nil {
 		if err := s.productionHardening.Stop(); err != nil {
 			s.logger.ErrorCtx(ctx, "Failed to stop production hardening", "error", err)
 		}
 	}
-	
+
 	// Stop discovery service
 	s.discovery.Stop()
 
@@ -472,7 +472,7 @@ func (s *Server) setupRoutes() *mux.Router {
 	smAPI.HandleFunc("/stats", s.ServiceModelStatsHandler).Methods("GET", "OPTIONS")
 	smAPI.HandleFunc("/process/indication", s.ProcessIndicationHandler).Methods("POST", "OPTIONS")
 	smAPI.HandleFunc("/process/control", s.ProcessControlHandler).Methods("POST", "OPTIONS")
-	
+
 	// Enhanced Service Model API endpoints
 	smAPI.HandleFunc("/operations", s.ServiceModelOperationsHandler).Methods("GET", "OPTIONS")
 	smAPI.HandleFunc("/{type}/schema", s.ServiceModelSchemaHandler).Methods("GET", "OPTIONS")
@@ -504,7 +504,7 @@ func (s *Server) setupRoutes() *mux.Router {
 	a1API.HandleFunc("/policytypes/{policyTypeId}/policies", s.A1PolicyInstancesHandler).Methods("GET", "OPTIONS")
 	a1API.HandleFunc("/policytypes/{policyTypeId}/policies/{policyInstanceId}", s.EnhancedA1PolicyInstanceHandler).Methods("GET", "OPTIONS")
 	a1API.HandleFunc("/policytypes/{policyTypeId}/policies/{policyInstanceId}/status", s.A1PolicyInstanceStatusHandler).Methods("GET", "OPTIONS")
-	
+
 	// A1 write operations (require policy write permission)
 	a1WriteAPI := protectedAPI.PathPrefix("/a1").Subrouter()
 	a1WriteAPI.Use(s.authMiddleware.RequirePermission("policies", "write"))
@@ -519,17 +519,17 @@ func (s *Server) setupRoutes() *mux.Router {
 	policyAPI.HandleFunc("/conflicts", s.PolicyConflictsHandler).Methods("GET", "OPTIONS")
 	policyAPI.HandleFunc("/{policyInstanceId}/distribution", s.PolicyDistributionStatusHandler).Methods("GET", "OPTIONS")
 	policyAPI.HandleFunc("/{policyInstanceId}/compliance", s.PolicyComplianceReportsHandler).Methods("GET", "OPTIONS")
-	
+
 	// Policy write operations
 	policyWriteAPI := protectedAPI.PathPrefix("/policies").Subrouter()
 	policyWriteAPI.Use(s.authMiddleware.RequirePermission("policies", "write"))
 	policyWriteAPI.HandleFunc("/conflicts/{conflictId}/resolve", s.PolicyConflictResolutionHandler).Methods("POST", "OPTIONS")
-	
+
 	// xApp Management endpoints for policy distribution (require xapp read permission)
 	xappRegAPI := protectedAPI.PathPrefix("/xapps/registration").Subrouter()
 	xappRegAPI.Use(s.authMiddleware.RequirePermission("xapps", "read"))
 	xappRegAPI.HandleFunc("", s.XAppRegistrationHandler).Methods("GET", "OPTIONS")
-	
+
 	xappRegWriteAPI := protectedAPI.PathPrefix("/xapps/registration").Subrouter()
 	xappRegWriteAPI.Use(s.authMiddleware.RequirePermission("xapps", "write"))
 	xappRegWriteAPI.HandleFunc("", s.XAppRegistrationHandler).Methods("POST", "OPTIONS")
@@ -540,7 +540,7 @@ func (s *Server) setupRoutes() *mux.Router {
 	xappAPI.Use(s.authMiddleware.RequirePermission("xapps", "read"))
 	xappAPI.HandleFunc("", s.handleGetXApps).Methods("GET", "OPTIONS")
 	xappAPI.HandleFunc("/{name}", s.handleGetXApp).Methods("GET", "OPTIONS")
-	
+
 	// xApp deployment operations (require xapp write permission)
 	xappWriteAPI := protectedAPI.PathPrefix("/xapps").Subrouter()
 	xappWriteAPI.Use(s.authMiddleware.RequirePermission("xapps", "deploy"))
@@ -557,7 +557,7 @@ func (s *Server) setupRoutes() *mux.Router {
 	o1API.HandleFunc("/configurations", s.O1ConfigurationsHandler).Methods("GET", "OPTIONS")
 	o1API.HandleFunc("/alarms", s.O1AlarmsHandler).Methods("GET", "OPTIONS")
 	o1API.HandleFunc("/kpis", s.O1KPIsHandler).Methods("GET", "OPTIONS")
-	
+
 	// O1 write operations (require o1 write permission)
 	o1WriteAPI := protectedAPI.PathPrefix("/o1").Subrouter()
 	o1WriteAPI.Use(s.authMiddleware.RequirePermission("o1", "write"))
@@ -573,7 +573,7 @@ func (s *Server) setupRoutes() *mux.Router {
 	o1API.HandleFunc("/resource-usage", s.O1ResourceUsageHandler).Methods("GET", "OPTIONS")
 	o1API.HandleFunc("/access-control/policies", s.O1AccessControlHandler).Methods("GET", "OPTIONS")
 	o1API.HandleFunc("/access-control/policies/{policyId}", s.O1AccessControlPolicyHandler).Methods("GET", "OPTIONS")
-	
+
 	// O1 write operations (continue)
 	o1WriteAPI.HandleFunc("/backups/{backupId}", s.O1BackupHandler).Methods("DELETE", "OPTIONS")
 	o1WriteAPI.HandleFunc("/alarms/generate", s.O1AlarmGenerationHandler).Methods("POST", "OPTIONS")
@@ -594,10 +594,10 @@ func (s *Server) setupRoutes() *mux.Router {
 
 	// Health check endpoint
 	router.HandleFunc("/health", s.handleHealth).Methods("GET", "OPTIONS")
-	
+
 	// Metrics endpoint
 	router.Handle("/metrics", s.metricsManager.Handler()).Methods("GET")
-	
+
 	// Performance monitoring endpoints
 	router.HandleFunc("/api/v1/performance/metrics", s.handlePerformanceMetrics).Methods("GET", "OPTIONS")
 	router.HandleFunc("/api/v1/performance/bottlenecks", s.handleBottleneckAlerts).Methods("GET", "OPTIONS")
@@ -682,7 +682,7 @@ func (s *Server) collectMetrics(ctx context.Context) {
 	// Collect system metrics
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-	
+
 	s.metricsManager.SetMemoryUsage("dashboard", "alloc", int64(m.Alloc))
 	s.metricsManager.SetMemoryUsage("dashboard", "sys", int64(m.Sys))
 	s.metricsManager.SetMemoryUsage("dashboard", "heap_alloc", int64(m.HeapAlloc))
@@ -724,8 +724,9 @@ func (s *Server) collectMetrics(ctx context.Context) {
 		"memory_alloc", m.Alloc,
 		"memory_sys", m.Sys,
 	)
-}// h
-andleMetricsWebSocket handles metrics WebSocket connections
+}
+
+// handleMetricsWebSocket handles metrics WebSocket connections
 func (s *Server) handleMetricsWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -746,11 +747,11 @@ func (s *Server) handleMetricsWebSocket(w http.ResponseWriter, r *http.Request) 
 	go client.writePump()
 	go client.readPump()
 }
-// ha
-ndlePerformanceMetrics handles requests for performance metrics
+
+// handlePerformanceMetrics handles requests for performance metrics
 func (s *Server) handlePerformanceMetrics(w http.ResponseWriter, r *http.Request) {
 	metrics := s.performanceOptimizer.GetMetrics()
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(metrics); err != nil {
 		log.Printf("Failed to encode performance metrics: %v", err)
@@ -762,7 +763,7 @@ func (s *Server) handlePerformanceMetrics(w http.ResponseWriter, r *http.Request
 // handleBottleneckAlerts handles requests for bottleneck alerts
 func (s *Server) handleBottleneckAlerts(w http.ResponseWriter, r *http.Request) {
 	alerts := make([]BottleneckAlert, 0)
-	
+
 	// Collect all available alerts
 	alertChan := s.performanceOptimizer.bottleneckDetector.GetAlerts()
 	for {
@@ -774,7 +775,7 @@ func (s *Server) handleBottleneckAlerts(w http.ResponseWriter, r *http.Request) 
 			goto done
 		}
 	}
-	
+
 done:
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(alerts); err != nil {
@@ -787,7 +788,7 @@ done:
 // handlePerformanceProfiles handles requests for performance profiles
 func (s *Server) handlePerformanceProfiles(w http.ResponseWriter, r *http.Request) {
 	profiles := s.performanceOptimizer.profiler.GetProfiles()
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(profiles); err != nil {
 		log.Printf("Failed to encode performance profiles: %v", err)

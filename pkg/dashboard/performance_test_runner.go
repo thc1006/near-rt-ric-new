@@ -9,12 +9,7 @@ import (
 	"github.com/prometheus/client_golang/api"
 )
 
-// PerformanceTestRunner orchestrates comprehensive performance testing
-type PerformanceTestRunner struct {
-	suite           *PerformanceTestSuite
-	validationRules *ValidationRules
-	testReport      *ComprehensiveTestReport
-}
+// NOTE: PerformanceTestRunner type moved to types.go to avoid redeclaration
 
 // ValidationRules defines the requirements validation criteria
 type ValidationRules struct {
@@ -51,16 +46,7 @@ type ValidationResults struct {
 	MemoryLeakTest          *ValidationResult `json:"memoryLeakTest"`
 }
 
-// ValidationResult represents the result of a specific validation
-type ValidationResult struct {
-	TestName        string    `json:"testName"`
-	RequirementMet  bool      `json:"requirementMet"`
-	ActualValue     float64   `json:"actualValue"`
-	RequiredValue   float64   `json:"requiredValue"`
-	PerformanceGap  float64   `json:"performanceGap"` // Positive means exceeds requirement
-	Details         string    `json:"details"`
-	Timestamp       time.Time `json:"timestamp"`
-}
+// ValidationResult type is now defined in types.go to avoid redeclaration
 
 // RequirementCompliance tracks compliance with each requirement
 type RequirementCompliance struct {
@@ -105,9 +91,9 @@ func NewPerformanceTestRunner(e2Manager *E2ManagerClient, subManager *Subscripti
 	}
 
 	return &PerformanceTestRunner{
-		suite:           suite,
-		validationRules: validationRules,
-		testReport:      &ComprehensiveTestReport{},
+		Suite:           suite,
+		ValidationRules: validationRules,
+		TestReport:      &ComprehensiveTestReport{},
 	}
 }
 
@@ -116,33 +102,33 @@ func (ptr *PerformanceTestRunner) RunComprehensivePerformanceTests(ctx context.C
 	log.Println("Starting comprehensive performance testing with requirement validation...")
 	
 	startTime := time.Now()
-	ptr.testReport.TestStartTime = startTime
+	ptr.TestReport.TestStartTime = startTime
 
 	// Execute the full performance test suite
-	results, err := ptr.suite.RunAllPerformanceTests(ctx)
+	results, err := ptr.Suite.RunAllPerformanceTests(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("performance tests failed: %w", err)
 	}
 
 	endTime := time.Now()
-	ptr.testReport.TestEndTime = endTime
-	ptr.testReport.TotalTestDuration = endTime.Sub(startTime)
-	ptr.testReport.PerformanceResults = results
+	ptr.TestReport.TestEndTime = endTime
+	ptr.TestReport.TotalTestDuration = endTime.Sub(startTime)
+	ptr.TestReport.PerformanceResults = results
 
 	// Validate results against requirements
 	validationResults, err := ptr.validateRequirements(results)
 	if err != nil {
 		return nil, fmt.Errorf("requirement validation failed: %w", err)
 	}
-	ptr.testReport.ValidationResults = validationResults
+	ptr.TestReport.ValidationResults = validationResults
 
 	// Generate compliance report
 	compliance := ptr.generateComplianceReport(validationResults)
-	ptr.testReport.RequirementCompliance = compliance
+	ptr.TestReport.RequirementCompliance = compliance
 
 	// Extract detailed metrics
 	detailedMetrics := ptr.extractDetailedMetrics(results)
-	ptr.testReport.DetailedMetrics = detailedMetrics
+	ptr.TestReport.DetailedMetrics = detailedMetrics
 
 	// Generate recommendations and identify issues
 	ptr.generateRecommendationsAndIssues()
@@ -150,11 +136,11 @@ func (ptr *PerformanceTestRunner) RunComprehensivePerformanceTests(ctx context.C
 	// Calculate overall grade and compliance score
 	ptr.calculateOverallAssessment()
 
-	log.Printf("Comprehensive performance testing completed in %v", ptr.testReport.TotalTestDuration)
-	log.Printf("Overall compliance score: %.1f%%", ptr.testReport.ComplianceScore)
-	log.Printf("Overall grade: %s", ptr.testReport.OverallGrade)
+	log.Printf("Comprehensive performance testing completed in %v", ptr.TestReport.TotalTestDuration)
+	log.Printf("Overall compliance score: %.1f%%", ptr.TestReport.ComplianceScore)
+	log.Printf("Overall grade: %s", ptr.TestReport.OverallGrade)
 
-	return ptr.testReport, nil
+	return ptr.TestReport, nil
 }
 
 // validateRequirements validates test results against performance requirements
@@ -189,15 +175,15 @@ func (ptr *PerformanceTestRunner) validateConcurrentE2Nodes(loadResults *LoadTes
 			TestName:       "Concurrent E2 Nodes Test",
 			RequirementMet: false,
 			ActualValue:    0,
-			RequiredValue:  float64(ptr.validationRules.MinConcurrentE2Nodes),
-			PerformanceGap: -float64(ptr.validationRules.MinConcurrentE2Nodes),
+			RequiredValue:  float64(ptr.ValidationRules.MinConcurrentE2Nodes),
+			PerformanceGap: -float64(ptr.ValidationRules.MinConcurrentE2Nodes),
 			Details:        "Load test results not available",
 			Timestamp:      time.Now(),
 		}
 	}
 
 	actualNodes := float64(loadResults.MaxConcurrentE2Nodes)
-	requiredNodes := float64(ptr.validationRules.MinConcurrentE2Nodes)
+	requiredNodes := float64(ptr.ValidationRules.MinConcurrentE2Nodes)
 	requirementMet := actualNodes >= requiredNodes
 	performanceGap := actualNodes - requiredNodes
 
@@ -227,15 +213,15 @@ func (ptr *PerformanceTestRunner) validateThroughput(throughputResults *Throughp
 			TestName:       "Throughput Test",
 			RequirementMet: false,
 			ActualValue:    0,
-			RequiredValue:  float64(ptr.validationRules.MinThroughputIPS),
-			PerformanceGap: -float64(ptr.validationRules.MinThroughputIPS),
+			RequiredValue:  float64(ptr.ValidationRules.MinThroughputIPS),
+			PerformanceGap: -float64(ptr.ValidationRules.MinThroughputIPS),
 			Details:        "Throughput test results not available",
 			Timestamp:      time.Now(),
 		}
 	}
 
 	actualThroughput := float64(throughputResults.MaxIndicationsPerSecond)
-	requiredThroughput := float64(ptr.validationRules.MinThroughputIPS)
+	requiredThroughput := float64(ptr.ValidationRules.MinThroughputIPS)
 	requirementMet := actualThroughput >= requiredThroughput
 	performanceGap := actualThroughput - requiredThroughput
 
@@ -265,15 +251,15 @@ func (ptr *PerformanceTestRunner) validateLatency(latencyResults *LatencyResults
 			TestName:       "Latency Test",
 			RequirementMet: false,
 			ActualValue:    999.0, // High value to indicate failure
-			RequiredValue:  ptr.validationRules.MaxLatencyMs,
-			PerformanceGap: -ptr.validationRules.MaxLatencyMs,
+			RequiredValue:  ptr.ValidationRules.MaxLatencyMs,
+			PerformanceGap: -ptr.ValidationRules.MaxLatencyMs,
 			Details:        "Latency test results not available",
 			Timestamp:      time.Now(),
 		}
 	}
 
 	actualLatency := latencyResults.EndToEndLatencyMs.P99
-	requiredLatency := ptr.validationRules.MaxLatencyMs
+	requiredLatency := ptr.ValidationRules.MaxLatencyMs
 	requirementMet := actualLatency <= requiredLatency
 	performanceGap := requiredLatency - actualLatency // Positive gap means better than required
 
@@ -303,8 +289,8 @@ func (ptr *PerformanceTestRunner) validateStressTesting(stressResults *StressTes
 			TestName:       "Stress Test",
 			RequirementMet: false,
 			ActualValue:    0,
-			RequiredValue:  float64(len(ptr.validationRules.RequiredStressScenarios)),
-			PerformanceGap: -float64(len(ptr.validationRules.RequiredStressScenarios)),
+			RequiredValue:  float64(len(ptr.ValidationRules.RequiredStressScenarios)),
+			PerformanceGap: -float64(len(ptr.ValidationRules.RequiredStressScenarios)),
 			Details:        "Stress test results not available",
 			Timestamp:      time.Now(),
 		}
@@ -350,15 +336,15 @@ func (ptr *PerformanceTestRunner) validateStabilityTesting(stabilityResults *Sta
 			TestName:       "Stability Test",
 			RequirementMet: false,
 			ActualValue:    0,
-			RequiredValue:  ptr.validationRules.MinStabilityTestHours,
-			PerformanceGap: -ptr.validationRules.MinStabilityTestHours,
+			RequiredValue:  ptr.ValidationRules.MinStabilityTestHours,
+			PerformanceGap: -ptr.ValidationRules.MinStabilityTestHours,
 			Details:        "Stability test results not available",
 			Timestamp:      time.Now(),
 		}
 	}
 
 	actualDuration := stabilityResults.TestDurationHours
-	requiredDuration := ptr.validationRules.MinStabilityTestHours
+	requiredDuration := ptr.ValidationRules.MinStabilityTestHours
 	requirementMet := actualDuration >= requiredDuration
 	performanceGap := actualDuration - requiredDuration
 
@@ -516,8 +502,8 @@ func (ptr *PerformanceTestRunner) generateRecommendationsAndIssues() {
 	recommendations := []string{}
 	criticalIssues := []string{}
 
-	validation := ptr.testReport.ValidationResults
-	compliance := ptr.testReport.RequirementCompliance
+	validation := ptr.TestReport.ValidationResults
+	compliance := ptr.TestReport.RequirementCompliance
 
 	// Check each requirement and generate specific recommendations
 	if !validation.ConcurrentE2NodesTest.RequirementMet {
@@ -556,7 +542,7 @@ func (ptr *PerformanceTestRunner) generateRecommendationsAndIssues() {
 			"Extend stability testing duration and improve monitoring")
 	}
 
-	if ptr.testReport.DetailedMetrics.MemoryLeakDetected {
+	if ptr.TestReport.DetailedMetrics.MemoryLeakDetected {
 		criticalIssues = append(criticalIssues, "Memory leak detected during stability testing")
 		recommendations = append(recommendations, 
 			"Investigate and fix memory leaks in long-running processes")
@@ -570,50 +556,50 @@ func (ptr *PerformanceTestRunner) generateRecommendationsAndIssues() {
 			"Implement performance monitoring and alerting in production")
 	}
 
-	ptr.testReport.Recommendations = recommendations
-	ptr.testReport.CriticalIssues = criticalIssues
+	ptr.TestReport.Recommendations = recommendations
+	ptr.TestReport.CriticalIssues = criticalIssues
 }
 
 // calculateOverallAssessment calculates overall grade and compliance score
 func (ptr *PerformanceTestRunner) calculateOverallAssessment() {
-	compliance := ptr.testReport.RequirementCompliance.OverallCompliance
-	ptr.testReport.ComplianceScore = compliance
+	compliance := ptr.TestReport.RequirementCompliance.OverallCompliance
+	ptr.TestReport.ComplianceScore = compliance
 
 	// Determine grade based on compliance score
 	switch {
 	case compliance >= 95.0:
-		ptr.testReport.OverallGrade = "A+"
+		ptr.TestReport.OverallGrade = "A+"
 	case compliance >= 90.0:
-		ptr.testReport.OverallGrade = "A"
+		ptr.TestReport.OverallGrade = "A"
 	case compliance >= 85.0:
-		ptr.testReport.OverallGrade = "A-"
+		ptr.TestReport.OverallGrade = "A-"
 	case compliance >= 80.0:
-		ptr.testReport.OverallGrade = "B+"
+		ptr.TestReport.OverallGrade = "B+"
 	case compliance >= 75.0:
-		ptr.testReport.OverallGrade = "B"
+		ptr.TestReport.OverallGrade = "B"
 	case compliance >= 70.0:
-		ptr.testReport.OverallGrade = "B-"
+		ptr.TestReport.OverallGrade = "B-"
 	case compliance >= 65.0:
-		ptr.testReport.OverallGrade = "C+"
+		ptr.TestReport.OverallGrade = "C+"
 	case compliance >= 60.0:
-		ptr.testReport.OverallGrade = "C"
+		ptr.TestReport.OverallGrade = "C"
 	case compliance >= 55.0:
-		ptr.testReport.OverallGrade = "C-"
+		ptr.TestReport.OverallGrade = "C-"
 	case compliance >= 50.0:
-		ptr.testReport.OverallGrade = "D"
+		ptr.TestReport.OverallGrade = "D"
 	default:
-		ptr.testReport.OverallGrade = "F"
+		ptr.TestReport.OverallGrade = "F"
 	}
 }
 
 // GetTestReport returns the comprehensive test report
 func (ptr *PerformanceTestRunner) GetTestReport() *ComprehensiveTestReport {
-	return ptr.testReport
+	return ptr.TestReport
 }
 
 // PrintSummaryReport prints a summary of the test results
 func (ptr *PerformanceTestRunner) PrintSummaryReport() {
-	report := ptr.testReport
+	report := ptr.TestReport
 	
 	fmt.Println("\n" + "="*80)
 	fmt.Println("COMPREHENSIVE PERFORMANCE TEST REPORT")

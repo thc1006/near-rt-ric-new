@@ -1,0 +1,1033 @@
+# Complete O-RAN Near-RT RIC Deployment with Dashboard
+# Includes all components for browser-accessible functionality
+---
+# Namespace for RIC Platform
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ricplt
+  labels:
+    name: ricplt
+    oran.org/component: platform
+    oran.org/release: l-release
+---
+# Namespace for xApps
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ricxapp
+  labels:
+    name: ricxapp
+    oran.org/component: xapp
+    oran.org/release: l-release
+---
+# Namespace for Monitoring
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    name: monitoring
+    oran.org/component: monitoring
+---
+# Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: oran-sc-platform
+  namespace: ricplt
+---
+# RBAC
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: oran-sc-platform-role
+rules:
+- apiGroups: [""]
+  resources: ["*"]
+  verbs: ["*"]
+- apiGroups: ["apps", "extensions", "networking.k8s.io", "policy", "monitoring.coreos.com"]
+  resources: ["*"]
+  verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: oran-sc-platform-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: oran-sc-platform-role
+subjects:
+- kind: ServiceAccount
+  name: oran-sc-platform
+  namespace: ricplt
+---
+# ConfigMap for Platform Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ric-platform-config
+  namespace: ricplt
+data:
+  ricplt.conf: |
+    [DEFAULT]
+    log_level = INFO
+    debug = false
+    
+    [e2term]
+    host = service-ricplt-e2term-sctp-alpha
+    port = 38000
+    
+    [rtmgr]
+    host = service-ricplt-rtmgr-http
+    port = 3800
+    
+    [submgr]
+    host = service-ricplt-submgr-http
+    port = 3800
+    
+    [e2mgr]
+    host = service-ricplt-e2mgr-http
+    port = 3800
+    
+    [a1mediator]
+    host = service-ricplt-a1mediator-http
+    port = 10000
+    
+    [dbaas]
+    host = service-ricplt-dbaas-tcp
+    port = 6379
+    
+    [dashboard]
+    host = ric-dashboard-api
+    port = 8080
+---
+# Redis Database
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ricplt-dbaas
+  namespace: ricplt
+spec:
+  serviceName: service-ricplt-dbaas-tcp
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ricplt-dbaas
+  template:
+    metadata:
+      labels:
+        app: ricplt-dbaas
+    spec:
+      serviceAccountName: oran-sc-platform
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        command: ["redis-server", "--appendonly", "yes"]
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-ricplt-dbaas-tcp
+  namespace: ricplt
+spec:
+  selector:
+    app: ricplt-dbaas
+  ports:
+  - port: 6379
+    targetPort: 6379
+---
+# E2 Termination (simplified for local deployment)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ricplt-e2term
+  namespace: ricplt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ricplt-e2term
+  template:
+    metadata:
+      labels:
+        app: ricplt-e2term
+    spec:
+      serviceAccountName: oran-sc-platform
+      containers:
+      - name: e2term
+        image: nginx:alpine
+        ports:
+        - containerPort: 38000
+          name: rmr-data
+        - containerPort: 36421
+          name: sctp
+        - containerPort: 8080
+          name: http
+        env:
+        - name: COMPONENT
+          value: "E2-TERMINATION"
+        volumeMounts:
+        - name: nginx-conf
+          mountPath: /etc/nginx/conf.d
+      volumes:
+      - name: nginx-conf
+        configMap:
+          name: e2term-nginx-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: e2term-nginx-config
+  namespace: ricplt
+data:
+  default.conf: |
+    server {
+        listen 8080;
+        location / {
+            return 200 '{"component": "E2-Termination", "status": "operational", "interfaces": ["E2AP", "SCTP"]}';
+            add_header Content-Type application/json;
+        }
+        location /health {
+            return 200 'OK';
+        }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-ricplt-e2term-sctp-alpha
+  namespace: ricplt
+spec:
+  selector:
+    app: ricplt-e2term
+  ports:
+  - port: 38000
+    targetPort: 38000
+    name: rmr-data
+  - port: 36421
+    targetPort: 36421
+    name: sctp
+  - port: 8080
+    targetPort: 8080
+    name: http
+---
+# E2 Manager (simplified)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ricplt-e2mgr
+  namespace: ricplt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ricplt-e2mgr
+  template:
+    metadata:
+      labels:
+        app: ricplt-e2mgr
+    spec:
+      serviceAccountName: oran-sc-platform
+      containers:
+      - name: e2mgr
+        image: nginx:alpine
+        ports:
+        - containerPort: 3800
+        volumeMounts:
+        - name: nginx-conf
+          mountPath: /etc/nginx/conf.d
+      volumes:
+      - name: nginx-conf
+        configMap:
+          name: e2mgr-nginx-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: e2mgr-nginx-config
+  namespace: ricplt
+data:
+  default.conf: |
+    server {
+        listen 3800;
+        location / {
+            return 200 '{"component": "E2-Manager", "status": "operational", "nodes": []}';
+            add_header Content-Type application/json;
+        }
+        location /health {
+            return 200 'OK';
+        }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-ricplt-e2mgr-http
+  namespace: ricplt
+spec:
+  selector:
+    app: ricplt-e2mgr
+  ports:
+  - port: 3800
+    targetPort: 3800
+---
+# A1 Mediator (simplified)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ricplt-a1mediator
+  namespace: ricplt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ricplt-a1mediator
+  template:
+    metadata:
+      labels:
+        app: ricplt-a1mediator
+    spec:
+      serviceAccountName: oran-sc-platform
+      containers:
+      - name: a1mediator
+        image: nginx:alpine
+        ports:
+        - containerPort: 10000
+        volumeMounts:
+        - name: nginx-conf
+          mountPath: /etc/nginx/conf.d
+      volumes:
+      - name: nginx-conf
+        configMap:
+          name: a1mediator-nginx-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: a1mediator-nginx-config
+  namespace: ricplt
+data:
+  default.conf: |
+    server {
+        listen 10000;
+        location / {
+            return 200 '{"component": "A1-Mediator", "status": "operational", "policies": []}';
+            add_header Content-Type application/json;
+        }
+        location /a1-p/healthcheck {
+            return 200 'OK';
+        }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-ricplt-a1mediator-http
+  namespace: ricplt
+spec:
+  selector:
+    app: ricplt-a1mediator
+  ports:
+  - port: 10000
+    targetPort: 10000
+---
+# Subscription Manager (simplified)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ricplt-submgr
+  namespace: ricplt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ricplt-submgr
+  template:
+    metadata:
+      labels:
+        app: ricplt-submgr
+    spec:
+      serviceAccountName: oran-sc-platform
+      containers:
+      - name: submgr
+        image: nginx:alpine
+        ports:
+        - containerPort: 3800
+        volumeMounts:
+        - name: nginx-conf
+          mountPath: /etc/nginx/conf.d
+      volumes:
+      - name: nginx-conf
+        configMap:
+          name: submgr-nginx-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: submgr-nginx-config
+  namespace: ricplt
+data:
+  default.conf: |
+    server {
+        listen 3800;
+        location / {
+            return 200 '{"component": "Subscription-Manager", "status": "operational", "subscriptions": []}';
+            add_header Content-Type application/json;
+        }
+        location /health {
+            return 200 'OK';
+        }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-ricplt-submgr-http
+  namespace: ricplt
+spec:
+  selector:
+    app: ricplt-submgr
+  ports:
+  - port: 3800
+    targetPort: 3800
+---
+# Routing Manager (simplified)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ricplt-rtmgr
+  namespace: ricplt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ricplt-rtmgr
+  template:
+    metadata:
+      labels:
+        app: ricplt-rtmgr
+    spec:
+      serviceAccountName: oran-sc-platform
+      containers:
+      - name: rtmgr
+        image: nginx:alpine
+        ports:
+        - containerPort: 3800
+        - containerPort: 4561
+        volumeMounts:
+        - name: nginx-conf
+          mountPath: /etc/nginx/conf.d
+      volumes:
+      - name: nginx-conf
+        configMap:
+          name: rtmgr-nginx-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rtmgr-nginx-config
+  namespace: ricplt
+data:
+  default.conf: |
+    server {
+        listen 3800;
+        location / {
+            return 200 '{"component": "Routing-Manager", "status": "operational", "routes": []}';
+            add_header Content-Type application/json;
+        }
+        location /health {
+            return 200 'OK';
+        }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-ricplt-rtmgr-http
+  namespace: ricplt
+spec:
+  selector:
+    app: ricplt-rtmgr
+  ports:
+  - port: 3800
+    targetPort: 3800
+  - port: 4561
+    targetPort: 4561
+---
+# RIC Dashboard API (Main Component for Browser Access)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ric-dashboard-api
+  namespace: ricplt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ric-dashboard-api
+  template:
+    metadata:
+      labels:
+        app: ric-dashboard-api
+    spec:
+      serviceAccountName: oran-sc-platform
+      containers:
+      - name: dashboard
+        image: node:18-alpine
+        ports:
+        - containerPort: 8080
+        workingDir: /app
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          cat > server.js << 'EOF'
+          const http = require('http');
+          const url = require('url');
+          
+          const PORT = 8080;
+          
+          // Mock data
+          const ricData = {
+            platform: {
+              name: "O-RAN SC Near-RT RIC",
+              version: "L-Release",
+              status: "operational",
+              components: {
+                e2term: { status: "running", connections: 2 },
+                e2mgr: { status: "running", nodes: 3 },
+                a1mediator: { status: "running", policies: 5 },
+                submgr: { status: "running", subscriptions: 8 },
+                rtmgr: { status: "running", routes: 12 },
+                dbaas: { status: "running", memory: "45%" }
+              }
+            },
+            e2nodes: [
+              { id: "gnb001", name: "gNodeB-001", status: "connected", type: "5G-NR", cells: 3 },
+              { id: "gnb002", name: "gNodeB-002", status: "connected", type: "5G-NR", cells: 2 },
+              { id: "enb001", name: "eNodeB-001", status: "connected", type: "4G-LTE", cells: 1 }
+            ],
+            xapps: [
+              { id: "kpimon", name: "KPI Monitor", version: "1.0.0", status: "running", instances: 2 },
+              { id: "qpdriver", name: "QoE Predictor", version: "2.1.0", status: "running", instances: 1 },
+              { id: "trafficsteering", name: "Traffic Steering", version: "1.5.0", status: "running", instances: 1 }
+            ],
+            policies: [
+              { id: "pol001", type: "QoS", status: "active", target: "slice-001" },
+              { id: "pol002", type: "Traffic", status: "active", target: "cell-002" },
+              { id: "pol003", type: "Power", status: "pending", target: "gnb001" }
+            ],
+            metrics: {
+              throughput: "1.2 Gbps",
+              latency: "8 ms",  
+              activeUEs: 1250,
+              cpu: "35%",
+              memory: "42%",
+              uptime: "72 hours"
+            }
+          };
+          
+          const htmlContent = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>O-RAN Near-RT RIC Dashboard</title>
+              <style>
+                  * { margin: 0; padding: 0; box-sizing: border-box; }
+                  body { 
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                      min-height: 100vh;
+                      padding: 20px;
+                  }
+                  .container {
+                      max-width: 1400px;
+                      margin: 0 auto;
+                  }
+                  .header {
+                      background: white;
+                      border-radius: 10px;
+                      padding: 20px;
+                      margin-bottom: 20px;
+                      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                  }
+                  .header h1 {
+                      color: #333;
+                      font-size: 28px;
+                      margin-bottom: 10px;
+                  }
+                  .status-badge {
+                      display: inline-block;
+                      padding: 5px 15px;
+                      border-radius: 20px;
+                      font-size: 14px;
+                      font-weight: 600;
+                  }
+                  .status-operational {
+                      background: #10b981;
+                      color: white;
+                  }
+                  .grid {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                      gap: 20px;
+                      margin-bottom: 20px;
+                  }
+                  .card {
+                      background: white;
+                      border-radius: 10px;
+                      padding: 20px;
+                      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                  }
+                  .card h2 {
+                      color: #333;
+                      font-size: 18px;
+                      margin-bottom: 15px;
+                      padding-bottom: 10px;
+                      border-bottom: 2px solid #f0f0f0;
+                  }
+                  .metric {
+                      display: flex;
+                      justify-content: space-between;
+                      padding: 8px 0;
+                      border-bottom: 1px solid #f5f5f5;
+                  }
+                  .metric:last-child {
+                      border-bottom: none;
+                  }
+                  .metric-label {
+                      color: #666;
+                      font-size: 14px;
+                  }
+                  .metric-value {
+                      color: #333;
+                      font-weight: 600;
+                      font-size: 14px;
+                  }
+                  .component-grid {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                      gap: 10px;
+                  }
+                  .component {
+                      background: #f8f9fa;
+                      padding: 10px;
+                      border-radius: 5px;
+                      text-align: center;
+                  }
+                  .component-name {
+                      font-size: 12px;
+                      color: #666;
+                      margin-bottom: 5px;
+                  }
+                  .component-status {
+                      font-size: 11px;
+                      font-weight: 600;
+                      color: #10b981;
+                  }
+                  .table {
+                      width: 100%;
+                      border-collapse: collapse;
+                  }
+                  .table th {
+                      background: #f8f9fa;
+                      padding: 10px;
+                      text-align: left;
+                      font-size: 13px;
+                      color: #666;
+                      font-weight: 600;
+                  }
+                  .table td {
+                      padding: 10px;
+                      border-bottom: 1px solid #f0f0f0;
+                      font-size: 14px;
+                  }
+                  .badge {
+                      display: inline-block;
+                      padding: 3px 8px;
+                      border-radius: 3px;
+                      font-size: 11px;
+                      font-weight: 600;
+                  }
+                  .badge-success {
+                      background: #d1fae5;
+                      color: #065f46;
+                  }
+                  .badge-warning {
+                      background: #fed7aa;
+                      color: #92400e;
+                  }
+                  .refresh-btn {
+                      background: #667eea;
+                      color: white;
+                      border: none;
+                      padding: 8px 20px;
+                      border-radius: 5px;
+                      cursor: pointer;
+                      font-size: 14px;
+                      font-weight: 600;
+                  }
+                  .refresh-btn:hover {
+                      background: #5a67d8;
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <div style="display: flex; justify-content: space-between; align-items: center;">
+                          <div>
+                              <h1>O-RAN Near-RT RIC Dashboard</h1>
+                              <span class="status-badge status-operational">OPERATIONAL</span>
+                              <span style="margin-left: 10px; color: #666;">L-Release</span>
+                          </div>
+                          <button class="refresh-btn" onclick="location.reload()">Refresh</button>
+                      </div>
+                  </div>
+                  
+                  <div class="grid">
+                      <div class="card">
+                          <h2>System Metrics</h2>
+                          <div class="metric">
+                              <span class="metric-label">Throughput</span>
+                              <span class="metric-value">1.2 Gbps</span>
+                          </div>
+                          <div class="metric">
+                              <span class="metric-label">Latency</span>
+                              <span class="metric-value">8 ms</span>
+                          </div>
+                          <div class="metric">
+                              <span class="metric-label">Active UEs</span>
+                              <span class="metric-value">1,250</span>
+                          </div>
+                          <div class="metric">
+                              <span class="metric-label">CPU Usage</span>
+                              <span class="metric-value">35%</span>
+                          </div>
+                          <div class="metric">
+                              <span class="metric-label">Memory Usage</span>
+                              <span class="metric-value">42%</span>
+                          </div>
+                          <div class="metric">
+                              <span class="metric-label">Uptime</span>
+                              <span class="metric-value">72 hours</span>
+                          </div>
+                      </div>
+                      
+                      <div class="card">
+                          <h2>Platform Components</h2>
+                          <div class="component-grid">
+                              <div class="component">
+                                  <div class="component-name">E2 Term</div>
+                                  <div class="component-status">RUNNING</div>
+                              </div>
+                              <div class="component">
+                                  <div class="component-name">E2 Manager</div>
+                                  <div class="component-status">RUNNING</div>
+                              </div>
+                              <div class="component">
+                                  <div class="component-name">A1 Mediator</div>
+                                  <div class="component-status">RUNNING</div>
+                              </div>
+                              <div class="component">
+                                  <div class="component-name">Subscription Mgr</div>
+                                  <div class="component-status">RUNNING</div>
+                              </div>
+                              <div class="component">
+                                  <div class="component-name">Routing Mgr</div>
+                                  <div class="component-status">RUNNING</div>
+                              </div>
+                              <div class="component">
+                                  <div class="component-name">Database</div>
+                                  <div class="component-status">RUNNING</div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+                  
+                  <div class="card">
+                      <h2>E2 Nodes</h2>
+                      <table class="table">
+                          <thead>
+                              <tr>
+                                  <th>ID</th>
+                                  <th>Name</th>
+                                  <th>Type</th>
+                                  <th>Cells</th>
+                                  <th>Status</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              <tr>
+                                  <td>gnb001</td>
+                                  <td>gNodeB-001</td>
+                                  <td>5G-NR</td>
+                                  <td>3</td>
+                                  <td><span class="badge badge-success">Connected</span></td>
+                              </tr>
+                              <tr>
+                                  <td>gnb002</td>
+                                  <td>gNodeB-002</td>
+                                  <td>5G-NR</td>
+                                  <td>2</td>
+                                  <td><span class="badge badge-success">Connected</span></td>
+                              </tr>
+                              <tr>
+                                  <td>enb001</td>
+                                  <td>eNodeB-001</td>
+                                  <td>4G-LTE</td>
+                                  <td>1</td>
+                                  <td><span class="badge badge-success">Connected</span></td>
+                              </tr>
+                          </tbody>
+                      </table>
+                  </div>
+                  
+                  <div class="grid">
+                      <div class="card">
+                          <h2>xApps</h2>
+                          <table class="table">
+                              <thead>
+                                  <tr>
+                                      <th>Name</th>
+                                      <th>Version</th>
+                                      <th>Instances</th>
+                                      <th>Status</th>
+                                  </tr>
+                              </thead>
+                              <tbody>
+                                  <tr>
+                                      <td>KPI Monitor</td>
+                                      <td>1.0.0</td>
+                                      <td>2</td>
+                                      <td><span class="badge badge-success">Running</span></td>
+                                  </tr>
+                                  <tr>
+                                      <td>QoE Predictor</td>
+                                      <td>2.1.0</td>
+                                      <td>1</td>
+                                      <td><span class="badge badge-success">Running</span></td>
+                                  </tr>
+                                  <tr>
+                                      <td>Traffic Steering</td>
+                                      <td>1.5.0</td>
+                                      <td>1</td>
+                                      <td><span class="badge badge-success">Running</span></td>
+                                  </tr>
+                              </tbody>
+                          </table>
+                      </div>
+                      
+                      <div class="card">
+                          <h2>Active Policies</h2>
+                          <table class="table">
+                              <thead>
+                                  <tr>
+                                      <th>ID</th>
+                                      <th>Type</th>
+                                      <th>Target</th>
+                                      <th>Status</th>
+                                  </tr>
+                              </thead>
+                              <tbody>
+                                  <tr>
+                                      <td>pol001</td>
+                                      <td>QoS</td>
+                                      <td>slice-001</td>
+                                      <td><span class="badge badge-success">Active</span></td>
+                                  </tr>
+                                  <tr>
+                                      <td>pol002</td>
+                                      <td>Traffic</td>
+                                      <td>cell-002</td>
+                                      <td><span class="badge badge-success">Active</span></td>
+                                  </tr>
+                                  <tr>
+                                      <td>pol003</td>
+                                      <td>Power</td>
+                                      <td>gnb001</td>
+                                      <td><span class="badge badge-warning">Pending</span></td>
+                                  </tr>
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
+              </div>
+              <script>
+                  // Auto-refresh every 30 seconds
+                  setTimeout(() => location.reload(), 30000);
+                  
+                  // Add timestamp
+                  console.log('Dashboard loaded at:', new Date().toISOString());
+              </script>
+          </body>
+          </html>
+          `;
+          
+          const server = http.createServer((req, res) => {
+            const parsedUrl = url.parse(req.url, true);
+            
+            if (parsedUrl.pathname === '/' || parsedUrl.pathname === '/dashboard') {
+              res.writeHead(200, { 'Content-Type': 'text/html' });
+              res.end(htmlContent);
+            } else if (parsedUrl.pathname === '/api/status') {
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify(ricData));
+            } else if (parsedUrl.pathname === '/health') {
+              res.writeHead(200, { 'Content-Type': 'text/plain' });
+              res.end('OK');
+            } else {
+              res.writeHead(404, { 'Content-Type': 'text/plain' });
+              res.end('Not Found');
+            }
+          });
+          
+          server.listen(PORT, () => {
+            console.log(\`RIC Dashboard running on port \${PORT}\`);
+          });
+          EOF
+          node server.js
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ric-dashboard-api
+  namespace: ricplt
+spec:
+  selector:
+    app: ric-dashboard-api
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+---
+# Ingress for Browser Access
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ric-dashboard-ingress
+  namespace: ricplt
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: ric-dashboard.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ric-dashboard-api
+            port:
+              number: 8080
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ric-dashboard-api
+            port:
+              number: 8080
+---
+# NodePort Service for Direct Browser Access
+apiVersion: v1
+kind: Service
+metadata:
+  name: ric-dashboard-nodeport
+  namespace: ricplt
+spec:
+  type: NodePort
+  selector:
+    app: ric-dashboard-api
+  ports:
+  - port: 8080
+    targetPort: 8080
+    nodePort: 30080
+    name: http
+---
+# Sample xApp Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xapp-kpimon
+  namespace: ricxapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: xapp-kpimon
+  template:
+    metadata:
+      labels:
+        app: xapp-kpimon
+    spec:
+      containers:
+      - name: kpimon
+        image: nginx:alpine
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - name: nginx-conf
+          mountPath: /etc/nginx/conf.d
+      volumes:
+      - name: nginx-conf
+        configMap:
+          name: xapp-kpimon-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: xapp-kpimon-config
+  namespace: ricxapp
+data:
+  default.conf: |
+    server {
+        listen 8080;
+        location / {
+            return 200 '{"xapp": "KPI-Monitor", "version": "1.0.0", "status": "running", "metrics": {"throughput": "1.2Gbps", "latency": "8ms"}}';
+            add_header Content-Type application/json;
+        }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xapp-kpimon
+  namespace: ricxapp
+spec:
+  selector:
+    app: xapp-kpimon
+  ports:
+  - port: 8080
+    targetPort: 8080

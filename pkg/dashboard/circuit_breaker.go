@@ -13,41 +13,7 @@ import (
 	"time"
 )
 
-// CircuitBreaker implements the circuit breaker pattern for external service calls
-type CircuitBreaker struct {
-	mu                sync.RWMutex
-	name              string
-	state             CircuitState
-	failureCount      int
-	successCount      int
-	lastFailureTime   time.Time
-	lastSuccessTime   time.Time
-	nextAttempt       time.Time
-	
-	// Configuration
-	maxFailures       int
-	timeout           time.Duration
-	resetTimeout      time.Duration
-	halfOpenMaxCalls  int
-	
-	// Callbacks
-	onStateChange     func(name string, from, to CircuitState)
-	
-	// Statistics
-	totalCalls        int64
-	totalFailures     int64
-	totalSuccesses    int64
-	totalTimeouts     int64
-}
-
-// CircuitState represents the state of a circuit breaker
-type CircuitState int
-
-const (
-	StateClosed CircuitState = iota
-	StateHalfOpen
-	StateOpen
-)
+// CircuitBreaker and CircuitState types moved to types.go to avoid redeclaration
 
 // String returns the string representation of the circuit state
 func (s CircuitState) String() string {

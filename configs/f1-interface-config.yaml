@@ -1,0 +1,276 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: f1-interface-config
+  namespace: oran-network-functions
+  labels:
+    interface: f1
+    component: interface-config
+data:
+  f1ap.conf: |
+    # F1 Application Protocol Configuration
+    f1ap:
+      version: "16.8.0"
+      
+      # Timer Configuration
+      timer_values:
+        t_wait: 3000              # Setup timeout (ms)
+        t_ng_setup: 3000         # NG setup timeout (ms)
+        t_ue_context_setup: 5000 # UE context setup timeout (ms)
+        t_ue_context_release: 3000 # UE context release timeout (ms)
+        t_initial_ul_rrc: 1000   # Initial UL RRC timeout (ms)
+        t_dl_rrc_transfer: 1000  # DL RRC transfer timeout (ms)
+        t_ul_rrc_transfer: 1000  # UL RRC transfer timeout (ms)
+      
+      # Retry Configuration
+      max_retry: 3
+      retry_interval: 1000
+      
+      # SCTP Configuration for F1-C
+      sctp:
+        heartbeat_interval: 30
+        path_max_retrans: 5
+        max_init_retrans: 8
+        rto_initial: 3000
+        rto_min: 1000
+        rto_max: 60000
+        sack_timeout: 200
+        sack_freq: 2
+        
+      # Message Priorities
+      message_priority:
+        f1_setup_request: 1
+        f1_setup_response: 1
+        f1_setup_failure: 1
+        reset: 2
+        reset_acknowledge: 2
+        error_indication: 3
+        f1_removal_request: 1
+        f1_removal_response: 1
+        
+      # Load Balancing
+      load_balancing:
+        enabled: true
+        algorithm: "round_robin"
+        max_connections_per_du: 10
+        
+  f1_interface.yaml: |
+    # F1 Interface Specification
+    f1_c_interface:
+      protocol: "F1AP"
+      transport: "SCTP"
+      port: 38472
+      
+      # Supported procedures
+      procedures:
+        - name: "F1 Setup"
+          initiated_by: "DU"
+          purpose: "Setup F1 interface between DU and CU-CP"
+        - name: "gNB-DU Configuration Update"
+          initiated_by: "DU"
+          purpose: "Update DU configuration"
+        - name: "gNB-CU Configuration Update"  
+          initiated_by: "CU-CP"
+          purpose: "Update CU configuration"
+        - name: "UE Context Setup"
+          initiated_by: "CU-CP"
+          purpose: "Setup UE context in DU"
+        - name: "UE Context Release"
+          initiated_by: "CU-CP"
+          purpose: "Release UE context from DU"
+        - name: "UE Context Modification"
+          initiated_by: "CU-CP"
+          purpose: "Modify UE context in DU"
+        - name: "DL RRC Message Transfer"
+          initiated_by: "CU-CP"
+          purpose: "Transfer DL RRC messages"
+        - name: "UL RRC Message Transfer"
+          initiated_by: "DU"
+          purpose: "Transfer UL RRC messages"
+        - name: "Initial UL RRC Message Transfer"
+          initiated_by: "DU"
+          purpose: "Transfer initial UL RRC message"
+        - name: "System Information Delivery Command"
+          initiated_by: "CU-CP"
+          purpose: "Deliver system information"
+        - name: "Paging"
+          initiated_by: "CU-CP"
+          purpose: "Page UE in coverage area"
+        - name: "Notify"
+          initiated_by: "DU"
+          purpose: "Notify CU-CP of events"
+        - name: "Write-Replace Warning"
+          initiated_by: "CU-CP"
+          purpose: "Broadcast emergency messages"
+        - name: "PWS Cancel"
+          initiated_by: "CU-CP"
+          purpose: "Cancel emergency message broadcast"
+        - name: "PWS Restart Indication"
+          initiated_by: "DU"
+          purpose: "Indicate PWS restart"
+        - name: "PWS Failure Indication"
+          initiated_by: "DU"
+          purpose: "Indicate PWS failure"
+          
+    f1_u_interface:
+      protocol: "GTP-U"
+      transport: "UDP"
+      port: 2152
+      
+      # Tunnel management
+      tunnel_management:
+        keep_alive_timer: 60
+        path_failure_threshold: 3
+        echo_request_interval: 60
+        
+      # QoS mapping
+      qos_mapping:
+        - qci: 1
+          priority_level: 2
+          packet_delay_budget: 100
+          packet_error_loss_rate: "10^-2"
+        - qci: 2  
+          priority_level: 4
+          packet_delay_budget: 150
+          packet_error_loss_rate: "10^-3"
+        - qci: 3
+          priority_level: 3
+          packet_delay_budget: 50
+          packet_error_loss_rate: "10^-3"
+        - qci: 4
+          priority_level: 5
+          packet_delay_budget: 300
+          packet_error_loss_rate: "10^-6"
+        - qci: 5
+          priority_level: 1
+          packet_delay_budget: 100
+          packet_error_loss_rate: "10^-6"
+        - qci: 6
+          priority_level: 6
+          packet_delay_budget: 300
+          packet_error_loss_rate: "10^-6"
+        - qci: 7
+          priority_level: 7
+          packet_delay_budget: 100
+          packet_error_loss_rate: "10^-3"
+        - qci: 8
+          priority_level: 8
+          packet_delay_budget: 300
+          packet_error_loss_rate: "10^-6"
+        - qci: 9
+          priority_level: 9
+          packet_delay_budget: 300
+          packet_error_loss_rate: "10^-6"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: f1-interface-service
+  namespace: oran-network-functions
+  labels:
+    interface: f1
+    component: interface-service
+spec:
+  type: ClusterIP
+  ports:
+  - name: f1-c
+    port: 38472
+    targetPort: 38472
+    protocol: SCTP
+  - name: f1-u
+    port: 2152
+    targetPort: 2152
+    protocol: UDP
+  selector:
+    interface: f1
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: f1-interface-policy
+  namespace: oran-network-functions
+spec:
+  podSelector:
+    matchLabels:
+      interface: f1
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: cu-cp
+    - podSelector:
+        matchLabels:
+          app: du
+    ports:
+    - protocol: SCTP
+      port: 38472
+    - protocol: UDP
+      port: 2152
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: cu-cp
+    - podSelector:
+        matchLabels:
+          app: du
+    ports:
+    - protocol: SCTP
+      port: 38472
+    - protocol: UDP
+      port: 2152
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: f1-monitoring-config
+  namespace: oran-network-functions
+  labels:
+    interface: f1
+    component: monitoring
+data:
+  prometheus-rules.yaml: |
+    groups:
+    - name: f1_interface_rules
+      rules:
+      - alert: F1SetupFailure
+        expr: increase(f1_setup_failures_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "F1 setup failure detected"
+          description: "F1 setup between CU and DU has failed"
+          
+      - alert: F1ConnectionLoss
+        expr: f1_connection_status == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "F1 connection lost"
+          description: "F1 connection between CU and DU is down"
+          
+      - alert: F1HighLatency
+        expr: f1_message_latency_seconds > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High F1 message latency"
+          description: "F1 message latency is above 100ms"
+          
+      - alert: F1MessageErrors
+        expr: increase(f1_message_errors_total[5m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High F1 message error rate"
+          description: "F1 message error rate is above threshold"

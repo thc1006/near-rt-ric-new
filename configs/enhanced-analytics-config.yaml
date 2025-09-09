@@ -1,0 +1,905 @@
+# Enhanced O-RAN Analytics Framework Configuration
+# This configuration file defines all aspects of the telemetry data processing,
+# analytics, ML pipeline, and optimization settings for O-RAN L Release
+
+# Global Configuration
+global:
+  organization: "oran"
+  environment: "production"  # development, staging, production
+  version: "1.0.0"
+  timezone: "UTC"
+  log_level: "info"  # debug, info, warn, error
+  metrics_enabled: true
+  tracing_enabled: true
+
+# Infrastructure Configuration
+infrastructure:
+  kafka:
+    brokers:
+      - "kafka:9092"
+    topics:
+      e2_indications:
+        name: "e2-indications"
+        partitions: 10
+        replication_factor: 3
+        retention_ms: 604800000  # 7 days
+        compression_type: "lz4"
+      processed_e2_data:
+        name: "processed-e2-data"
+        partitions: 6
+        replication_factor: 3
+        retention_ms: 259200000  # 3 days
+        compression_type: "snappy"
+      performance_insights:
+        name: "performance-insights"
+        partitions: 4
+        replication_factor: 3
+        retention_ms: 604800000  # 7 days
+        compression_type: "gzip"
+      analytics_requests:
+        name: "analytics-requests"
+        partitions: 2
+        replication_factor: 3
+        retention_ms: 86400000  # 1 day
+        compression_type: "lz4"
+    
+    consumer_configs:
+      session_timeout_ms: 30000
+      heartbeat_interval_ms: 3000
+      max_poll_records: 1000
+      fetch_min_bytes: 1024
+      fetch_max_wait_ms: 500
+    
+    producer_configs:
+      acks: "all"
+      retries: 3
+      batch_size: 16384
+      linger_ms: 5
+      buffer_memory: 33554432
+      compression_type: "lz4"
+
+  influxdb:
+    url: "http://influxdb:8086"
+    organization: "oran"
+    buckets:
+      oran_metrics:
+        name: "oran-metrics"
+        retention_policy: "30d"
+        shard_group_duration: "1d"
+        description: "Raw O-RAN metrics and measurements"
+      oran_kpis:
+        name: "oran-kpis"
+        retention_policy: "90d"
+        shard_group_duration: "1d"
+        description: "Calculated O-RAN KPIs"
+      oran_e2_data:
+        name: "oran-e2-data"
+        retention_policy: "7d"
+        shard_group_duration: "1h"
+        description: "E2 interface telemetry data"
+      oran_predictions:
+        name: "oran-predictions"
+        retention_policy: "30d"
+        shard_group_duration: "1d"
+        description: "ML predictions and forecasts"
+      oran_anomalies:
+        name: "oran-anomalies"
+        retention_policy: "30d"
+        shard_group_duration: "1d"
+        description: "Detected anomalies and alerts"
+      oran_analytics:
+        name: "oran-analytics"
+        retention_policy: "180d"
+        shard_group_duration: "1d"
+        description: "Analytics processing results"
+    
+    connection_pool:
+      max_idle_conns: 10
+      max_open_conns: 100
+      conn_max_lifetime: "5m"
+      conn_max_idle_time: "30s"
+    
+    write_options:
+      batch_size: 5000
+      flush_interval: "10s"
+      retry_interval: "5s"
+      max_retries: 3
+      exponential_base: 2
+
+  redis:
+    host: "redis-master"
+    port: 6379
+    database: 0
+    password: ""
+    connection_pool:
+      max_idle: 10
+      max_active: 100
+      idle_timeout: "240s"
+    cache_settings:
+      default_ttl: "5m"
+      max_key_length: 250
+      max_value_size: "10MB"
+
+# E2 Telemetry Processor Configuration
+e2_telemetry_processor:
+  server:
+    host: "0.0.0.0"
+    port: 8089
+    metrics_port: 9098
+    read_timeout: "30s"
+    write_timeout: "30s"
+    idle_timeout: "120s"
+    max_header_bytes: 8192
+
+  processing:
+    worker_count: 4
+    batch_size: 100
+    max_queue_size: 10000
+    processing_timeout: "30s"
+    correlation_timeout: "10m"
+    cleanup_interval: "5m"
+
+  ran_functions:
+    kpm:
+      id: 2
+      name: "Key Performance Measurement"
+      version: "1.0"
+      supported_measurements:
+        - "DL_PRB_USAGE"
+        - "UL_PRB_USAGE"
+        - "DL_TOTAL_PRB"
+        - "UL_TOTAL_PRB"
+        - "ACTIVE_UE_DL"
+        - "ACTIVE_UE_UL"
+      processing_rules:
+        - field: "DL_PRB_USAGE"
+          validation: "range(0, 100)"
+          transformation: "percentage"
+        - field: "UL_PRB_USAGE"
+          validation: "range(0, 100)"
+          transformation: "percentage"
+
+    rc:
+      id: 1
+      name: "RAN Control"
+      version: "1.0"
+      supported_measurements:
+        - "RIC_CONTROL_OUTCOME"
+        - "RIC_CONTROL_ACK"
+        - "RIC_CONTROL_FAILURE"
+      processing_rules:
+        - field: "RIC_CONTROL_OUTCOME"
+          validation: "not_null"
+          transformation: "string"
+
+    ni:
+      id: 3
+      name: "Network Interface"
+      version: "1.0"
+      supported_measurements:
+        - "NETWORK_SLICE_INFO"
+        - "QOS_FLOW_INFO"
+        - "BEARER_INFO"
+      processing_rules:
+        - field: "NETWORK_SLICE_INFO"
+          validation: "json_schema"
+          transformation: "json_parse"
+
+  correlation:
+    session_timeout: "10m"
+    cell_timeout: "30m"
+    ue_timeout: "5m"
+    slice_timeout: "1h"
+    max_concurrent_sessions: 10000
+    
+    context_enrichment:
+      enabled: true
+      geographical_data: true
+      network_topology: true
+      service_mapping: true
+      historical_context: true
+
+# Performance Analytics Engine Configuration
+performance_analytics:
+  server:
+    host: "0.0.0.0"
+    port: 8090
+    metrics_port: 9099
+    read_timeout: "60s"
+    write_timeout: "60s"
+    idle_timeout: "300s"
+
+  trend_analysis:
+    enabled: true
+    update_interval: "5m"
+    window_sizes:
+      - "1h"
+      - "6h"
+      - "24h"
+      - "7d"
+    min_data_points: 10
+    confidence_threshold: 0.95
+    
+    seasonal_detection:
+      enabled: true
+      daily_pattern: true
+      weekly_pattern: true
+      monthly_pattern: false
+      min_seasons: 3
+
+  anomaly_detection:
+    enabled: true
+    algorithms:
+      statistical:
+        enabled: true
+        z_score_threshold: 3.0
+        window_size: "1h"
+        min_samples: 30
+      
+      isolation_forest:
+        enabled: true
+        contamination: 0.1
+        n_estimators: 100
+        max_samples: 256
+        random_state: 42
+      
+      lstm:
+        enabled: false  # Requires GPU resources
+        sequence_length: 50
+        prediction_horizon: 10
+        threshold: 0.7
+      
+      threshold:
+        enabled: true
+        static_thresholds:
+          prb_utilization_dl: 90.0
+          throughput_dl_mbps: 1.0
+          latency_e2e_ms: 50.0
+          call_drop_rate: 5.0
+
+    response_actions:
+      immediate:
+        - "log_anomaly"
+        - "send_alert"
+        - "update_dashboard"
+      
+      delayed:
+        - "trigger_investigation"
+        - "schedule_maintenance"
+        - "update_models"
+
+  sla_monitoring:
+    enabled: true
+    check_interval: "1m"
+    violation_cooldown: "5m"
+    
+    definitions:
+      throughput_sla:
+        service: "mobile_broadband"
+        metric: "throughput_dl_mbps"
+        threshold_type: "min"
+        threshold_value: 25.0
+        time_window: "5m"
+        violation_level: "warning"
+        
+      latency_sla:
+        service: "urllc"
+        metric: "latency_e2e_ms"
+        threshold_type: "max"
+        threshold_value: 1.0
+        time_window: "1m"
+        violation_level: "critical"
+        
+      reliability_sla:
+        service: "voice"
+        metric: "call_drop_rate"
+        threshold_type: "max"
+        threshold_value: 1.0
+        time_window: "10m"
+        violation_level: "critical"
+
+  performance_tracking:
+    real_time_metrics:
+      enabled: true
+      update_interval: "10s"
+      history_length: 1000
+      
+    statistics_calculation:
+      enabled: true
+      calculation_interval: "1m"
+      percentiles: [50, 75, 90, 95, 99]
+      
+    quality_scoring:
+      enabled: true
+      scoring_interval: "5m"
+      weights:
+        stability: 0.3
+        performance: 0.4
+        trend: 0.3
+
+  correlation_analysis:
+    enabled: true
+    update_interval: "10m"
+    correlation_window: "2h"
+    min_correlation_strength: 0.5
+    max_correlations_per_metric: 10
+    
+    causal_analysis:
+      enabled: true
+      max_lag: "30m"
+      confidence_threshold: 0.8
+
+# Time Series Optimizer Configuration
+timeseries_optimizer:
+  server:
+    host: "0.0.0.0"
+    port: 8091
+    metrics_port: 9100
+    read_timeout: "30s"
+    write_timeout: "30s"
+    idle_timeout: "300s"
+
+  compression:
+    enabled: true
+    default_algorithm: "gzip"
+    
+    algorithms:
+      gzip:
+        level: 6
+        memory_level: 8
+      snappy:
+        enabled: true
+      lz4:
+        enabled: true
+        level: 1
+      zstd:
+        enabled: true
+        level: 3
+
+    policies:
+      measurement_based:
+        oran_kpis:
+          algorithm: "gzip"
+          level: 6
+          delay: "15m"
+          min_ratio: 0.3
+        oran_measurements:
+          algorithm: "lz4"
+          level: 4
+          delay: "5m"
+          min_ratio: 0.4
+      
+      age_based:
+        - min_age: "1h"
+          algorithm: "lz4"
+          level: 4
+        - min_age: "24h"
+          algorithm: "gzip"
+          level: 6
+        - min_age: "7d"
+          algorithm: "zstd"
+          level: 9
+
+  retention:
+    enabled: true
+    cleanup_interval: "1h"
+    
+    policies:
+      realtime:
+        pattern: "oran_.*"
+        retention: "24h"
+        downsample_rules:
+          - age: "15m"
+            resolution: "1m"
+            function: "mean"
+            keep_original: true
+        archive_after: "0s"  # No archiving
+        delete_after: "24h"
+      
+      shortterm:
+        pattern: "oran_.*"
+        retention: "7d"
+        downsample_rules:
+          - age: "1h"
+            resolution: "5m"
+            function: "mean"
+            keep_original: false
+        archive_after: "3d"
+        delete_after: "7d"
+      
+      longterm:
+        pattern: "oran_.*_aggregated"
+        retention: "90d"
+        downsample_rules:
+          - age: "24h"
+            resolution: "1h"
+            function: "mean"
+            keep_original: false
+          - age: "7d"
+            resolution: "24h"
+            function: "mean"
+            keep_original: false
+        archive_after: "30d"
+        delete_after: "90d"
+      
+      archive:
+        pattern: "oran_.*_daily"
+        retention: "365d"
+        downsample_rules:
+          - age: "30d"
+            resolution: "7d"
+            function: "mean"
+            keep_original: false
+        archive_after: "180d"
+        delete_after: "365d"
+
+  query_optimization:
+    enabled: true
+    
+    caching:
+      enabled: true
+      max_size: "1GB"
+      default_ttl: "5m"
+      eviction_policy: "LRU"
+      
+      patterns:
+        - pattern: "oran_kpis.*"
+          ttl: "2m"
+        - pattern: "oran_predictions.*"
+          ttl: "10m"
+        - pattern: "oran_analytics.*"
+          ttl: "15m"
+
+    indexing:
+      enabled: true
+      auto_create: true
+      index_threshold: 10000
+      max_indexes: 50
+      maintenance_schedule: "daily"
+      
+      indexes:
+        - measurement: "oran_kpis"
+          tags: ["source", "cell_id"]
+          fields: ["prb_utilization_dl", "throughput_dl_mbps"]
+        - measurement: "oran_measurements"
+          tags: ["source", "measurement_type"]
+          fields: ["value", "timestamp"]
+
+    parallelization:
+      enabled: true
+      max_workers: 4
+      queue_size: 1000
+      worker_timeout: "30s"
+
+  aggregation:
+    enabled: true
+    
+    rules:
+      hourly_kpis:
+        source: "oran_kpis"
+        target: "oran_kpis_hourly"
+        window: "1h"
+        schedule: "0 * * * *"  # Every hour
+        functions:
+          - source_field: "prb_utilization_dl"
+            target_field: "avg_prb_utilization_dl"
+            function: "mean"
+          - source_field: "prb_utilization_dl"
+            target_field: "max_prb_utilization_dl"
+            function: "max"
+          - source_field: "throughput_dl_mbps"
+            target_field: "avg_throughput_dl_mbps"
+            function: "mean"
+          - source_field: "throughput_dl_mbps"
+            target_field: "p95_throughput_dl_mbps"
+            function: "percentile"
+            parameters:
+              percentile: 95
+        group_by: ["source", "cell_id"]
+        
+      daily_kpis:
+        source: "oran_kpis_hourly"
+        target: "oran_kpis_daily"
+        window: "24h"
+        schedule: "0 1 * * *"  # Daily at 1 AM
+        functions:
+          - source_field: "avg_prb_utilization_dl"
+            target_field: "daily_avg_prb_utilization_dl"
+            function: "mean"
+          - source_field: "max_prb_utilization_dl"
+            target_field: "daily_max_prb_utilization_dl"
+            function: "max"
+          - source_field: "p95_throughput_dl_mbps"
+            target_field: "daily_p95_throughput_dl_mbps"
+            function: "mean"
+        group_by: ["source", "cell_id"]
+
+  downsampling:
+    enabled: true
+    
+    rules:
+      5min_downsample:
+        age: "15m"
+        resolution: "5m"
+        function: "mean"
+        keep_original: true
+        
+      1hour_downsample:
+        age: "6h"
+        resolution: "1h"
+        function: "mean"
+        keep_original: false
+        
+      1day_downsample:
+        age: "30d"
+        resolution: "1d"
+        function: "mean"
+        keep_original: false
+
+# KPI Definitions and Calculations
+kpi_definitions:
+  resource_utilization:
+    prb_utilization_dl:
+      formula: "(prb_used_dl / prb_available_dl) * 100"
+      unit: "percent"
+      thresholds:
+        warning: 70.0
+        critical: 90.0
+      description: "Downlink Physical Resource Block utilization"
+      
+    prb_utilization_ul:
+      formula: "(prb_used_ul / prb_available_ul) * 100"
+      unit: "percent"
+      thresholds:
+        warning: 60.0
+        critical: 85.0
+      description: "Uplink Physical Resource Block utilization"
+
+  throughput:
+    throughput_dl_mbps:
+      formula: "(mac_volume_dl_bytes * 8) / (measurement_interval * 1000000)"
+      unit: "Mbps"
+      thresholds:
+        warning: 10.0
+        critical: 5.0
+      description: "Downlink throughput in Megabits per second"
+      
+    throughput_ul_mbps:
+      formula: "(mac_volume_ul_bytes * 8) / (measurement_interval * 1000000)"
+      unit: "Mbps"
+      thresholds:
+        warning: 5.0
+        critical: 2.0
+      description: "Uplink throughput in Megabits per second"
+
+  quality:
+    rsrp:
+      formula: "rsrp_value"
+      unit: "dBm"
+      thresholds:
+        excellent: -70.0
+        good: -85.0
+        fair: -100.0
+        poor: -110.0
+      description: "Reference Signal Received Power"
+      
+    rsrq:
+      formula: "rsrq_value"
+      unit: "dB"
+      thresholds:
+        excellent: -10.0
+        good: -15.0
+        fair: -20.0
+      description: "Reference Signal Received Quality"
+      
+    cqi:
+      formula: "cqi_value"
+      unit: "index"
+      thresholds:
+        excellent: 12
+        good: 8
+        fair: 4
+      description: "Channel Quality Indicator"
+
+  efficiency:
+    energy_efficiency:
+      formula: "throughput_total_mbps / power_consumption_watts"
+      unit: "Mbps/W"
+      thresholds:
+        target: 2.0
+        minimum: 1.0
+      description: "Energy efficiency in Mbps per Watt"
+      
+    spectral_efficiency:
+      formula: "throughput_total_mbps / bandwidth_mhz"
+      unit: "bps/Hz"
+      thresholds:
+        target: 4.0
+        minimum: 2.0
+      description: "Spectral efficiency in bits per second per Hz"
+
+  connection:
+    active_users:
+      formula: "count_active_ues"
+      unit: "users"
+      description: "Number of active user equipments"
+      
+    handover_rate:
+      formula: "(handovers_attempted / active_users) * 100"
+      unit: "percent"
+      thresholds:
+        warning: 10.0
+        critical: 20.0
+      description: "Handover rate percentage"
+      
+    call_drop_rate:
+      formula: "(calls_dropped / calls_attempted) * 100"
+      unit: "percent"
+      thresholds:
+        warning: 2.0
+        critical: 5.0
+      description: "Call drop rate percentage"
+
+  latency:
+    latency_e2e_ms:
+      formula: "end_to_end_latency_microseconds / 1000"
+      unit: "ms"
+      thresholds:
+        excellent: 1.0
+        good: 10.0
+        acceptable: 50.0
+      description: "End-to-end latency in milliseconds"
+      
+    latency_ran_ms:
+      formula: "ran_latency_microseconds / 1000"
+      unit: "ms"
+      thresholds:
+        excellent: 0.5
+        good: 2.0
+        acceptable: 10.0
+      description: "RAN latency in milliseconds"
+
+# ML Model Configuration
+ml_models:
+  load_prediction:
+    enabled: true
+    type: "ensemble"
+    models:
+      - type: "moving_average"
+        weight: 0.3
+        parameters:
+          window_size: 10
+          trend_threshold: 0.1
+      - type: "linear_regression"
+        weight: 0.4
+        parameters:
+          feature_window: 24
+          regularization: 0.01
+      - type: "random_forest"
+        weight: 0.3
+        parameters:
+          n_estimators: 100
+          max_depth: 10
+    
+    features:
+      - "prb_utilization_dl"
+      - "prb_utilization_ul"
+      - "active_users"
+      - "hour_of_day"
+      - "day_of_week"
+    
+    horizons:
+      - "15m"
+      - "1h"
+      - "4h"
+    
+    training:
+      data_window: "30d"
+      retrain_interval: "6h"
+      min_samples: 1000
+      validation_split: 0.2
+
+  quality_prediction:
+    enabled: true
+    type: "linear_regression"
+    features:
+      - "rsrp"
+      - "rsrq"
+      - "sinr"
+      - "cqi"
+      - "interference_level"
+    
+    coefficients:
+      rsrp: 0.3
+      rsrq: 0.25
+      sinr: 0.35
+      cqi: 0.1
+    
+    training:
+      retrain_interval: "12h"
+      min_samples: 500
+      validation_split: 0.2
+
+  anomaly_detection:
+    enabled: true
+    ensemble:
+      - type: "isolation_forest"
+        weight: 0.4
+        parameters:
+          contamination: 0.1
+          n_estimators: 100
+      - type: "one_class_svm"
+        weight: 0.3
+        parameters:
+          kernel: "rbf"
+          gamma: "scale"
+      - type: "local_outlier_factor"
+        weight: 0.3
+        parameters:
+          n_neighbors: 20
+    
+    features:
+      - "prb_utilization_dl"
+      - "throughput_dl_mbps"
+      - "energy_efficiency"
+      - "latency_e2e_ms"
+      - "call_drop_rate"
+    
+    training:
+      retrain_interval: "4h"
+      min_samples: 2000
+
+# Alert Configuration
+alerting:
+  enabled: true
+  
+  channels:
+    webhook:
+      enabled: true
+      url: "http://alertmanager:9093/api/v1/alerts"
+      timeout: "10s"
+      retry_count: 3
+      
+    email:
+      enabled: false
+      smtp_server: "smtp.company.com:587"
+      username: "alerts@company.com"
+      
+    slack:
+      enabled: false
+      webhook_url: "https://hooks.slack.com/services/..."
+      channel: "#oran-alerts"
+
+  rules:
+    network_health:
+      enabled: true
+      conditions:
+        - metric: "oran_network_health_score"
+          operator: "<"
+          threshold: 50
+          duration: "5m"
+          severity: "critical"
+        - metric: "oran_network_health_score"
+          operator: "<"
+          threshold: 75
+          duration: "10m"
+          severity: "warning"
+
+    performance:
+      enabled: true
+      conditions:
+        - metric: "prb_utilization_dl"
+          operator: ">"
+          threshold: 95
+          duration: "5m"
+          severity: "critical"
+        - metric: "throughput_dl_mbps"
+          operator: "<"
+          threshold: 10
+          duration: "10m"
+          severity: "warning"
+
+    quality:
+      enabled: true
+      conditions:
+        - metric: "call_drop_rate"
+          operator: ">"
+          threshold: 5
+          duration: "5m"
+          severity: "critical"
+        - metric: "rsrp"
+          operator: "<"
+          threshold: -110
+          duration: "15m"
+          severity: "warning"
+
+# Security Configuration
+security:
+  authentication:
+    enabled: true
+    method: "jwt"
+    secret: "${JWT_SECRET}"
+    expiry: "24h"
+    
+  authorization:
+    enabled: true
+    rbac:
+      enabled: true
+      roles:
+        admin:
+          permissions: ["read", "write", "delete", "admin"]
+        operator:
+          permissions: ["read", "write"]
+        viewer:
+          permissions: ["read"]
+
+  encryption:
+    tls:
+      enabled: true
+      cert_file: "/certs/tls.crt"
+      key_file: "/certs/tls.key"
+      
+    data_at_rest:
+      enabled: true
+      algorithm: "AES-256-GCM"
+      
+  audit:
+    enabled: true
+    log_level: "info"
+    retention: "90d"
+    include_request_body: false
+    exclude_health_checks: true
+
+# Observability Configuration
+observability:
+  metrics:
+    enabled: true
+    port: 9090
+    path: "/metrics"
+    include_go_metrics: false
+    include_process_metrics: false
+    
+  logging:
+    level: "info"
+    format: "json"
+    output: "stdout"
+    
+    structured_logging:
+      enabled: true
+      include_caller: true
+      include_stack_trace: false
+      
+  tracing:
+    enabled: true
+    service_name: "oran-analytics"
+    jaeger:
+      endpoint: "http://jaeger-collector:14268/api/traces"
+      sampler:
+        type: "probabilistic"
+        param: 0.1
+
+# Resource Limits
+resources:
+  e2_telemetry_processor:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+      
+  performance_analytics:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+      
+  timeseries_optimizer:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"

@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cu-up
+  namespace: oran-network-functions
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cu-up
+  template:
+    metadata:
+      labels:
+        app: cu-up
+    spec:
+      containers:
+      - name: cu-up
+        image: oaisoftwarealliance/oai-cu-up:latest
+        resources:
+          requests:
+            cpu: 2
+            memory: 4Gi
+          limits:
+            cpu: 4
+            memory: 8Gi
+        env:
+        - name: CU_UP_ID
+          value: "1"
+        - name: MCC
+          value: "001"
+        - name: MNC
+          value: "01"
+        ports:
+        - containerPort: 38472  # F1 interface
+        - containerPort: 2152   # GTP-U

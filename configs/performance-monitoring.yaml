@@ -1,0 +1,477 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: performance-tuning-config
+  namespace: oran-network-functions
+  labels:
+    component: performance-optimization
+data:
+  cpu_tuning.sh: |
+    #!/bin/bash
+    # CPU Performance Tuning for CU/DU
+    
+    # CPU Isolation and Affinity
+    echo "Configuring CPU isolation for real-time processing..."
+    
+    # Isolate CPUs for CU-CP (CPUs 2-3)
+    if [ "$COMPONENT" = "cu-cp" ]; then
+      echo "2-3" > /sys/fs/cgroup/cpuset/cpuset.cpus
+      taskset -c 2-3 $(pidof nr-softmodem)
+    fi
+    
+    # Isolate CPUs for CU-UP (CPUs 4-7)
+    if [ "$COMPONENT" = "cu-up" ]; then
+      echo "4-7" > /sys/fs/cgroup/cpuset/cpuset.cpus
+      taskset -c 4-7 $(pidof nr-softmodem)
+    fi
+    
+    # Isolate CPUs for DU (CPUs 8-15)
+    if [ "$COMPONENT" = "du" ]; then
+      echo "8-15" > /sys/fs/cgroup/cpuset/cpuset.cpus
+      taskset -c 8-15 $(pidof nr-softmodem)
+    fi
+    
+    # Set CPU governor to performance
+    for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+      if [ -f "$cpu" ]; then
+        echo performance > "$cpu"
+      fi
+    done
+    
+    # Disable CPU frequency scaling
+    echo 1 > /sys/devices/system/cpu/intel_pstate/disable
+    
+    # Set real-time priority
+    chrt -f 99 $(pidof nr-softmodem)
+    
+    # Configure interrupt affinity
+    for irq in $(grep eth /proc/interrupts | cut -d: -f1); do
+      echo 1 > /proc/irq/$irq/smp_affinity
+    done
+    
+  memory_tuning.sh: |
+    #!/bin/bash
+    # Memory Performance Tuning
+    
+    echo "Configuring memory optimization..."
+    
+    # Configure hugepages
+    echo 1024 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+    echo 512 > /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages
+    
+    # Mount hugepage filesystem
+    mkdir -p /dev/hugepages
+    mount -t hugetlbfs nodev /dev/hugepages
+    
+    # Configure NUMA policy
+    echo 1 > /proc/sys/kernel/numa_balancing
+    
+    # Set swappiness
+    echo 10 > /proc/sys/vm/swappiness
+    
+    # Configure dirty pages
+    echo 15 > /proc/sys/vm/dirty_background_ratio
+    echo 20 > /proc/sys/vm/dirty_ratio
+    
+  network_tuning.sh: |
+    #!/bin/bash
+    # Network Performance Tuning
+    
+    echo "Configuring network optimization..."
+    
+    # Increase network buffer sizes
+    echo 16777216 > /proc/sys/net/core/rmem_max
+    echo 16777216 > /proc/sys/net/core/wmem_max
+    echo 16777216 > /proc/sys/net/core/rmem_default
+    echo 16777216 > /proc/sys/net/core/wmem_default
+    
+    # TCP tuning
+    echo "4096 65536 16777216" > /proc/sys/net/ipv4/tcp_rmem
+    echo "4096 65536 16777216" > /proc/sys/net/ipv4/tcp_wmem
+    
+    # UDP tuning  
+    echo 16777216 > /proc/sys/net/core/netdev_max_backlog
+    echo 30000 > /proc/sys/net/core/netdev_budget
+    
+    # Configure interface ring buffers
+    for iface in $(ls /sys/class/net/ | grep -E '^eth|^ens'); do
+      if [ -d "/sys/class/net/$iface" ]; then
+        ethtool -G "$iface" rx 4096 tx 4096 2>/dev/null || true
+        ethtool -C "$iface" rx-usecs 50 tx-usecs 50 2>/dev/null || true
+        ethtool -K "$iface" gro on lro on tso on gso on 2>/dev/null || true
+      fi
+    done
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-config
+  namespace: oran-network-functions
+  labels:
+    component: monitoring
+data:
+  prometheus-rules.yaml: |
+    groups:
+    - name: cu_du_performance_rules
+      interval: 30s
+      rules:
+      # CU-CP Performance Rules
+      - alert: CUCPHighCPUUsage
+        expr: rate(cpu_usage_seconds_total{job="cu-cp"}[5m]) > 0.8
+        for: 2m
+        labels:
+          severity: warning
+          component: cu-cp
+        annotations:
+          summary: "CU-CP high CPU usage"
+          description: "CU-CP CPU usage is above 80% for 2 minutes"
+          
+      - alert: CUCPHighMemoryUsage
+        expr: memory_usage_bytes{job="cu-cp"} / memory_limit_bytes{job="cu-cp"} > 0.9
+        for: 2m
+        labels:
+          severity: critical
+          component: cu-cp
+        annotations:
+          summary: "CU-CP high memory usage"
+          description: "CU-CP memory usage is above 90%"
+          
+      - alert: F1ConnectionFailure
+        expr: f1_connection_status{job="cu-cp"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          component: f1-interface
+        annotations:
+          summary: "F1 connection failure"
+          description: "F1 connection between CU-CP and DU is down"
+          
+      - alert: E1ConnectionFailure
+        expr: e1_connection_status{job="cu-cp"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          component: e1-interface
+        annotations:
+          summary: "E1 connection failure"
+          description: "E1 connection between CU-CP and CU-UP is down"
+          
+      # CU-UP Performance Rules
+      - alert: CUUPHighCPUUsage
+        expr: rate(cpu_usage_seconds_total{job="cu-up"}[5m]) > 0.8
+        for: 2m
+        labels:
+          severity: warning
+          component: cu-up
+        annotations:
+          summary: "CU-UP high CPU usage"
+          description: "CU-UP CPU usage is above 80% for 2 minutes"
+          
+      - alert: CUUPHighThroughput
+        expr: rate(gtpu_bytes_total{job="cu-up"}[5m]) > 1e9  # 1 Gbps
+        for: 5m
+        labels:
+          severity: info
+          component: cu-up
+        annotations:
+          summary: "CU-UP high throughput"
+          description: "CU-UP throughput is above 1 Gbps"
+          
+      - alert: CUUPPacketLoss
+        expr: rate(gtpu_packet_drops_total{job="cu-up"}[5m]) / rate(gtpu_packets_total{job="cu-up"}[5m]) > 0.01
+        for: 1m
+        labels:
+          severity: warning
+          component: cu-up
+        annotations:
+          summary: "CU-UP packet loss"
+          description: "CU-UP packet loss rate is above 1%"
+          
+      # DU Performance Rules
+      - alert: DUHighCPUUsage
+        expr: rate(cpu_usage_seconds_total{job="du"}[5m]) > 0.85
+        for: 2m
+        labels:
+          severity: warning
+          component: du
+        annotations:
+          summary: "DU high CPU usage"
+          description: "DU CPU usage is above 85% for 2 minutes"
+          
+      - alert: DUHighPRBUtilization
+        expr: prb_utilization_ratio{job="du"} > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: du
+        annotations:
+          summary: "DU high PRB utilization"
+          description: "DU PRB utilization is above 90%"
+          
+      - alert: DUHighBlockErrorRate
+        expr: rate(tb_error_total{job="du"}[5m]) / rate(tb_total{job="du"}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          component: du
+        annotations:
+          summary: "DU high block error rate"
+          description: "DU block error rate is above 10%"
+          
+      - alert: CellOutage
+        expr: cell_availability_status{job="du"} == 0
+        for: 10s
+        labels:
+          severity: critical
+          component: du
+        annotations:
+          summary: "Cell outage detected"
+          description: "Cell {{ $labels.cell_id }} is not available"
+          
+      # E2 Interface Rules
+      - alert: E2ConnectionFailure
+        expr: e2_connection_status == 0
+        for: 30s
+        labels:
+          severity: critical
+          component: e2-interface
+        annotations:
+          summary: "E2 connection failure"
+          description: "E2 connection to Near-RT RIC is down"
+          
+      - alert: E2SubscriptionFailure
+        expr: increase(e2_subscription_failures_total[5m]) > 5
+        for: 1m
+        labels:
+          severity: warning
+          component: e2-interface
+        annotations:
+          summary: "E2 subscription failures"
+          description: "E2 subscription failure rate is above threshold"
+          
+      - alert: E2HighLatency
+        expr: e2_indication_latency_seconds > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          component: e2-interface
+        annotations:
+          summary: "High E2 indication latency"
+          description: "E2 indication latency is above 100ms"
+
+  grafana-dashboard.json: |
+    {
+      "dashboard": {
+        "title": "O-RAN CU/DU Performance Dashboard",
+        "tags": ["o-ran", "cu", "du", "performance"],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s",
+        "panels": [
+          {
+            "title": "CU-CP CPU Usage",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "rate(cpu_usage_seconds_total{job=\"cu-cp\"}[5m]) * 100"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percent",
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": 0},
+                    {"color": "yellow", "value": 70},
+                    {"color": "red", "value": 90}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "title": "CU-UP Throughput",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(gtpu_bytes_total{job=\"cu-up\"}[5m]) * 8"
+              }
+            ],
+            "yAxes": [
+              {
+                "unit": "bps",
+                "logBase": 2
+              }
+            ]
+          },
+          {
+            "title": "DU PRB Utilization",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "prb_utilization_ratio{job=\"du\"} * 100"
+              }
+            ],
+            "yAxes": [
+              {
+                "unit": "percent",
+                "min": 0,
+                "max": 100
+              }
+            ]
+          },
+          {
+            "title": "Interface Status",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "f1_connection_status"
+              },
+              {
+                "expr": "e1_connection_status"
+              },
+              {
+                "expr": "e2_connection_status"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "mappings": [
+                  {"options": {"0": {"text": "DOWN"}}, "type": "value"},
+                  {"options": {"1": {"text": "UP"}}, "type": "value"}
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: performance-metrics-config
+  namespace: oran-network-functions
+  labels:
+    component: metrics
+data:
+  metrics.yaml: |
+    # Performance Metrics Configuration
+    metrics:
+      # CPU Metrics
+      cpu_metrics:
+        - name: "cpu_usage_seconds_total"
+          help: "Total CPU time consumed"
+          type: "counter"
+          labels: ["cpu", "mode"]
+          
+        - name: "cpu_frequency_hertz"
+          help: "Current CPU frequency"
+          type: "gauge"
+          labels: ["cpu"]
+          
+      # Memory Metrics
+      memory_metrics:
+        - name: "memory_usage_bytes"
+          help: "Current memory usage"
+          type: "gauge"
+          labels: ["type"]
+          
+        - name: "memory_limit_bytes"
+          help: "Memory limit"
+          type: "gauge"
+          
+      # Network Metrics
+      network_metrics:
+        - name: "network_bytes_total"
+          help: "Total network bytes"
+          type: "counter"
+          labels: ["device", "direction"]
+          
+        - name: "network_packets_total"
+          help: "Total network packets"
+          type: "counter"
+          labels: ["device", "direction"]
+          
+        - name: "network_errors_total"
+          help: "Total network errors"
+          type: "counter"
+          labels: ["device", "direction"]
+          
+      # CU-CP Metrics
+      cu_cp_metrics:
+        - name: "rrc_connections_total"
+          help: "Total RRC connections"
+          type: "gauge"
+          labels: ["state"]
+          
+        - name: "f1_messages_total"
+          help: "Total F1 messages"
+          type: "counter"
+          labels: ["type", "direction"]
+          
+        - name: "e1_messages_total"
+          help: "Total E1 messages"
+          type: "counter"
+          labels: ["type", "direction"]
+          
+      # CU-UP Metrics
+      cu_up_metrics:
+        - name: "gtpu_packets_total"
+          help: "Total GTP-U packets"
+          type: "counter"
+          labels: ["direction"]
+          
+        - name: "gtpu_bytes_total"
+          help: "Total GTP-U bytes"
+          type: "counter"
+          labels: ["direction"]
+          
+        - name: "bearer_contexts_active"
+          help: "Active bearer contexts"
+          type: "gauge"
+          
+      # DU Metrics
+      du_metrics:
+        - name: "prb_utilization_ratio"
+          help: "PRB utilization ratio"
+          type: "gauge"
+          labels: ["direction", "cell_id"]
+          
+        - name: "tb_total"
+          help: "Total transport blocks"
+          type: "counter"
+          labels: ["direction", "cell_id"]
+          
+        - name: "tb_error_total"
+          help: "Total transport block errors"
+          type: "counter"
+          labels: ["direction", "cell_id"]
+          
+        - name: "mcs_index"
+          help: "Current MCS index"
+          type: "gauge"
+          labels: ["direction", "cell_id"]
+          
+      # E2 Metrics
+      e2_metrics:
+        - name: "e2_subscriptions_active"
+          help: "Active E2 subscriptions"
+          type: "gauge"
+          
+        - name: "e2_indications_total"
+          help: "Total E2 indications sent"
+          type: "counter"
+          labels: ["service_model"]
+          
+        - name: "e2_indication_latency_seconds"
+          help: "E2 indication latency"
+          type: "histogram"
+          
+        - name: "e2_connection_status"
+          help: "E2 connection status"
+          type: "gauge"

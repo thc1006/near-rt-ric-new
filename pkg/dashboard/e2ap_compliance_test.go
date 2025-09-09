@@ -52,36 +52,6 @@ func NewE2APComplianceTest(runner *ComplianceTestRunner) *E2APComplianceTest {
 	}
 }
 
-// runE2APTest executes E2AP compliance tests
-func (r *ComplianceTestRunner) runE2APTest(ctx context.Context, test ComplianceTest) TestResult {
-	e2apTest := NewE2APComplianceTest(r)
-	
-	switch test.ID {
-	case "e2ap-001":
-		return e2apTest.testE2SetupProcedure(ctx, test)
-	case "e2ap-002":
-		return e2apTest.testASN1Encoding(ctx, test)
-	case "e2ap-003":
-		return e2apTest.testSCTPTransport(ctx, test)
-	case "e2ap-004":
-		return e2apTest.testServiceModelSupport(ctx, test)
-	case "e2ap-005":
-		return e2apTest.testSubscriptionProcedures(ctx, test)
-	case "e2ap-006":
-		return e2apTest.testControlProcedures(ctx, test)
-	case "e2ap-007":
-		return e2apTest.testErrorHandling(ctx, test)
-	case "e2ap-008":
-		return e2apTest.testMessageValidation(ctx, test)
-	default:
-		return TestResult{
-			TestID:  test.ID,
-			Status:  StatusError,
-			Message: fmt.Sprintf("Unknown E2AP test: %s", test.ID),
-		}
-	}
-}
-
 // testE2SetupProcedure validates E2 Setup procedure compliance
 func (t *E2APComplianceTest) testE2SetupProcedure(ctx context.Context, test ComplianceTest) TestResult {
 	result := TestResult{
@@ -105,7 +75,7 @@ func (t *E2APComplianceTest) testE2SetupProcedure(ctx context.Context, test Comp
 		result.Evidence = append(result.Evidence, Evidence{
 			Type:        "encoding_validation",
 			Description: "ASN.1 PER encoding validation failed",
-			Data:        hex.EncodeToString(setupRequest[:min(len(setupRequest), 100)]),
+			Data:        hex.EncodeToString(setupRequest[:minInt(len(setupRequest), 100)]),
 			Timestamp:   time.Now(),
 		})
 		return result
@@ -164,7 +134,7 @@ func (t *E2APComplianceTest) testASN1Encoding(ctx context.Context, test Complian
 			result.Evidence = append(result.Evidence, Evidence{
 				Type:        "encoding_failure",
 				Description: fmt.Sprintf("ASN.1 PER validation failed for %s", msg.name),
-				Data:        hex.EncodeToString(msg.data[:min(len(msg.data), 50)]),
+				Data:        hex.EncodeToString(msg.data[:minInt(len(msg.data), 50)]),
 				Timestamp:   time.Now(),
 			})
 		} else {
@@ -582,11 +552,4 @@ func loadE2APTestData() *E2APTestData {
 			},
 		},
 	}
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

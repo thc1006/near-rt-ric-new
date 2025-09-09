@@ -8,7 +8,6 @@ package dashboard
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -354,7 +353,7 @@ func (ah *AuthHandlers) GetPermissionsHandler(w http.ResponseWriter, r *http.Req
 func (ah *AuthHandlers) GetAuditEventsHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters
 	query := r.URL.Query()
-	
+
 	filter := &AuditEventFilter{}
 	if eventType := query.Get("eventType"); eventType != "" {
 		filter.EventType = eventType

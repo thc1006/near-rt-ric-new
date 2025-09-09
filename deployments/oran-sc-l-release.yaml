@@ -1,0 +1,860 @@
+# O-RAN SC L Release Near-RT RIC Deployment
+# Following official O-RAN SC deployment standards
+# This configuration deploys the complete Near-RT RIC platform
+
+---
+# Namespace for RIC Platform
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ricplt
+  labels:
+    name: ricplt
+    oran.org/component: platform
+    oran.org/release: l-release
+---
+# Namespace for xApps
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ricxapp
+  labels:
+    name: ricxapp
+    oran.org/component: xapp
+    oran.org/release: l-release
+---
+# Service Account for O-RAN SC Platform
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: oran-sc-platform
+  namespace: ricplt
+  labels:
+    app: oran-sc-platform
+---
+# RBAC for O-RAN SC Platform
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: oran-sc-platform-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "events", "configmaps", "secrets", "nodes"]
+  verbs: ["*"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "daemonsets", "replicasets", "statefulsets"]
+  verbs: ["*"]
+- apiGroups: ["extensions", "networking.k8s.io"]
+  resources: ["ingresses", "networkpolicies"]
+  verbs: ["*"]
+- apiGroups: ["monitoring.coreos.com"]
+  resources: ["servicemonitors"]
+  verbs: ["get", "create"]
+- apiGroups: ["policy"]
+  resources: ["poddisruptionbudgets"]
+  verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: oran-sc-platform-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: oran-sc-platform-role
+subjects:
+- kind: ServiceAccount
+  name: oran-sc-platform
+  namespace: ricplt
+---
+# ConfigMap for RIC Platform Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ric-platform-config
+  namespace: ricplt
+  labels:
+    app: ric-platform
+data:
+  ricplt.conf: |
+    # O-RAN SC L Release Configuration
+    [DEFAULT]
+    log_level = INFO
+    debug = false
+    
+    [e2term]
+    host = service-ricplt-e2term-sctp-alpha
+    port = 38000
+    
+    [rtmgr]
+    host = service-ricplt-rtmgr-http
+    port = 3800
+    
+    [submgr] 
+    host = service-ricplt-submgr-http
+    port = 3800
+    
+    [e2mgr]
+    host = service-ricplt-e2mgr-http
+    port = 3800
+    
+    [dbaas]
+    host = service-ricplt-dbaas-tcp
+    port = 6379
+    
+    [messagerouter]
+    host = service-ricplt-messagerouter-http
+    port = 3904
+---
+# Database (Redis) for O-RAN SC
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ricplt-dbaas
+  namespace: ricplt
+  labels:
+    app: ricplt-dbaas
+    release: oran-sc-l-release
+spec:
+  serviceName: service-ricplt-dbaas-tcp
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ricplt-dbaas
+  template:
+    metadata:
+      labels:
+        app: ricplt-dbaas
+        release: oran-sc-l-release
+    spec:
+      serviceAccountName: oran-sc-platform
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+      containers:
+      - name: dbaas
+        image: redis:6.2-alpine
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 6379
+          name: redis
+        command:
+        - redis-server
+        - --appendonly
+        - "yes"
+        - --save
+        - "900 1"
+        - --save
+        - "300 10"
+        - --save
+        - "60 10000"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: dbaas-storage
+          mountPath: /data
+        livenessProbe:
+          tcpSocket:
+            port: 6379
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+  volumeClaimTemplates:
+  - metadata:
+      name: dbaas-storage
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: "local-path"
+      resources:
+        requests:
+          storage: 1Gi
+---
+# Service for Database
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-ricplt-dbaas-tcp
+  namespace: ricplt
+  labels:
+    app: ricplt-dbaas
+spec:
+  type: ClusterIP
+  ports:
+  - port: 6379
+    targetPort: 6379
+    protocol: TCP
+    name: redis
+  selector:
+    app: ricplt-dbaas
+---
+# E2 Termination
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ricplt-e2term
+  namespace: ricplt
+  labels:
+    app: ricplt-e2term
+    release: oran-sc-l-release
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ricplt-e2term
+  template:
+    metadata:
+      labels:
+        app: ricplt-e2term
+        release: oran-sc-l-release
+      annotations:
+        k8s.v1.cni.cncf.io/networks: ricplt/e2-network
+    spec:
+      serviceAccountName: oran-sc-platform
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: e2term
+        image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-plt-e2:6.0.0
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+        ports:
+        - containerPort: 38000
+          name: rmr-data
+          protocol: TCP
+        - containerPort: 38001
+          name: rmr-route
+          protocol: TCP
+        - containerPort: 36421
+          name: sctp-alpha
+          protocol: SCTP
+        - containerPort: 36422
+          name: sctp-beta
+          protocol: SCTP
+        env:
+        - name: RMR_RTG_SVC
+          value: "4561"
+        - name: RMR_SEED_RT
+          value: "/opt/e2/router.txt"
+        - name: DBAAS_SERVICE_HOST
+          value: "service-ricplt-dbaas-tcp"
+        - name: DBAAS_SERVICE_PORT
+          value: "6379"
+        - name: SCTP_PORT
+          value: "36421"
+        - name: LOG_LEVEL
+          value: "INFO"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: config-volume
+          mountPath: /opt/e2/config
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      volumes:
+      - name: config-volume
+        configMap:
+          name: ric-platform-config
+      - name: tmp
+        emptyDir: {}
+---
+# Service for E2 Termination
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-ricplt-e2term-sctp-alpha
+  namespace: ricplt
+  labels:
+    app: ricplt-e2term
+spec:
+  type: ClusterIP
+  ports:
+  - port: 38000
+    targetPort: 38000
+    protocol: TCP
+    name: rmr-data
+  - port: 38001
+    targetPort: 38001
+    protocol: TCP
+    name: rmr-route
+  - port: 36421
+    targetPort: 36421
+    protocol: SCTP
+    name: sctp-alpha
+  selector:
+    app: ricplt-e2term
+---
+# Service for E2 Termination SCTP (NodePort for external access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-ricplt-e2term-sctp-nodeport
+  namespace: ricplt
+  labels:
+    app: ricplt-e2term
+spec:
+  type: NodePort
+  ports:
+  - port: 36421
+    targetPort: 36421
+    protocol: SCTP
+    name: sctp-alpha
+    nodePort: 36421
+  selector:
+    app: ricplt-e2term
+---
+# E2 Manager
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ricplt-e2mgr
+  namespace: ricplt
+  labels:
+    app: ricplt-e2mgr
+    release: oran-sc-l-release
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ricplt-e2mgr
+  template:
+    metadata:
+      labels:
+        app: ricplt-e2mgr
+        release: oran-sc-l-release
+    spec:
+      serviceAccountName: oran-sc-platform
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: e2mgr
+        image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-plt-e2mgr:5.4.13
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+        ports:
+        - containerPort: 3800
+          name: http
+        - containerPort: 38000
+          name: rmr-data
+        - containerPort: 38001
+          name: rmr-route
+        env:
+        - name: RMR_RTG_SVC
+          value: "4561"
+        - name: RMR_SEED_RT
+          value: "/opt/e2mgr/router.txt"
+        - name: DBAAS_SERVICE_HOST
+          value: "service-ricplt-dbaas-tcp"
+        - name: DBAAS_SERVICE_PORT
+          value: "6379"
+        - name: LOG_LEVEL
+          value: "INFO"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: config-volume
+          mountPath: /opt/e2mgr/config
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3800
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3800
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      volumes:
+      - name: config-volume
+        configMap:
+          name: ric-platform-config
+      - name: tmp
+        emptyDir: {}
+---
+# Service for E2 Manager
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-ricplt-e2mgr-http
+  namespace: ricplt
+  labels:
+    app: ricplt-e2mgr
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3800
+    targetPort: 3800
+    protocol: TCP
+    name: http
+  - port: 38000
+    targetPort: 38000
+    protocol: TCP
+    name: rmr-data
+  selector:
+    app: ricplt-e2mgr
+---
+# Subscription Manager
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ricplt-submgr
+  namespace: ricplt
+  labels:
+    app: ricplt-submgr
+    release: oran-sc-l-release
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ricplt-submgr
+  template:
+    metadata:
+      labels:
+        app: ricplt-submgr
+        release: oran-sc-l-release
+    spec:
+      serviceAccountName: oran-sc-platform
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: submgr
+        image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-plt-submgr:0.5.4
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+        ports:
+        - containerPort: 3800
+          name: http
+        - containerPort: 38000
+          name: rmr-data
+        - containerPort: 38001
+          name: rmr-route
+        env:
+        - name: RMR_RTG_SVC
+          value: "4561"
+        - name: RMR_SEED_RT
+          value: "/opt/submgr/router.txt"
+        - name: DBAAS_SERVICE_HOST
+          value: "service-ricplt-dbaas-tcp"
+        - name: DBAAS_SERVICE_PORT
+          value: "6379"
+        - name: LOG_LEVEL
+          value: "INFO"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: config-volume
+          mountPath: /opt/submgr/config
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3800
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3800
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      volumes:
+      - name: config-volume
+        configMap:
+          name: ric-platform-config
+      - name: tmp
+        emptyDir: {}
+---
+# Service for Subscription Manager
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-ricplt-submgr-http
+  namespace: ricplt
+  labels:
+    app: ricplt-submgr
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3800
+    targetPort: 3800
+    protocol: TCP
+    name: http
+  - port: 38000
+    targetPort: 38000
+    protocol: TCP
+    name: rmr-data
+  selector:
+    app: ricplt-submgr
+---
+# Routing Manager
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ricplt-rtmgr
+  namespace: ricplt
+  labels:
+    app: ricplt-rtmgr
+    release: oran-sc-l-release
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ricplt-rtmgr
+  template:
+    metadata:
+      labels:
+        app: ricplt-rtmgr
+        release: oran-sc-l-release
+    spec:
+      serviceAccountName: oran-sc-platform
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: rtmgr
+        image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-plt-rtmgr:0.8.0
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+        ports:
+        - containerPort: 3800
+          name: http
+        - containerPort: 4561
+          name: rtg
+        - containerPort: 38000
+          name: rmr-data
+        - containerPort: 38001
+          name: rmr-route
+        env:
+        - name: RMR_RTG_SVC
+          value: "4561"
+        - name: RMR_SEED_RT
+          value: "/opt/rtmgr/router.txt"
+        - name: DBAAS_SERVICE_HOST
+          value: "service-ricplt-dbaas-tcp"
+        - name: DBAAS_SERVICE_PORT
+          value: "6379"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: KUBE_NAMESPACE
+          value: "ricplt"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: config-volume
+          mountPath: /opt/rtmgr/config
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3800
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3800
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      volumes:
+      - name: config-volume
+        configMap:
+          name: ric-platform-config
+      - name: tmp
+        emptyDir: {}
+---
+# Service for Routing Manager
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-ricplt-rtmgr-http
+  namespace: ricplt
+  labels:
+    app: ricplt-rtmgr
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3800
+    targetPort: 3800
+    protocol: TCP
+    name: http
+  - port: 4561
+    targetPort: 4561
+    protocol: TCP
+    name: rtg
+  - port: 38000
+    targetPort: 38000
+    protocol: TCP
+    name: rmr-data
+  selector:
+    app: ricplt-rtmgr
+---
+# A1 Mediator
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ricplt-a1mediator
+  namespace: ricplt
+  labels:
+    app: ricplt-a1mediator
+    release: oran-sc-l-release
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ricplt-a1mediator
+  template:
+    metadata:
+      labels:
+        app: ricplt-a1mediator
+        release: oran-sc-l-release
+    spec:
+      serviceAccountName: oran-sc-platform
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: a1mediator
+        image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-plt-a1:2.10.4
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+        ports:
+        - containerPort: 10000
+          name: http
+        - containerPort: 38000
+          name: rmr-data
+        - containerPort: 38001
+          name: rmr-route
+        env:
+        - name: RMR_RTG_SVC
+          value: "4561"
+        - name: RMR_SEED_RT
+          value: "/opt/a1mediator/router.txt"
+        - name: DBAAS_SERVICE_HOST
+          value: "service-ricplt-dbaas-tcp"
+        - name: DBAAS_SERVICE_PORT
+          value: "6379"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: A1_RMR_RETRY_TIMES
+          value: "4"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: config-volume
+          mountPath: /opt/a1mediator/config
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        livenessProbe:
+          httpGet:
+            path: /a1-p/healthcheck
+            port: 10000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /a1-p/healthcheck
+            port: 10000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      volumes:
+      - name: config-volume
+        configMap:
+          name: ric-platform-config
+      - name: tmp
+        emptyDir: {}
+---
+# Service for A1 Mediator
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-ricplt-a1mediator-http
+  namespace: ricplt
+  labels:
+    app: ricplt-a1mediator
+spec:
+  type: ClusterIP
+  ports:
+  - port: 10000
+    targetPort: 10000
+    protocol: TCP
+    name: http
+  - port: 38000
+    targetPort: 38000
+    protocol: TCP
+    name: rmr-data
+  selector:
+    app: ricplt-a1mediator
+---
+# Service Monitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ric-platform-metrics
+  namespace: ricplt
+  labels:
+    app: ric-platform
+    release: oran-sc-l-release
+spec:
+  selector:
+    matchLabels:
+      app: ric-platform
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+---
+# Network Policy for RIC Platform
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ric-platform-network-policy
+  namespace: ricplt
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ricplt
+    - namespaceSelector:
+        matchLabels:
+          name: ricxapp
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+  - from: []
+    ports:
+    - protocol: SCTP
+      port: 36421
+    - protocol: SCTP  
+      port: 36422
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: ricplt
+    - namespaceSelector:
+        matchLabels:
+          name: ricxapp
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+---
+# Pod Disruption Budget for High Availability
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ric-platform-pdb
+  namespace: ricplt
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      release: oran-sc-l-release

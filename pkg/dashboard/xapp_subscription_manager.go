@@ -1,8 +1,5 @@
-/*
-SPDX-FileCopyrightText: 2020-present Open Networking Foundation <info@opennetworking.org>
-SPDX-License-Identifier: Apache-2.0
-*/
-
+// Package dashboard provides xApp subscription management capabilities
+// for the O-RAN Near-RT RIC platform
 package dashboard
 
 import (
@@ -12,525 +9,514 @@ import (
 	"log"
 	"sync"
 	"time"
-
-	"github.com/google/uuid"
 )
 
-// XAppSubscriptionManager manages subscriptions for xApps
+// XAppSubscriptionManager manages E2 subscriptions for xApps
 type XAppSubscriptionManager struct {
-	mu              sync.RWMutex
-	subscriptions   map[string]*XAppSubscription
-	clientManager   *ClientManager
-	messageBus      *RMRMessageBus
-	subscriptionMap map[string]string // maps subscription ID to xApp instance ID
-	isRunning       bool
-	ctx             context.Context
-	cancel          context.CancelFunc
+	subscriptions    map[SubscriptionID]*ManagedSubscription
+	subscriptionsByNode map[string][]SubscriptionID
+	subscriptionsByXApp map[string][]SubscriptionID
+	eventTriggers    map[SubscriptionID]*EventTrigger
+	mu               sync.RWMutex
+	ctx              context.Context
+	cancel           context.CancelFunc
+	messageBus       *RMRMessageBus
+	e2tClient        *E2TClient
+	submgrClient     *SubscriptionManagerClient
 }
 
-// XAppSubscription represents a subscription created by an xApp
-type XAppSubscription struct {
-	ID               string                `json:"id"`
-	XAppInstanceID   string                `json:"xappInstanceId"`
-	E2NodeID         string                `json:"e2NodeId"`
-	RANFunctionID    uint32                `json:"ranFunctionId"`
-	ServiceModelType ServiceModelType      `json:"serviceModelType"`
-	EventTrigger     *SubscriptionEventTrigger `json:"eventTrigger"`
-	Actions          []SubscriptionAction  `json:"actions"`
-	Status           SubscriptionStatus    `json:"status"`
-	CreatedAt        time.Time             `json:"createdAt"`
-	UpdatedAt        time.Time             `json:"updatedAt"`
-	LastIndication   time.Time             `json:"lastIndication"`
-	IndicationCount  uint64                `json:"indicationCount"`
-	ErrorCount       uint64                `json:"errorCount"`
-	LastError        string                `json:"lastError,omitempty"`
+// ManagedSubscription represents a managed E2 subscription
+type ManagedSubscription struct {
+	ID               SubscriptionID         `json:"id"`
+	XAppID           string                 `json:"xappId"`
+	E2NodeID         string                 `json:"e2NodeId"`
+	RANFunctionID    uint32                 `json:"ranFunctionId"`
+	EventTrigger     *EventTrigger          `json:"eventTrigger"`
+	Actions          []SubscriptionAction   `json:"actions"`
+	Status           SubscriptionStatus     `json:"status"`
+	CreatedAt        time.Time              `json:"createdAt"`
+	UpdatedAt        time.Time              `json:"updatedAt"`
+	LastActivity     time.Time              `json:"lastActivity"`
+	IndicationCount  int64                  `json:"indicationCount"`
+	ErrorCount       int64                  `json:"errorCount"`
+	Configuration    map[string]interface{} `json:"configuration,omitempty"`
 }
 
-// SubscriptionEventTrigger represents the event trigger for a subscription
-type SubscriptionEventTrigger struct {
-	Type       EventTriggerType `json:"type"`
-	Period     *time.Duration   `json:"period,omitempty"`
-	Threshold  *float64         `json:"threshold,omitempty"`
-	Definition []byte           `json:"definition,omitempty"`
-}
 
-// EventTriggerType represents the type of event trigger
-type EventTriggerType string
+// NOTE: EventTriggerType type moved to types.go to avoid redeclaration
 
-const (
-	EventTriggerPeriodic     EventTriggerType = "PERIODIC"
-	EventTriggerOnChange     EventTriggerType = "ON_CHANGE"
-	EventTriggerThreshold    EventTriggerType = "THRESHOLD"
-	EventTriggerEventBased   EventTriggerType = "EVENT_BASED"
-)
+// NOTE: EventTrigger type moved to subscription_models.go to avoid redeclaration
 
-// SubscriptionAction represents an action in a subscription
-type SubscriptionAction struct {
+// NOTE: SubscriptionAction type moved to types.go to avoid redeclaration
+
+// SubsequentAction represents a subsequent action in a subscription
+type SubsequentAction struct {
 	ID         uint32                `json:"id"`
 	Type       ActionType            `json:"type"`
 	Definition []byte                `json:"definition,omitempty"`
-	Subsequent *SubsequentAction     `json:"subsequent,omitempty"`
+	TimeToWait time.Duration         `json:"timeToWait,omitempty"`
 }
 
-// ActionType represents the type of subscription action
-type ActionType string
+// NOTE: SubscriptionRequest type moved to xapp_communication_api.go to avoid redeclaration
+
+// NOTE: SubscriptionResponse type moved to xapp_communication_api.go to avoid redeclaration
+
+// NOTE: ActionResponse type moved to xapp_communication_api.go to avoid redeclaration
+
+// ActionStatus represents the status of an action
+type ActionStatus string
 
 const (
-	ActionTypeReport ActionType = "REPORT"
-	ActionTypeInsert ActionType = "INSERT"
-	ActionTypePolicy ActionType = "POLICY"
+	ActionStatusAccepted ActionStatus = "ACCEPTED"
+	ActionStatusRejected ActionStatus = "REJECTED"
+	ActionStatusPending  ActionStatus = "PENDING"
 )
 
-// SubsequentAction represents a subsequent action
-type SubsequentAction struct {
-	Type       ActionType `json:"type"`
-	TimeToWait uint32     `json:"timeToWait"`
+// SubscriptionStats represents subscription statistics
+type SubscriptionStats struct {
+	TotalSubscriptions    int64                          `json:"totalSubscriptions"`
+	ActiveSubscriptions   int64                          `json:"activeSubscriptions"`
+	PendingSubscriptions  int64                          `json:"pendingSubscriptions"`
+	FailedSubscriptions   int64                          `json:"failedSubscriptions"`
+	IndicationsReceived   int64                          `json:"indicationsReceived"`
+	ByE2Node             map[string]int64               `json:"byE2Node"`
+	ByXApp               map[string]int64               `json:"byXApp"`
+	ByRANFunction        map[uint32]int64               `json:"byRanFunction"`
+	EventTriggerTypes    map[EventTriggerType]int64     `json:"eventTriggerTypes"`
 }
 
-// SubscriptionStatus represents the status of a subscription
-type SubscriptionStatus string
-
-const (
-	SubscriptionStatusPending SubscriptionStatus = "PENDING"
-	SubscriptionStatusActive  SubscriptionStatus = "ACTIVE"
-	SubscriptionStatusFailed  SubscriptionStatus = "FAILED"
-	SubscriptionStatusDeleted SubscriptionStatus = "DELETED"
-)
-
-// NewXAppSubscriptionManager creates a new xApp subscription manager
-func NewXAppSubscriptionManager(clientManager *ClientManager, messageBus *RMRMessageBus) *XAppSubscriptionManager {
+// NewXAppSubscriptionManager creates a new subscription manager
+func NewXAppSubscriptionManager(messageBus *RMRMessageBus) *XAppSubscriptionManager {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	return &XAppSubscriptionManager{
-		subscriptions:   make(map[string]*XAppSubscription),
-		clientManager:   clientManager,
-		messageBus:      messageBus,
-		subscriptionMap: make(map[string]string),
-		ctx:             ctx,
-		cancel:          cancel,
+		subscriptions:       make(map[SubscriptionID]*ManagedSubscription),
+		subscriptionsByNode: make(map[string][]SubscriptionID),
+		subscriptionsByXApp: make(map[string][]SubscriptionID),
+		eventTriggers:       make(map[SubscriptionID]*EventTrigger),
+		ctx:                 ctx,
+		cancel:              cancel,
+		messageBus:          messageBus,
 	}
 }
 
-// Start starts the subscription manager
-func (sm *XAppSubscriptionManager) Start() error {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-	
-	if sm.isRunning {
-		return fmt.Errorf("subscription manager is already running")
-	}
-	
-	// Register as RMR message handler for subscription-related messages
-	sm.messageBus.RegisterMessageHandler(sm)
-	
-	// Start indication processor
-	go sm.indicationProcessor()
-	
-	// Start subscription health monitor
-	go sm.subscriptionHealthMonitor()
-	
-	sm.isRunning = true
-	log.Println("xApp subscription manager started")
-	return nil
-}
+// CreateSubscription creates a new E2 subscription
+func (manager *XAppSubscriptionManager) CreateSubscription(req *SubscriptionRequest) (*SubscriptionResponse, error) {
+	manager.mu.Lock()
+	defer manager.mu.Unlock()
 
-// Stop stops the subscription manager
-func (sm *XAppSubscriptionManager) Stop() error {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-	
-	if !sm.isRunning {
-		return nil
-	}
-	
-	sm.cancel()
-	sm.isRunning = false
-	log.Println("xApp subscription manager stopped")
-	return nil
-}
+	// Generate subscription ID
+	subscriptionID := manager.generateSubscriptionID()
 
-// CreateSubscription creates a new subscription for an xApp
-func (sm *XAppSubscriptionManager) CreateSubscription(xappInstanceID string, req *SubscriptionRequest) (*XAppSubscription, error) {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-	
-	subscriptionID := uuid.New().String()
-	
-	subscription := &XAppSubscription{
-		ID:               subscriptionID,
-		XAppInstanceID:   xappInstanceID,
-		E2NodeID:         req.E2NodeID,
-		RANFunctionID:    req.RANFunctionID,
-		ServiceModelType: req.ServiceModelType,
-		EventTrigger:     req.EventTrigger,
-		Actions:          req.Actions,
-		Status:           SubscriptionStatusPending,
-		CreatedAt:        time.Now(),
-		UpdatedAt:        time.Now(),
+	// Create managed subscription
+	subscription := &ManagedSubscription{
+		ID:            subscriptionID,
+		XAppID:        req.XAppID,
+		E2NodeID:      req.E2NodeID,
+		RANFunctionID: req.RANFunctionID,
+		EventTrigger:  req.EventTrigger,
+		Actions:       req.Actions,
+		Status:        SubscriptionStatusPending,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+		LastActivity:  time.Now(),
+		Configuration: req.Configuration,
 	}
-	
+
 	// Store subscription
-	sm.subscriptions[subscriptionID] = subscription
-	sm.subscriptionMap[subscriptionID] = xappInstanceID
-	
-	// Send subscription request via RMR
-	if err := sm.sendSubscriptionRequest(subscription); err != nil {
+	manager.subscriptions[subscriptionID] = subscription
+	manager.eventTriggers[subscriptionID] = req.EventTrigger
+
+	// Update indexes
+	manager.subscriptionsByNode[req.E2NodeID] = append(manager.subscriptionsByNode[req.E2NodeID], subscriptionID)
+	manager.subscriptionsByXApp[req.XAppID] = append(manager.subscriptionsByXApp[req.XAppID], subscriptionID)
+
+	// Send subscription request to E2T
+	if err := manager.sendSubscriptionRequest(subscription); err != nil {
 		subscription.Status = SubscriptionStatusFailed
-		subscription.LastError = err.Error()
-		subscription.UpdatedAt = time.Now()
-		return subscription, fmt.Errorf("failed to send subscription request: %w", err)
+		log.Printf("Failed to send subscription request: %v", err)
+		return &SubscriptionResponse{
+			SubscriptionID: subscriptionID,
+			Status:         SubscriptionStatusFailed,
+			StatusMessage:  fmt.Sprintf("Failed to send request: %v", err),
+			E2NodeID:       req.E2NodeID,
+			RANFunctionID:  req.RANFunctionID,
+			CreatedAt:      subscription.CreatedAt,
+		}, err
 	}
-	
-	log.Printf("Created subscription %s for xApp %s", subscriptionID, xappInstanceID)
-	return subscription, nil
+
+	// Create action responses
+	actions := make([]ActionResponse, len(req.Actions))
+	for i, action := range req.Actions {
+		actions[i] = ActionResponse{
+			ID:     action.ActionID,
+			Status: ActionStatusAccepted,
+		}
+	}
+
+	log.Printf("Created subscription %s for xApp %s on E2 node %s", subscriptionID, req.XAppID, req.E2NodeID)
+
+	return &SubscriptionResponse{
+		SubscriptionID: subscriptionID,
+		Status:         SubscriptionStatusActive,
+		StatusMessage:  "Subscription created successfully",
+		Actions:        actions,
+		E2NodeID:       req.E2NodeID,
+		RANFunctionID:  req.RANFunctionID,
+		CreatedAt:      subscription.CreatedAt,
+	}, nil
 }
 
-// DeleteSubscription deletes a subscription
-func (sm *XAppSubscriptionManager) DeleteSubscription(subscriptionID string) error {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-	
-	subscription, exists := sm.subscriptions[subscriptionID]
+// DeleteSubscription deletes an existing subscription
+func (manager *XAppSubscriptionManager) DeleteSubscription(subscriptionID SubscriptionID) error {
+	manager.mu.Lock()
+	defer manager.mu.Unlock()
+
+	subscription, exists := manager.subscriptions[subscriptionID]
 	if !exists {
 		return fmt.Errorf("subscription %s not found", subscriptionID)
 	}
-	
-	// Send subscription delete request via RMR
-	if err := sm.sendSubscriptionDeleteRequest(subscription); err != nil {
-		return fmt.Errorf("failed to send subscription delete request: %w", err)
+
+	// Send delete request to E2T
+	if err := manager.sendDeleteRequest(subscription); err != nil {
+		log.Printf("Failed to send delete request for subscription %s: %v", subscriptionID, err)
 	}
-	
-	// Update subscription status
-	subscription.Status = SubscriptionStatusDeleted
-	subscription.UpdatedAt = time.Now()
-	
-	// Remove from maps
-	delete(sm.subscriptions, subscriptionID)
-	delete(sm.subscriptionMap, subscriptionID)
-	
+
+	// Remove from indexes
+	manager.removeFromIndex(manager.subscriptionsByNode, subscription.E2NodeID, subscriptionID)
+	manager.removeFromIndex(manager.subscriptionsByXApp, subscription.XAppID, subscriptionID)
+
+	// Remove subscription
+	delete(manager.subscriptions, subscriptionID)
+	delete(manager.eventTriggers, subscriptionID)
+
 	log.Printf("Deleted subscription %s", subscriptionID)
 	return nil
 }
 
-// GetSubscription returns a subscription by ID
-func (sm *XAppSubscriptionManager) GetSubscription(subscriptionID string) (*XAppSubscription, error) {
-	sm.mu.RLock()
-	defer sm.mu.RUnlock()
-	
-	subscription, exists := sm.subscriptions[subscriptionID]
+// GetSubscription retrieves a subscription by ID
+func (manager *XAppSubscriptionManager) GetSubscription(subscriptionID SubscriptionID) (*ManagedSubscription, error) {
+	manager.mu.RLock()
+	defer manager.mu.RUnlock()
+
+	subscription, exists := manager.subscriptions[subscriptionID]
 	if !exists {
 		return nil, fmt.Errorf("subscription %s not found", subscriptionID)
 	}
-	
-	return subscription, nil
+
+	// Return a copy to avoid race conditions
+	subscriptionCopy := *subscription
+	return &subscriptionCopy, nil
 }
 
-// ListSubscriptions returns all subscriptions for an xApp instance
-func (sm *XAppSubscriptionManager) ListSubscriptions(xappInstanceID string) ([]*XAppSubscription, error) {
-	sm.mu.RLock()
-	defer sm.mu.RUnlock()
-	
-	var subscriptions []*XAppSubscription
-	for _, subscription := range sm.subscriptions {
-		if subscription.XAppInstanceID == xappInstanceID {
-			subscriptions = append(subscriptions, subscription)
+// GetSubscriptionsByXApp retrieves all subscriptions for a specific xApp
+func (manager *XAppSubscriptionManager) GetSubscriptionsByXApp(xappID string) ([]*ManagedSubscription, error) {
+	manager.mu.RLock()
+	defer manager.mu.RUnlock()
+
+	subscriptionIDs, exists := manager.subscriptionsByXApp[xappID]
+	if !exists {
+		return []*ManagedSubscription{}, nil
+	}
+
+	subscriptions := make([]*ManagedSubscription, 0, len(subscriptionIDs))
+	for _, id := range subscriptionIDs {
+		if subscription, exists := manager.subscriptions[id]; exists {
+			subscriptionCopy := *subscription
+			subscriptions = append(subscriptions, &subscriptionCopy)
 		}
 	}
-	
+
 	return subscriptions, nil
 }
 
-// GetAllSubscriptions returns all subscriptions
-func (sm *XAppSubscriptionManager) GetAllSubscriptions() map[string]*XAppSubscription {
-	sm.mu.RLock()
-	defer sm.mu.RUnlock()
-	
-	subscriptions := make(map[string]*XAppSubscription)
-	for id, subscription := range sm.subscriptions {
-		subscriptions[id] = &XAppSubscription{
-			ID:               subscription.ID,
-			XAppInstanceID:   subscription.XAppInstanceID,
-			E2NodeID:         subscription.E2NodeID,
-			RANFunctionID:    subscription.RANFunctionID,
-			ServiceModelType: subscription.ServiceModelType,
-			EventTrigger:     subscription.EventTrigger,
-			Actions:          subscription.Actions,
-			Status:           subscription.Status,
-			CreatedAt:        subscription.CreatedAt,
-			UpdatedAt:        subscription.UpdatedAt,
-			LastIndication:   subscription.LastIndication,
-			IndicationCount:  subscription.IndicationCount,
-			ErrorCount:       subscription.ErrorCount,
-			LastError:        subscription.LastError,
+// GetSubscriptionsByE2Node retrieves all subscriptions for a specific E2 node
+func (manager *XAppSubscriptionManager) GetSubscriptionsByE2Node(e2NodeID string) ([]*ManagedSubscription, error) {
+	manager.mu.RLock()
+	defer manager.mu.RUnlock()
+
+	subscriptionIDs, exists := manager.subscriptionsByNode[e2NodeID]
+	if !exists {
+		return []*ManagedSubscription{}, nil
+	}
+
+	subscriptions := make([]*ManagedSubscription, 0, len(subscriptionIDs))
+	for _, id := range subscriptionIDs {
+		if subscription, exists := manager.subscriptions[id]; exists {
+			subscriptionCopy := *subscription
+			subscriptions = append(subscriptions, &subscriptionCopy)
 		}
 	}
-	
-	return subscriptions
+
+	return subscriptions, nil
 }
 
-// HandleMessage implements MessageHandler interface for RMR messages
-func (sm *XAppSubscriptionManager) HandleMessage(ctx context.Context, msg *RMRMessage) error {
-	switch msg.MessageType {
-	case RMR_MSG_E2AP_SUBSCRIPTION_RESP:
-		return sm.handleSubscriptionResponse(msg)
-	case RMR_MSG_E2AP_SUBSCRIPTION_FAILURE:
-		return sm.handleSubscriptionFailure(msg)
-	case RMR_MSG_E2AP_SUBSCRIPTION_DELETE_RESP:
-		return sm.handleSubscriptionDeleteResponse(msg)
-	case RMR_MSG_E2AP_INDICATION:
-		return sm.handleIndication(msg)
-	default:
-		return fmt.Errorf("unsupported message type: %d", msg.MessageType)
+// GetAllSubscriptions retrieves all subscriptions
+func (manager *XAppSubscriptionManager) GetAllSubscriptions() map[SubscriptionID]*ManagedSubscription {
+	manager.mu.RLock()
+	defer manager.mu.RUnlock()
+
+	result := make(map[SubscriptionID]*ManagedSubscription)
+	for id, subscription := range manager.subscriptions {
+		subscriptionCopy := *subscription
+		result[id] = &subscriptionCopy
 	}
+
+	return result
 }
 
-// GetMessageTypes returns the message types this handler processes
-func (sm *XAppSubscriptionManager) GetMessageTypes() []uint32 {
-	return []uint32{
-		RMR_MSG_E2AP_SUBSCRIPTION_RESP,
-		RMR_MSG_E2AP_SUBSCRIPTION_FAILURE,
-		RMR_MSG_E2AP_SUBSCRIPTION_DELETE_RESP,
-		RMR_MSG_E2AP_INDICATION,
-	}
-}
+// UpdateSubscriptionStatus updates the status of a subscription
+func (manager *XAppSubscriptionManager) UpdateSubscriptionStatus(subscriptionID SubscriptionID, status SubscriptionStatus, message string) error {
+	manager.mu.Lock()
+	defer manager.mu.Unlock()
 
-// Private methods
-
-func (sm *XAppSubscriptionManager) sendSubscriptionRequest(subscription *XAppSubscription) error {
-	// Create subscription request message
-	subReq := map[string]interface{}{
-		"subscriptionId": subscription.ID,
-		"e2NodeId":       subscription.E2NodeID,
-		"ranFunctionId":  subscription.RANFunctionID,
-		"eventTrigger":   subscription.EventTrigger,
-		"actions":        subscription.Actions,
-	}
-	
-	payload, err := json.Marshal(subReq)
-	if err != nil {
-		return fmt.Errorf("failed to marshal subscription request: %w", err)
-	}
-	
-	// Send via RMR
-	rmrMsg := &RMRMessage{
-		MessageType:    RMR_MSG_E2AP_SUBSCRIPTION_REQ,
-		SubscriptionID: subscription.ID,
-		TransactionID:  uuid.New().String(),
-		Payload:        payload,
-		Source:         subscription.XAppInstanceID,
-		Target:         "submgr",
-		Timestamp:      time.Now(),
-	}
-	
-	return sm.messageBus.SendMessage(rmrMsg)
-}
-
-func (sm *XAppSubscriptionManager) sendSubscriptionDeleteRequest(subscription *XAppSubscription) error {
-	// Create subscription delete request message
-	delReq := map[string]interface{}{
-		"subscriptionId": subscription.ID,
-		"e2NodeId":       subscription.E2NodeID,
-		"ranFunctionId":  subscription.RANFunctionID,
-	}
-	
-	payload, err := json.Marshal(delReq)
-	if err != nil {
-		return fmt.Errorf("failed to marshal subscription delete request: %w", err)
-	}
-	
-	// Send via RMR
-	rmrMsg := &RMRMessage{
-		MessageType:    RMR_MSG_E2AP_SUBSCRIPTION_DELETE_REQ,
-		SubscriptionID: subscription.ID,
-		TransactionID:  uuid.New().String(),
-		Payload:        payload,
-		Source:         subscription.XAppInstanceID,
-		Target:         "submgr",
-		Timestamp:      time.Now(),
-	}
-	
-	return sm.messageBus.SendMessage(rmrMsg)
-}
-
-func (sm *XAppSubscriptionManager) handleSubscriptionResponse(msg *RMRMessage) error {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-	
-	subscription, exists := sm.subscriptions[msg.SubscriptionID]
+	subscription, exists := manager.subscriptions[subscriptionID]
 	if !exists {
-		return fmt.Errorf("subscription %s not found", msg.SubscriptionID)
+		return fmt.Errorf("subscription %s not found", subscriptionID)
 	}
-	
-	subscription.Status = SubscriptionStatusActive
+
+	oldStatus := subscription.Status
+	subscription.Status = status
 	subscription.UpdatedAt = time.Now()
-	
-	log.Printf("Subscription %s activated successfully", msg.SubscriptionID)
+
+	if subscription.Configuration == nil {
+		subscription.Configuration = make(map[string]interface{})
+	}
+	subscription.Configuration["statusMessage"] = message
+
+	log.Printf("Subscription %s status changed from %s to %s: %s", subscriptionID, oldStatus, status, message)
 	return nil
 }
 
-func (sm *XAppSubscriptionManager) handleSubscriptionFailure(msg *RMRMessage) error {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-	
-	subscription, exists := sm.subscriptions[msg.SubscriptionID]
+// HandleIndication processes an indication message for a subscription
+func (manager *XAppSubscriptionManager) HandleIndication(indication *Indication) error {
+	manager.mu.Lock()
+	defer manager.mu.Unlock()
+
+	subscriptionID := indication.SubscriptionID
+	subscription, exists := manager.subscriptions[subscriptionID]
 	if !exists {
-		return fmt.Errorf("subscription %s not found", msg.SubscriptionID)
+		return fmt.Errorf("subscription %s not found for indication", subscriptionID)
 	}
-	
-	subscription.Status = SubscriptionStatusFailed
-	subscription.UpdatedAt = time.Now()
-	subscription.ErrorCount++
-	
-	// Parse failure reason from payload
-	var failureInfo map[string]interface{}
-	if err := json.Unmarshal(msg.Payload, &failureInfo); err == nil {
-		if reason, ok := failureInfo["reason"].(string); ok {
-			subscription.LastError = reason
-		}
-	}
-	
-	log.Printf("Subscription %s failed: %s", msg.SubscriptionID, subscription.LastError)
-	return nil
-}
 
-func (sm *XAppSubscriptionManager) handleSubscriptionDeleteResponse(msg *RMRMessage) error {
-	log.Printf("Subscription %s delete confirmed", msg.SubscriptionID)
-	return nil
-}
-
-func (sm *XAppSubscriptionManager) handleIndication(msg *RMRMessage) error {
-	sm.mu.Lock()
-	subscription, exists := sm.subscriptions[msg.SubscriptionID]
-	if !exists {
-		sm.mu.Unlock()
-		return fmt.Errorf("subscription %s not found for indication", msg.SubscriptionID)
-	}
-	
-	// Update subscription statistics
-	subscription.LastIndication = time.Now()
+	// Update subscription activity
+	subscription.LastActivity = time.Now()
 	subscription.IndicationCount++
-	sm.mu.Unlock()
-	
-	// Forward indication to xApp instance
-	return sm.forwardIndicationToXApp(subscription, msg)
+
+	log.Printf("Processed indication for subscription %s (count: %d)", subscriptionID, subscription.IndicationCount)
+	return nil
 }
 
-func (sm *XAppSubscriptionManager) forwardIndicationToXApp(subscription *XAppSubscription, msg *RMRMessage) error {
-	// Create indication message for xApp
-	indication := map[string]interface{}{
-		"subscriptionId":   subscription.ID,
-		"e2NodeId":         subscription.E2NodeID,
-		"ranFunctionId":    subscription.RANFunctionID,
-		"serviceModelType": subscription.ServiceModelType,
-		"timestamp":        msg.Timestamp,
-		"payload":          msg.Payload,
+// GetSubscriptionStats returns subscription statistics
+func (manager *XAppSubscriptionManager) GetSubscriptionStats() *SubscriptionStats {
+	manager.mu.RLock()
+	defer manager.mu.RUnlock()
+
+	stats := &SubscriptionStats{
+		ByE2Node:          make(map[string]int64),
+		ByXApp:            make(map[string]int64),
+		ByRANFunction:     make(map[uint32]int64),
+		EventTriggerTypes: make(map[EventTriggerType]int64),
 	}
-	
-	payload, err := json.Marshal(indication)
+
+	for _, subscription := range manager.subscriptions {
+		stats.TotalSubscriptions++
+
+		switch subscription.Status {
+		case SubscriptionStatusActive:
+			stats.ActiveSubscriptions++
+		case SubscriptionStatusPending:
+			stats.PendingSubscriptions++
+		case SubscriptionStatusFailed:
+			stats.FailedSubscriptions++
+		}
+
+		stats.IndicationsReceived += subscription.IndicationCount
+		stats.ByE2Node[subscription.E2NodeID]++
+		stats.ByXApp[subscription.XAppID]++
+		stats.ByRANFunction[subscription.RANFunctionID]++
+
+		if trigger := subscription.EventTrigger; trigger != nil {
+			stats.EventTriggerTypes[trigger.Type]++
+		}
+	}
+
+	return stats
+}
+
+// Start starts the subscription manager
+func (manager *XAppSubscriptionManager) Start() error {
+	log.Println("Starting xApp subscription manager...")
+
+	// Start subscription monitoring
+	go manager.monitorSubscriptions()
+
+	// Start cleanup routine
+	go manager.cleanupRoutine()
+
+	log.Println("xApp subscription manager started successfully")
+	return nil
+}
+
+// Stop stops the subscription manager
+func (manager *XAppSubscriptionManager) Stop() error {
+	log.Println("Stopping xApp subscription manager...")
+
+	manager.cancel()
+
+	log.Println("xApp subscription manager stopped")
+	return nil
+}
+
+// Private helper methods
+
+// generateSubscriptionID generates a unique subscription ID
+func (manager *XAppSubscriptionManager) generateSubscriptionID() SubscriptionID {
+	return SubscriptionID(fmt.Sprintf("sub-%d", time.Now().UnixNano()))
+}
+
+// sendSubscriptionRequest sends a subscription request to E2T
+func (manager *XAppSubscriptionManager) sendSubscriptionRequest(subscription *ManagedSubscription) error {
+	if manager.messageBus == nil {
+		return fmt.Errorf("message bus not available")
+	}
+
+	// Create RMR message for subscription request
+	payload, err := json.Marshal(subscription)
 	if err != nil {
-		return fmt.Errorf("failed to marshal indication for xApp: %w", err)
+		return fmt.Errorf("failed to marshal subscription: %w", err)
 	}
-	
-	// Send to xApp via RMR
-	xappMsg := &RMRMessage{
-		MessageType:    RMR_MSG_E2AP_INDICATION,
-		SubscriptionID: subscription.ID,
-		TransactionID:  msg.TransactionID,
-		Payload:        payload,
-		Source:         "submgr",
-		Target:         subscription.XAppInstanceID,
-		Timestamp:      time.Now(),
+
+	msg := &RMRMessage{
+		MessageType:   12010, // RIC_SUB_REQ
+		TransactionID: string(subscription.ID),
+		Source:        "dashboard",
+		Target:        subscription.E2NodeID,
+		Timestamp:     time.Now(),
+		Payload:       payload,
 	}
-	
-	return sm.messageBus.SendMessage(xappMsg)
+
+	return manager.messageBus.Send(msg)
 }
 
-func (sm *XAppSubscriptionManager) indicationProcessor() {
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-	
-	for {
-		select {
-		case <-sm.ctx.Done():
-			return
-		case <-ticker.C:
-			// Process any queued indications
-			// This is a placeholder for more sophisticated indication processing
+// sendDeleteRequest sends a subscription delete request to E2T
+func (manager *XAppSubscriptionManager) sendDeleteRequest(subscription *ManagedSubscription) error {
+	if manager.messageBus == nil {
+		return fmt.Errorf("message bus not available")
+	}
+
+	deleteReq := map[string]interface{}{
+		"subscriptionId": subscription.ID,
+		"e2NodeId":      subscription.E2NodeID,
+		"ranFunctionId": subscription.RANFunctionID,
+	}
+
+	payload, err := json.Marshal(deleteReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal delete request: %w", err)
+	}
+
+	msg := &RMRMessage{
+		MessageType:   12020, // RIC_SUB_DEL_REQ
+		TransactionID: string(subscription.ID),
+		Source:        "dashboard",
+		Target:        subscription.E2NodeID,
+		Timestamp:     time.Now(),
+		Payload:       payload,
+	}
+
+	return manager.messageBus.Send(msg)
+}
+
+// removeFromIndex removes a subscription ID from an index
+func (manager *XAppSubscriptionManager) removeFromIndex(index map[string][]SubscriptionID, key string, subscriptionID SubscriptionID) {
+	if subscriptionIDs, exists := index[key]; exists {
+		for i, id := range subscriptionIDs {
+			if id == subscriptionID {
+				index[key] = append(subscriptionIDs[:i], subscriptionIDs[i+1:]...)
+				break
+			}
+		}
+		if len(index[key]) == 0 {
+			delete(index, key)
 		}
 	}
 }
 
-func (sm *XAppSubscriptionManager) subscriptionHealthMonitor() {
+// monitorSubscriptions monitors subscription health and activity
+func (manager *XAppSubscriptionManager) monitorSubscriptions() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
-		case <-sm.ctx.Done():
+		case <-manager.ctx.Done():
 			return
 		case <-ticker.C:
-			sm.checkSubscriptionHealth()
+			manager.checkSubscriptionHealth()
 		}
 	}
 }
 
-func (sm *XAppSubscriptionManager) checkSubscriptionHealth() {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-	
+// checkSubscriptionHealth checks the health of all subscriptions
+func (manager *XAppSubscriptionManager) checkSubscriptionHealth() {
+	manager.mu.Lock()
+	defer manager.mu.Unlock()
+
 	now := time.Now()
-	for _, subscription := range sm.subscriptions {
+	inactivityThreshold := 5 * time.Minute
+
+	for id, subscription := range manager.subscriptions {
 		if subscription.Status == SubscriptionStatusActive {
-			// Check if subscription has been inactive for too long
-			if now.Sub(subscription.LastIndication) > 5*time.Minute {
-				log.Printf("Subscription %s appears inactive (last indication: %v)", 
-					subscription.ID, subscription.LastIndication)
+			if now.Sub(subscription.LastActivity) > inactivityThreshold {
+				log.Printf("Subscription %s appears inactive (last activity: %v)", id, subscription.LastActivity)
+				subscription.Status = SubscriptionStatusInactive
 			}
 		}
 	}
 }
 
-// GetSubscriptionStatistics returns statistics for all subscriptions
-func (sm *XAppSubscriptionManager) GetSubscriptionStatistics() map[string]interface{} {
-	sm.mu.RLock()
-	defer sm.mu.RUnlock()
-	
-	stats := map[string]interface{}{
-		"totalSubscriptions": len(sm.subscriptions),
-		"byStatus":           make(map[string]int),
-		"byServiceModel":     make(map[string]int),
-		"byXApp":             make(map[string]int),
+// cleanupRoutine performs periodic cleanup of failed/cancelled subscriptions
+func (manager *XAppSubscriptionManager) cleanupRoutine() {
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-manager.ctx.Done():
+			return
+		case <-ticker.C:
+			manager.cleanupFailedSubscriptions()
+		}
 	}
-	
-	statusCounts := make(map[string]int)
-	serviceModelCounts := make(map[string]int)
-	xappCounts := make(map[string]int)
-	
-	var totalIndications uint64
-	var totalErrors uint64
-	
-	for _, subscription := range sm.subscriptions {
-		statusCounts[string(subscription.Status)]++
-		serviceModelCounts[string(subscription.ServiceModelType)]++
-		xappCounts[subscription.XAppInstanceID]++
-		totalIndications += subscription.IndicationCount
-		totalErrors += subscription.ErrorCount
-	}
-	
-	stats["byStatus"] = statusCounts
-	stats["byServiceModel"] = serviceModelCounts
-	stats["byXApp"] = xappCounts
-	stats["totalIndications"] = totalIndications
-	stats["totalErrors"] = totalErrors
-	
-	return stats
 }
 
-// SubscriptionRequest represents a request to create a subscription
-type SubscriptionRequest struct {
-	E2NodeID         string                    `json:"e2NodeId"`
-	RANFunctionID    uint32                    `json:"ranFunctionId"`
-	ServiceModelType ServiceModelType          `json:"serviceModelType"`
-	EventTrigger     *SubscriptionEventTrigger `json:"eventTrigger"`
-	Actions          []SubscriptionAction      `json:"actions"`
+// cleanupFailedSubscriptions removes old failed/cancelled subscriptions
+func (manager *XAppSubscriptionManager) cleanupFailedSubscriptions() {
+	manager.mu.Lock()
+	defer manager.mu.Unlock()
+
+	now := time.Now()
+	cleanupThreshold := 24 * time.Hour // Remove failed subscriptions after 24 hours
+
+	var toDelete []SubscriptionID
+	for id, subscription := range manager.subscriptions {
+		if (subscription.Status == SubscriptionStatusFailed || subscription.Status == SubscriptionStatusCancelled) &&
+			now.Sub(subscription.UpdatedAt) > cleanupThreshold {
+			toDelete = append(toDelete, id)
+		}
+	}
+
+	for _, id := range toDelete {
+		subscription := manager.subscriptions[id]
+		manager.removeFromIndex(manager.subscriptionsByNode, subscription.E2NodeID, id)
+		manager.removeFromIndex(manager.subscriptionsByXApp, subscription.XAppID, id)
+		delete(manager.subscriptions, id)
+		delete(manager.eventTriggers, id)
+		log.Printf("Cleaned up subscription %s", id)
+	}
+
+	if len(toDelete) > 0 {
+		log.Printf("Cleaned up %d failed/cancelled subscriptions", len(toDelete))
+	}
 }

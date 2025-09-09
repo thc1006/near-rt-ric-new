@@ -1,0 +1,401 @@
+# Fixed RIC Dashboard Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ric-dashboard-api
+  namespace: ricplt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ric-dashboard-api
+  template:
+    metadata:
+      labels:
+        app: ric-dashboard-api
+    spec:
+      serviceAccountName: oran-sc-platform
+      containers:
+      - name: dashboard
+        image: node:18-alpine
+        ports:
+        - containerPort: 8080
+        workingDir: /app
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          cat > server.js << 'EOFSCRIPT'
+          const http = require('http');
+          const url = require('url');
+          
+          const PORT = 8080;
+          
+          const ricData = {
+            platform: {
+              name: "O-RAN SC Near-RT RIC",
+              version: "L-Release",
+              status: "operational",
+              components: {
+                e2term: { status: "running", connections: 2 },
+                e2mgr: { status: "running", nodes: 3 },
+                a1mediator: { status: "running", policies: 5 },
+                submgr: { status: "running", subscriptions: 8 },
+                rtmgr: { status: "running", routes: 12 },
+                dbaas: { status: "running", memory: "45%" }
+              }
+            },
+            e2nodes: [
+              { id: "gnb001", name: "gNodeB-001", status: "connected", type: "5G-NR", cells: 3 },
+              { id: "gnb002", name: "gNodeB-002", status: "connected", type: "5G-NR", cells: 2 },
+              { id: "enb001", name: "eNodeB-001", status: "connected", type: "4G-LTE", cells: 1 }
+            ],
+            xapps: [
+              { id: "kpimon", name: "KPI Monitor", version: "1.0.0", status: "running", instances: 2 },
+              { id: "qpdriver", name: "QoE Predictor", version: "2.1.0", status: "running", instances: 1 },
+              { id: "trafficsteering", name: "Traffic Steering", version: "1.5.0", status: "running", instances: 1 }
+            ],
+            policies: [
+              { id: "pol001", type: "QoS", status: "active", target: "slice-001" },
+              { id: "pol002", type: "Traffic", status: "active", target: "cell-002" },
+              { id: "pol003", type: "Power", status: "pending", target: "gnb001" }
+            ],
+            metrics: {
+              throughput: "1.2 Gbps",
+              latency: "8 ms",
+              activeUEs: 1250,
+              cpu: "35%",
+              memory: "42%",
+              uptime: "72 hours"
+            }
+          };
+          
+          const htmlContent = `<!DOCTYPE html>
+          <html>
+          <head>
+              <title>O-RAN Near-RT RIC Dashboard</title>
+              <style>
+                  * { margin: 0; padding: 0; box-sizing: border-box; }
+                  body { 
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                      min-height: 100vh;
+                      padding: 20px;
+                  }
+                  .container { max-width: 1400px; margin: 0 auto; }
+                  .header {
+                      background: white;
+                      border-radius: 10px;
+                      padding: 20px;
+                      margin-bottom: 20px;
+                      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                  }
+                  .header h1 {
+                      color: #333;
+                      font-size: 28px;
+                      margin-bottom: 10px;
+                  }
+                  .status-badge {
+                      display: inline-block;
+                      padding: 5px 15px;
+                      border-radius: 20px;
+                      font-size: 14px;
+                      font-weight: 600;
+                      background: #10b981;
+                      color: white;
+                  }
+                  .grid {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                      gap: 20px;
+                      margin-bottom: 20px;
+                  }
+                  .card {
+                      background: white;
+                      border-radius: 10px;
+                      padding: 20px;
+                      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                  }
+                  .card h2 {
+                      color: #333;
+                      font-size: 18px;
+                      margin-bottom: 15px;
+                      padding-bottom: 10px;
+                      border-bottom: 2px solid #f0f0f0;
+                  }
+                  .metric {
+                      display: flex;
+                      justify-content: space-between;
+                      padding: 8px 0;
+                      border-bottom: 1px solid #f5f5f5;
+                  }
+                  .metric:last-child { border-bottom: none; }
+                  .metric-label { color: #666; font-size: 14px; }
+                  .metric-value { color: #333; font-weight: 600; font-size: 14px; }
+                  .component-grid {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                      gap: 10px;
+                  }
+                  .component {
+                      background: #f8f9fa;
+                      padding: 10px;
+                      border-radius: 5px;
+                      text-align: center;
+                  }
+                  .component-name { font-size: 12px; color: #666; margin-bottom: 5px; }
+                  .component-status { font-size: 11px; font-weight: 600; color: #10b981; }
+                  .table { width: 100%; border-collapse: collapse; }
+                  .table th {
+                      background: #f8f9fa;
+                      padding: 10px;
+                      text-align: left;
+                      font-size: 13px;
+                      color: #666;
+                      font-weight: 600;
+                  }
+                  .table td {
+                      padding: 10px;
+                      border-bottom: 1px solid #f0f0f0;
+                      font-size: 14px;
+                  }
+                  .badge {
+                      display: inline-block;
+                      padding: 3px 8px;
+                      border-radius: 3px;
+                      font-size: 11px;
+                      font-weight: 600;
+                  }
+                  .badge-success { background: #d1fae5; color: #065f46; }
+                  .badge-warning { background: #fed7aa; color: #92400e; }
+                  .refresh-btn {
+                      background: #667eea;
+                      color: white;
+                      border: none;
+                      padding: 8px 20px;
+                      border-radius: 5px;
+                      cursor: pointer;
+                      font-size: 14px;
+                      font-weight: 600;
+                  }
+                  .refresh-btn:hover { background: #5a67d8; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <div style="display: flex; justify-content: space-between; align-items: center;">
+                          <div>
+                              <h1>O-RAN Near-RT RIC Dashboard</h1>
+                              <span class="status-badge">OPERATIONAL</span>
+                              <span style="margin-left: 10px; color: #666;">L-Release</span>
+                          </div>
+                          <button class="refresh-btn" onclick="location.reload()">Refresh</button>
+                      </div>
+                  </div>
+                  
+                  <div class="grid">
+                      <div class="card">
+                          <h2>System Metrics</h2>
+                          <div class="metric">
+                              <span class="metric-label">Throughput</span>
+                              <span class="metric-value">1.2 Gbps</span>
+                          </div>
+                          <div class="metric">
+                              <span class="metric-label">Latency</span>
+                              <span class="metric-value">8 ms</span>
+                          </div>
+                          <div class="metric">
+                              <span class="metric-label">Active UEs</span>
+                              <span class="metric-value">1,250</span>
+                          </div>
+                          <div class="metric">
+                              <span class="metric-label">CPU Usage</span>
+                              <span class="metric-value">35%</span>
+                          </div>
+                          <div class="metric">
+                              <span class="metric-label">Memory Usage</span>
+                              <span class="metric-value">42%</span>
+                          </div>
+                          <div class="metric">
+                              <span class="metric-label">Uptime</span>
+                              <span class="metric-value">72 hours</span>
+                          </div>
+                      </div>
+                      
+                      <div class="card">
+                          <h2>Platform Components</h2>
+                          <div class="component-grid">
+                              <div class="component">
+                                  <div class="component-name">E2 Term</div>
+                                  <div class="component-status">RUNNING</div>
+                              </div>
+                              <div class="component">
+                                  <div class="component-name">E2 Manager</div>
+                                  <div class="component-status">RUNNING</div>
+                              </div>
+                              <div class="component">
+                                  <div class="component-name">A1 Mediator</div>
+                                  <div class="component-status">RUNNING</div>
+                              </div>
+                              <div class="component">
+                                  <div class="component-name">Subscription Mgr</div>
+                                  <div class="component-status">RUNNING</div>
+                              </div>
+                              <div class="component">
+                                  <div class="component-name">Routing Mgr</div>
+                                  <div class="component-status">RUNNING</div>
+                              </div>
+                              <div class="component">
+                                  <div class="component-name">Database</div>
+                                  <div class="component-status">RUNNING</div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+                  
+                  <div class="card">
+                      <h2>E2 Nodes</h2>
+                      <table class="table">
+                          <thead>
+                              <tr>
+                                  <th>ID</th>
+                                  <th>Name</th>
+                                  <th>Type</th>
+                                  <th>Cells</th>
+                                  <th>Status</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              <tr>
+                                  <td>gnb001</td>
+                                  <td>gNodeB-001</td>
+                                  <td>5G-NR</td>
+                                  <td>3</td>
+                                  <td><span class="badge badge-success">Connected</span></td>
+                              </tr>
+                              <tr>
+                                  <td>gnb002</td>
+                                  <td>gNodeB-002</td>
+                                  <td>5G-NR</td>
+                                  <td>2</td>
+                                  <td><span class="badge badge-success">Connected</span></td>
+                              </tr>
+                              <tr>
+                                  <td>enb001</td>
+                                  <td>eNodeB-001</td>
+                                  <td>4G-LTE</td>
+                                  <td>1</td>
+                                  <td><span class="badge badge-success">Connected</span></td>
+                              </tr>
+                          </tbody>
+                      </table>
+                  </div>
+                  
+                  <div class="grid">
+                      <div class="card">
+                          <h2>xApps</h2>
+                          <table class="table">
+                              <thead>
+                                  <tr>
+                                      <th>Name</th>
+                                      <th>Version</th>
+                                      <th>Instances</th>
+                                      <th>Status</th>
+                                  </tr>
+                              </thead>
+                              <tbody>
+                                  <tr>
+                                      <td>KPI Monitor</td>
+                                      <td>1.0.0</td>
+                                      <td>2</td>
+                                      <td><span class="badge badge-success">Running</span></td>
+                                  </tr>
+                                  <tr>
+                                      <td>QoE Predictor</td>
+                                      <td>2.1.0</td>
+                                      <td>1</td>
+                                      <td><span class="badge badge-success">Running</span></td>
+                                  </tr>
+                                  <tr>
+                                      <td>Traffic Steering</td>
+                                      <td>1.5.0</td>
+                                      <td>1</td>
+                                      <td><span class="badge badge-success">Running</span></td>
+                                  </tr>
+                              </tbody>
+                          </table>
+                      </div>
+                      
+                      <div class="card">
+                          <h2>Active Policies</h2>
+                          <table class="table">
+                              <thead>
+                                  <tr>
+                                      <th>ID</th>
+                                      <th>Type</th>
+                                      <th>Target</th>
+                                      <th>Status</th>
+                                  </tr>
+                              </thead>
+                              <tbody>
+                                  <tr>
+                                      <td>pol001</td>
+                                      <td>QoS</td>
+                                      <td>slice-001</td>
+                                      <td><span class="badge badge-success">Active</span></td>
+                                  </tr>
+                                  <tr>
+                                      <td>pol002</td>
+                                      <td>Traffic</td>
+                                      <td>cell-002</td>
+                                      <td><span class="badge badge-success">Active</span></td>
+                                  </tr>
+                                  <tr>
+                                      <td>pol003</td>
+                                      <td>Power</td>
+                                      <td>gnb001</td>
+                                      <td><span class="badge badge-warning">Pending</span></td>
+                                  </tr>
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
+              </div>
+              <script>
+                  setTimeout(() => location.reload(), 30000);
+                  console.log('Dashboard loaded at:', new Date().toISOString());
+              </script>
+          </body>
+          </html>`;
+          
+          const server = http.createServer((req, res) => {
+            const parsedUrl = url.parse(req.url, true);
+            
+            if (parsedUrl.pathname === '/' || parsedUrl.pathname === '/dashboard') {
+              res.writeHead(200, { 'Content-Type': 'text/html' });
+              res.end(htmlContent);
+            } else if (parsedUrl.pathname === '/api/status') {
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify(ricData));
+            } else if (parsedUrl.pathname === '/health') {
+              res.writeHead(200, { 'Content-Type': 'text/plain' });
+              res.end('OK');
+            } else {
+              res.writeHead(404, { 'Content-Type': 'text/plain' });
+              res.end('Not Found');
+            }
+          });
+          
+          server.listen(PORT, () => {
+            console.log('RIC Dashboard running on port ' + PORT);
+          });
+          EOFSCRIPT
+          node server.js
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"

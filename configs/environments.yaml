@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oran-environment-configs
+  namespace: oran-config
+data:
+  development:
+    log_level: DEBUG
+    feature_flags: |
+      {
+        "a1_mediator": {
+          "policy_validation": true,
+          "logging_verbose": true
+        },
+        "e2_manager": {
+          "node_discovery": true,
+          "debug_mode": true
+        }
+      }
+  staging:
+    log_level: INFO
+    feature_flags: |
+      {
+        "a1_mediator": {
+          "policy_validation": true,
+          "logging_verbose": false
+        },
+        "e2_manager": {
+          "node_discovery": true,
+          "debug_mode": false
+        }
+      }
+  production:
+    log_level: ERROR
+    feature_flags: |
+      {
+        "a1_mediator": {
+          "policy_validation": true,
+          "logging_verbose": false
+        },
+        "e2_manager": {
+          "node_discovery": false,
+          "debug_mode": false
+        }
+      }

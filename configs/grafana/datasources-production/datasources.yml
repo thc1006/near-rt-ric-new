@@ -1,0 +1,50 @@
+apiVersion: 1
+
+# List of datasources to insert/update depending on what's available in the database
+datasources:
+  # Prometheus
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: "15s"
+      queryTimeout: "60s"
+      httpMethod: "GET"
+
+  # Jaeger for tracing
+  - name: Jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    editable: true
+    jsonData:
+      tracesToLogs:
+        datasourceUid: 'loki'
+
+  # Redis
+  - name: Redis
+    type: redis-datasource
+    access: proxy
+    url: redis://redis:6379
+    editable: true
+    secureJsonData:
+      password: ${REDIS_PASSWORD}
+
+  # PostgreSQL
+  - name: PostgreSQL
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    database: oran_prod
+    user: oran_prod
+    editable: true
+    secureJsonData:
+      password: ${DB_PASSWORD}
+    jsonData:
+      sslmode: "require"
+      maxOpenConns: 0
+      maxIdleConns: 2
+      connMaxLifetime: 14400

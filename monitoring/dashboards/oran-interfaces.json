@@ -1,0 +1,67 @@
+{
+  "annotations": {},
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "id": 1,
+      "title": "E2 Interface Metrics",
+      "type": "graph",
+      "targets": [{
+        "expr": "rate(e2_connection_total[5m])",
+        "legendFormat": "E2 Connection Rate"
+      }, {
+        "expr": "e2_active_connections",
+        "legendFormat": "Active E2 Connections"
+      }]
+    },
+    {
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "id": 2,
+      "title": "A1 Policy Management",
+      "type": "graph",
+      "targets": [{
+        "expr": "a1_policy_updates_total",
+        "legendFormat": "A1 Policy Updates"
+      }, {
+        "expr": "a1_policy_enforcement_latency_seconds",
+        "legendFormat": "Policy Enforcement Latency"
+      }]
+    },
+    {
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "id": 3,
+      "title": "O1 Configuration Management",
+      "type": "graph",
+      "targets": [{
+        "expr": "o1_configuration_changes_total",
+        "legendFormat": "O1 Config Changes"
+      }, {
+        "expr": "o1_operational_state_changes",
+        "legendFormat": "Operational State Changes"
+      }]
+    }
+  ],
+  "schemaVersion": 27,
+  "style": "dark",
+  "tags": ["oran", "interfaces"],
+  "templating": {
+    "list": [{
+      "name": "interface",
+      "type": "query",
+      "datasource": "Prometheus",
+      "definition": "label_values(interface)"
+    }]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "O-RAN Interfaces Dashboard",
+  "uid": "oran-interfaces"
+}

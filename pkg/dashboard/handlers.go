@@ -90,87 +90,12 @@ func (s *Server) handleGetE2Node(w http.ResponseWriter, r *http.Request) {
 
 // Subscription Manager handlers
 
-// handleGetSubscriptions returns all subscriptions
-func (s *Server) handleGetSubscriptions(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement actual subscription retrieval from Subscription Manager
-	// For now, return mock data
-	subscriptions := []map[string]interface{}{
-		{
-			"id":            "sub-001",
-			"e2nodeId":      "gnb-001",
-			"ranFunctionId": 1,
-			"status":        "active",
-			"createdTime":   time.Now().Add(-30 * time.Minute),
-		},
-	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"subscriptions": subscriptions,
-		"count":         len(subscriptions),
-		"timestamp":     time.Now(),
-	})
+// Placeholder handlers - see e2_handlers.go for actual implementation
+func placeholderHandlerFunction() {
+	// Code moved to e2_handlers.go with proper signatures
 }
 
-// handleCreateSubscription creates a new subscription
-func (s *Server) handleCreateSubscription(w http.ResponseWriter, r *http.Request) {
-	var req map[string]interface{}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	// TODO: Implement actual subscription creation via Subscription Manager
-	// For now, return mock response
-	subscription := map[string]interface{}{
-		"id":            "sub-" + time.Now().Format("20060102150405"),
-		"e2nodeId":      req["e2nodeId"],
-		"ranFunctionId": req["ranFunctionId"],
-		"status":        "active",
-		"createdTime":   time.Now(),
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(subscription)
-
-	// Broadcast subscription update via WebSocket
-	s.wsHub.BroadcastMessage("subscription_created", subscription)
-}
-
-// handleGetSubscription returns a specific subscription
-func (s *Server) handleGetSubscription(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	subID := vars["id"]
-
-	// TODO: Implement actual subscription retrieval from Subscription Manager
-	// For now, return mock data
-	subscription := map[string]interface{}{
-		"id":            subID,
-		"e2nodeId":      "gnb-001",
-		"ranFunctionId": 1,
-		"status":        "active",
-		"createdTime":   time.Now().Add(-30 * time.Minute),
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(subscription)
-}
-
-// handleDeleteSubscription deletes a subscription
-func (s *Server) handleDeleteSubscription(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	subID := vars["id"]
-
-	// TODO: Implement actual subscription deletion via Subscription Manager
-
-	w.WriteHeader(http.StatusNoContent)
-
-	// Broadcast subscription deletion via WebSocket
-	s.wsHub.BroadcastMessage("subscription_deleted", map[string]string{"id": subID})
-}
-
-// App Manager handlers
 
 // handleGetXApps returns all deployed xApps
 func (s *Server) handleGetXApps(w http.ResponseWriter, r *http.Request) {

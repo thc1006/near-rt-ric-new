@@ -21,16 +21,7 @@ type StressTestManager struct {
 	mu                sync.RWMutex
 }
 
-// ResourceMonitor monitors system resources during stress testing
-type ResourceMonitor struct {
-	cpuSamples        []float64
-	memorySamples     []float64
-	networkSamples    []int64
-	diskSamples       []int64
-	goroutineSamples  []int
-	exhaustionPoint   *ResourceExhaustionPoint
-	mu                sync.RWMutex
-}
+// ResourceMonitor type is now defined in types.go to avoid redeclaration
 
 // FailureInjector simulates various failure scenarios
 type FailureInjector struct {

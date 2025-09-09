@@ -16,20 +16,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// ErrorHandler provides comprehensive error handling and recovery mechanisms
-type ErrorHandler struct {
-	mu                sync.RWMutex
-	errorRecords      map[string]*ErrorRecord
-	recoveryHandlers  map[ErrorType]RecoveryHandler
-	alertCallbacks    []ErrorAlertCallback
-	maxRetries        int
-	retryBackoff      time.Duration
-	errorThreshold    int
-	timeWindow        time.Duration
-	isRunning         bool
-	ctx               context.Context
-	cancel            context.CancelFunc
-}
+// ErrorHandler type is now defined in types.go to avoid redeclaration
 
 // ErrorRecord represents a recorded error with context
 type ErrorRecord struct {

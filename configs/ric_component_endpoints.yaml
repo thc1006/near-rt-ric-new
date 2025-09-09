@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ric-component-endpoints
+  namespace: ricplt
+data:
+  # Service discovery configuration for RIC components
+  E2_MGR_ENDPOINT: "ricplt-e2mgr:3800"
+  A1_MEDIATOR_ENDPOINT: "ricplt-a1mediator:10000"
+  APP_MGR_ENDPOINT: "ricplt-appmgr:8080"
+  SUB_MGR_ENDPOINT: "ricplt-submgr:8080"
+  RT_MGR_ENDPOINT: "ricplt-rtmgr:4560"
+  
+  # Timeouts and retry settings
+  HEALTH_CHECK_TIMEOUT: "5"  # seconds
+  HEALTH_CHECK_RETRIES: "3"
+  CIRCUIT_BREAKER_THRESHOLD: "2"

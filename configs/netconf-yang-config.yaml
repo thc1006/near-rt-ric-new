@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oran-netconf-yang-config
+  namespace: oran-config
+data:
+  o1_interface_config: |
+    {
+      "netconf_servers": [
+        {
+          "host": "o-du-01",
+          "port": 830,
+          "yang_modules": [
+            "o-ran-interfaces",
+            "o-ran-operations",
+            "o-ran-performance-management"
+          ]
+        },
+        {
+          "host": "o-ru-01",
+          "port": 830,
+          "yang_modules": [
+            "o-ran-hardware",
+            "o-ran-radio-unit"
+          ]
+        }
+      ],
+      "capabilities": {
+        "data_store_support": [
+          "running",
+          "candidate",
+          "startup"
+        ],
+        "notification_support": true
+      }
+    }
+  
+  yang_model_validation: |
+    {
+      "validation_rules": {
+        "mandatory_modules": [
+          "ietf-interfaces",
+          "o-ran-interfaces",
+          "o-ran-operations"
+        ],
+        "version_constraints": {
+          "ietf-interfaces": ">=2018-02-20",
+          "o-ran-interfaces": ">=1.0.0"
+        }
+      }
+    }

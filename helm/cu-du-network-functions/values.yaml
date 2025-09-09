@@ -1,0 +1,399 @@
+# Default values for cu-du-network-functions
+global:
+  imageRegistry: "oaisoftwarealliance"
+  imagePullPolicy: IfNotPresent
+  storageClass: ""
+  namespace: "oran-network-functions"
+  
+  # Network Configuration
+  plmn:
+    mcc: "001"
+    mnc: "01"
+    
+  # Core Network
+  amf:
+    address: "10.100.1.10"
+    port: 38412
+    
+  upf:
+    address: "10.100.2.10"
+    port: 2152
+    
+  # E2 Termination
+  e2term:
+    address: "e2term-service.oran-system.svc.cluster.local"
+    port: 36421
+
+# CU-CP Configuration
+cucp:
+  enabled: true
+  replicaCount: 1
+  
+  image:
+    repository: oai-gnb
+    tag: "v2.0.0"
+    pullPolicy: IfNotPresent
+    
+  service:
+    type: ClusterIP
+    ports:
+      f1c: 38472
+      e1: 38462
+      ngap: 38412
+      e2: 36421
+      metrics: 9090
+      
+  resources:
+    requests:
+      cpu: 2
+      memory: 4Gi
+      hugepages-1Gi: 1Gi
+    limits:
+      cpu: 4
+      memory: 8Gi
+      hugepages-1Gi: 1Gi
+      
+  config:
+    gnbId: 1
+    gnbName: "CU-CP-01"
+    
+  # Security Context
+  securityContext:
+    capabilities:
+      add: ["IPC_LOCK", "NET_ADMIN", "SYS_NICE"]
+    runAsUser: 0
+    
+  # Node Selection
+  nodeSelector:
+    node-role.kubernetes.io/cu: "true"
+    
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: cu
+      effect: NoSchedule
+      
+  # Health Checks
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 9090
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 9090
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+# CU-UP Configuration
+cuup:
+  enabled: true
+  replicaCount: 1
+  
+  image:
+    repository: oai-gnb
+    tag: "v2.0.0"
+    pullPolicy: IfNotPresent
+    
+  service:
+    type: ClusterIP
+    ports:
+      e1: 38462
+      gtpu: 2152
+      metrics: 9091
+      
+  resources:
+    requests:
+      cpu: 4
+      memory: 8Gi
+      hugepages-1Gi: 2Gi
+      intel.com/intel_sriov_netdevice: "1"
+    limits:
+      cpu: 8
+      memory: 16Gi
+      hugepages-1Gi: 2Gi
+      intel.com/intel_sriov_netdevice: "1"
+      
+  config:
+    cupId: 1
+    
+  # Security Context
+  securityContext:
+    capabilities:
+      add: ["IPC_LOCK", "NET_ADMIN", "SYS_NICE"]
+    runAsUser: 0
+    
+  # Node Selection - prefer SR-IOV capable nodes
+  nodeSelector:
+    intel.feature.node.kubernetes.io/network-sriov: "true"
+    
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: cu
+      effect: NoSchedule
+      
+  # Health Checks
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 9091
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 9091
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+# DU Configuration
+du:
+  enabled: true
+  replicaCount: 2
+  
+  image:
+    repository: oai-gnb
+    tag: "v2.0.0"
+    pullPolicy: IfNotPresent
+    
+  service:
+    type: ClusterIP
+    ports:
+      f1c: 38472
+      f1u: 2152
+      e2: 36421
+      ecpri: 4043
+      metrics: 9092
+      
+  resources:
+    requests:
+      cpu: 8
+      memory: 16Gi
+      hugepages-1Gi: 4Gi
+      intel.com/intel_sriov_netdevice: "2"
+    limits:
+      cpu: 16
+      memory: 32Gi
+      hugepages-1Gi: 4Gi
+      intel.com/intel_sriov_netdevice: "2"
+      
+  # Per-DU Configuration
+  instances:
+    - duId: 1
+      cellId: 1
+      physicalCellId: 0
+      tac: 1
+    - duId: 2
+      cellId: 2
+      physicalCellId: 1
+      tac: 1
+      
+  # Security Context
+  securityContext:
+    capabilities:
+      add: ["IPC_LOCK", "NET_ADMIN", "SYS_NICE", "SYS_ADMIN"]
+    runAsUser: 0
+    
+  # Node Selection
+  nodeSelector:
+    node-role.kubernetes.io/du: "true"
+    
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: du
+      effect: NoSchedule
+      
+  # Health Checks
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 9092
+    initialDelaySeconds: 90
+    periodSeconds: 30
+    
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 9092
+    initialDelaySeconds: 60
+    periodSeconds: 10
+
+# Radio Configuration
+radio:
+  # Operating Band
+  band: "n78"
+  frequency: 3500000  # kHz
+  bandwidth: 100      # MHz
+  
+  # TDD Configuration
+  tdd:
+    pattern: "DDDSUU"
+    periodicity: "ms2p5"
+    
+  # Antenna Configuration
+  antenna:
+    txPower: 43       # dBm
+    numPorts: 4
+    
+  # Cell Configuration
+  cells:
+    - cellId: 1
+      pci: 0
+      earfcn: 632628
+    - cellId: 2
+      pci: 1
+      earfcn: 632628
+
+# Interface Configurations
+interfaces:
+  f1:
+    enabled: true
+    sctp:
+      heartbeatInterval: 30
+      pathMaxRetrans: 5
+      
+  e1:
+    enabled: true
+    sctp:
+      heartbeatInterval: 30
+      pathMaxRetrans: 5
+      
+  e2:
+    enabled: true
+    serviceModels:
+      kpm:
+        enabled: true
+        version: "3.0.0"
+      rc:
+        enabled: true
+        version: "1.0.3"
+
+# Network Policies
+networkPolicy:
+  enabled: true
+  ingress:
+    enabled: true
+    rules:
+      - from:
+        - podSelector:
+            matchLabels:
+              app: cu-cp
+        - podSelector:
+            matchLabels:
+              app: cu-up
+        - podSelector:
+            matchLabels:
+              app: du
+  egress:
+    enabled: true
+
+# Fronthaul Configuration
+fronthaul:
+  enabled: true
+  networkAttachmentDefinition:
+    name: "fronthaul-net"
+    config:
+      type: "sriov"
+      master: "enp1s0f1"
+      vlan: 100
+      
+  ecpri:
+    enabled: true
+    version: "2.0"
+    compression: 9
+
+# Performance Configuration
+performance:
+  cpuIsolation:
+    enabled: true
+    cucp: "2-3"
+    cuup: "4-7" 
+    du: "8-15"
+    
+  hugepages:
+    enabled: true
+    size: "1Gi"
+    
+  realtime:
+    enabled: true
+    priority: 99
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+  
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      
+  grafana:
+    enabled: true
+    dashboards:
+      enabled: true
+      
+  alerts:
+    enabled: true
+    rules:
+      cpu_threshold: 80
+      memory_threshold: 90
+      latency_threshold: 100  # ms
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: "cu-du-sa"
+
+# RBAC
+rbac:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources: ["pods", "services", "configmaps"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["apps"]
+      resources: ["deployments"]
+      verbs: ["get", "list", "watch"]
+
+# Pod Security Policy
+podSecurityPolicy:
+  enabled: false
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Autoscaling (disabled by default for network functions)
+autoscaling:
+  enabled: false
+  
+# Persistence
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 10Gi
+
+# Additional volumes and volume mounts
+extraVolumes: []
+extraVolumeMounts: []
+
+# Pod annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  
+# Test configuration
+tests:
+  enabled: true
+  image:
+    repository: curlimages/curl
+    tag: latest

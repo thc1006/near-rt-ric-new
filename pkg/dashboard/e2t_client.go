@@ -6,6 +6,7 @@ SPDX-License-Identifier: Apache-2.0
 package dashboard
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -49,11 +50,6 @@ type E2SetupResponse struct {
 	E2NodeComponentConfigUpdateAckList []E2NodeComponentConfigUpdateAck `json:"e2NodeComponentConfigUpdateAckList"`
 }
 
-// GlobalRICID represents the global RIC identifier
-type GlobalRICID struct {
-	PlmnID string `json:"plmnId"`
-	RicID  string `json:"ricId"`
-}
 
 // RANFunctionAccepted represents an accepted RAN function
 type RANFunctionAccepted struct {
@@ -67,25 +63,7 @@ type RANFunctionRejected struct {
 	Cause         string `json:"cause"`
 }
 
-// E2NodeComponentConfigUpdateAck represents acknowledgment of component config update
-type E2NodeComponentConfigUpdateAck struct {
-	E2NodeComponentInterfaceType string `json:"e2NodeComponentInterfaceType"`
-	E2NodeComponentID            string `json:"e2NodeComponentId"`
-	UpdateOutcome                string `json:"updateOutcome"`
-}
 
-// E2APMessage represents an E2AP protocol message
-type E2APMessage struct {
-	MessageType    string    `json:"messageType"`
-	ProcedureCode  uint8     `json:"procedureCode"`
-	Criticality    string    `json:"criticality"`
-	TransactionID  uint32    `json:"transactionId"`
-	Payload        []byte    `json:"payload"`
-	Timestamp      time.Time `json:"timestamp"`
-	SourceAddress  string    `json:"sourceAddress"`
-	DestAddress    string    `json:"destAddress"`
-	AssociationID  string    `json:"associationId"`
-}
 
 // NewE2TClient creates a new E2 Termination client
 func NewE2TClient(conn *grpc.ClientConn, httpClient *http.Client, endpoint string, sctpManager *SCTPConnectionManager) *E2TClient {
@@ -204,7 +182,7 @@ func (c *E2TClient) SendE2APMessage(ctx context.Context, message *E2APMessage) e
 		return fmt.Errorf("failed to marshal E2AP message: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}

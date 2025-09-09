@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-world-xapp
+  namespace: oran-xapps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello-world-xapp
+  template:
+    metadata:
+      labels:
+        app: hello-world-xapp
+    spec:
+      containers:
+      - name: hello-world-xapp
+        image: nexus3.o-ran-sc.org:10002/o-ran-sc/xapp-hello-world:latest
+        env:
+        - name: RMR_SEED_RT
+          value: "/opt/route/local.rt"
+        ports:
+        - containerPort: 4560  # RMR port
+        - containerPort: 8080  # HTTP management

@@ -1,0 +1,507 @@
+# O-RAN SC Near-RT RIC Fixed Deployment with Proper Images
+# This deployment uses official O-RAN SC images from nexus3.o-ran-sc.org:10002
+
+---
+# Registry Secret for O-RAN SC Nexus
+# NOTE: Create this secret separately using kubectl:
+# kubectl create secret docker-registry oran-sc-registry-secret \
+#   --docker-server=nexus3.o-ran-sc.org:10002 \
+#   --docker-username=<username> \
+#   --docker-password=<password> \
+#   --namespace=ricplt
+# 
+# DO NOT hardcode credentials in deployment files!
+
+---
+# Redis Database for RIC Platform
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ricplt-dbaas
+  namespace: ricplt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ricplt-dbaas
+  template:
+    metadata:
+      labels:
+        app: ricplt-dbaas
+    spec:
+      containers:
+      - name: dbaas
+        image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-plt-dbaas:4.1.0
+        ports:
+        - containerPort: 6379
+        env:
+        - name: DBAAS_SERVICE_HOST
+          value: "0.0.0.0"
+        - name: DBAAS_SERVICE_PORT
+          value: "6379"
+      imagePullSecrets:
+      - name: oran-sc-registry-secret
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ricplt-dbaas
+  namespace: ricplt
+spec:
+  selector:
+    app: ricplt-dbaas
+  ports:
+  - port: 6379
+    targetPort: 6379
+    name: redis
+
+---
+# E2 Termination
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ricplt-e2term
+  namespace: ricplt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ricplt-e2term
+  template:
+    metadata:
+      labels:
+        app: ricplt-e2term
+    spec:
+      containers:
+      - name: e2term
+        image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-plt-e2:6.0.4
+        ports:
+        - containerPort: 38000
+          name: rmr-data
+        - containerPort: 38001
+          name: rmr-route
+        - containerPort: 9999
+          name: sctp-alpha
+        - containerPort: 36421
+          name: sctp-beta
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: CFG_FILE
+          value: "/opt/e2/config/config.conf"
+        - name: RMR_SEED_RT
+          value: "/opt/e2/config/uta_rtg.rt"
+        - name: RMR_RTG_SVC
+          value: "ricplt-rtmgr:4561"
+        - name: SCTP_PORT
+          value: "36421"
+        - name: DBAAS_SERVICE_HOST
+          value: "ricplt-dbaas"
+        - name: DBAAS_SERVICE_PORT
+          value: "6379"
+        volumeMounts:
+        - name: config-volume
+          mountPath: /opt/e2/config
+        readinessProbe:
+          tcpSocket:
+            port: 38000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          tcpSocket:
+            port: 38000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+      volumes:
+      - name: config-volume
+        configMap:
+          name: ricplt-e2term-config
+      imagePullSecrets:
+      - name: oran-sc-registry-secret
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ricplt-e2term
+  namespace: ricplt
+spec:
+  selector:
+    app: ricplt-e2term
+  ports:
+  - port: 38000
+    targetPort: 38000
+    name: rmr-data
+  - port: 38001
+    targetPort: 38001
+    name: rmr-route
+  - port: 36421
+    targetPort: 36421
+    name: sctp-beta
+    protocol: SCTP
+  - port: 9999
+    targetPort: 9999
+    name: sctp-alpha
+    protocol: SCTP
+
+---
+# E2 Manager
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ricplt-e2mgr
+  namespace: ricplt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ricplt-e2mgr
+  template:
+    metadata:
+      labels:
+        app: ricplt-e2mgr
+    spec:
+      containers:
+      - name: e2mgr
+        image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-plt-e2mgr:5.4.2
+        ports:
+        - containerPort: 3800
+          name: http
+        - containerPort: 4800
+          name: rmr
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: RMR_PORT
+          value: "4800"
+        - name: HTTP_PORT
+          value: "3800"
+        - name: RMR_RTG_SVC
+          value: "ricplt-rtmgr:4561"
+        - name: DBAAS_SERVICE_HOST
+          value: "ricplt-dbaas"
+        - name: DBAAS_SERVICE_PORT
+          value: "6379"
+        - name: DBAAS_NAMESPACE
+          value: "ricplt"
+        readinessProbe:
+          httpGet:
+            path: /v1/nodeb/states
+            port: 3800
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /v1/nodeb/states
+            port: 3800
+          initialDelaySeconds: 15
+          periodSeconds: 10
+      imagePullSecrets:
+      - name: oran-sc-registry-secret
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ricplt-e2mgr
+  namespace: ricplt
+spec:
+  selector:
+    app: ricplt-e2mgr
+  ports:
+  - port: 3800
+    targetPort: 3800
+    name: http
+  - port: 4800
+    targetPort: 4800
+    name: rmr
+
+---
+# RIC Dashboard (Official O-RAN SC)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ric-dashboard-api
+  namespace: ricplt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ric-dashboard-api
+  template:
+    metadata:
+      labels:
+        app: ric-dashboard-api
+    spec:
+      containers:
+      - name: dashboard
+        image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-dashboard:2.1.0
+        ports:
+        - containerPort: 8080
+        env:
+        - name: PORTALAPI_SECURITY
+          value: "false"
+        - name: PORTALAPI_APPNAME
+          value: "RIC Dashboard"
+        - name: RICPLT_NAMESPACE
+          value: "ricplt"
+        - name: RICPLT_RELEASE_NAME
+          value: "ricplt"
+        - name: RICPLT_PLT_E2MGR_URL
+          value: "http://ricplt-e2mgr:3800"
+        - name: RICPLT_PLT_A1MEDIATOR_URL
+          value: "http://ricplt-a1mediator:10000"
+        - name: RICPLT_PLT_APPMGR_URL
+          value: "http://ricplt-appmgr:8080"
+        readinessProbe:
+          httpGet:
+            path: /api/health/ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /api/health/alive
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 10
+      imagePullSecrets:
+      - name: oran-sc-registry-secret
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ric-dashboard-api
+  namespace: ricplt
+spec:
+  selector:
+    app: ric-dashboard-api
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+  type: LoadBalancer
+
+---
+# Routing Manager
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ricplt-rtmgr
+  namespace: ricplt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ricplt-rtmgr
+  template:
+    metadata:
+      labels:
+        app: ricplt-rtmgr
+    spec:
+      containers:
+      - name: rtmgr
+        image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-plt-rtmgr:4.1.0
+        ports:
+        - containerPort: 4560
+          name: http
+        - containerPort: 4561
+          name: rmr-route
+        - containerPort: 4562
+          name: rmr-data
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: RTMGR_SBI
+          value: "nngpush"
+        - name: RTMGR_NBI
+          value: "httpRESTful"
+        - name: DBAAS_SERVICE_HOST
+          value: "ricplt-dbaas"
+        - name: DBAAS_SERVICE_PORT
+          value: "6379"
+      imagePullSecrets:
+      - name: oran-sc-registry-secret
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ricplt-rtmgr
+  namespace: ricplt
+spec:
+  selector:
+    app: ricplt-rtmgr
+  ports:
+  - port: 4560
+    targetPort: 4560
+    name: http
+  - port: 4561
+    targetPort: 4561
+    name: rmr-route
+  - port: 4562
+    targetPort: 4562
+    name: rmr-data
+
+---
+# A1 Mediator
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ricplt-a1mediator
+  namespace: ricplt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ricplt-a1mediator
+  template:
+    metadata:
+      labels:
+        app: ricplt-a1mediator
+    spec:
+      containers:
+      - name: a1mediator
+        image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-plt-a1:2.5.1
+        ports:
+        - containerPort: 10000
+          name: http
+        - containerPort: 4562
+          name: rmr
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: RMR_PORT
+          value: "4562"
+        - name: A1_HTTP_PORT
+          value: "10000"
+        - name: RMR_RTG_SVC
+          value: "ricplt-rtmgr:4561"
+        - name: DBAAS_SERVICE_HOST
+          value: "ricplt-dbaas"
+        - name: DBAAS_SERVICE_PORT
+          value: "6379"
+      imagePullSecrets:
+      - name: oran-sc-registry-secret
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ricplt-a1mediator
+  namespace: ricplt
+spec:
+  selector:
+    app: ricplt-a1mediator
+  ports:
+  - port: 10000
+    targetPort: 10000
+    name: http
+  - port: 4562
+    targetPort: 4562
+    name: rmr
+
+---
+# Subscription Manager
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ricplt-submgr
+  namespace: ricplt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ricplt-submgr
+  template:
+    metadata:
+      labels:
+        app: ricplt-submgr
+    spec:
+      containers:
+      - name: submgr
+        image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-plt-submgr:4.1.1
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 4560
+          name: rmr
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: RMR_PORT
+          value: "4560"
+        - name: HTTP_PORT
+          value: "8080"
+        - name: RMR_RTG_SVC
+          value: "ricplt-rtmgr:4561"
+        - name: DBAAS_SERVICE_HOST
+          value: "ricplt-dbaas"
+        - name: DBAAS_SERVICE_PORT
+          value: "6379"
+      imagePullSecrets:
+      - name: oran-sc-registry-secret
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ricplt-submgr
+  namespace: ricplt
+spec:
+  selector:
+    app: ricplt-submgr
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+  - port: 4560
+    targetPort: 4560
+    name: rmr
+
+---
+# E2TERM Configuration ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ricplt-e2term-config
+  namespace: ricplt
+data:
+  config.conf: |
+    # E2TERM Configuration
+    logLevel=info
+    mdclogLevel=info
+    prometheusPort=8088
+    
+    # RMR Configuration
+    rmrAddress=0.0.0.0
+    rmrPort=38000
+    
+    # SCTP Configuration
+    sctpPort=36421
+    
+    # Thread Pool Configuration
+    numOfCpuCores=2
+    numOfWorkerThreads=4
+  
+  uta_rtg.rt: |
+    # RMR Routing Table
+    newrt|start
+    rte|12010|ricplt-e2mgr:4800
+    rte|12011|ricplt-e2mgr:4800
+    rte|12020|ricplt-submgr:4560
+    rte|12021|ricplt-submgr:4560
+    rte|20001|ricplt-a1mediator:4562
+    newrt|end

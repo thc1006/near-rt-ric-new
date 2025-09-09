@@ -21,27 +21,7 @@ type LatencyTestManager struct {
 	mu              sync.RWMutex
 }
 
-// LatencyTracker tracks latency measurements across different operations
-type LatencyTracker struct {
-	e2SetupLatencies        []float64
-	subscriptionLatencies   []float64
-	indicationLatencies     []float64
-	controlLatencies        []float64
-	endToEndLatencies       []float64
-	latencyDistribution     map[float64]int64 // bucket -> count
-	activeOperations        map[string]*LatencyMeasurement
-	mu                      sync.RWMutex
-}
 
-// LatencyMeasurement tracks a single operation's latency
-type LatencyMeasurement struct {
-	OperationID   string
-	OperationType string
-	StartTime     time.Time
-	EndTime       *time.Time
-	Latency       *time.Duration
-	Metadata      map[string]interface{}
-}
 
 // LatencyTestMetrics captures detailed latency test metrics
 type LatencyTestMetrics struct {

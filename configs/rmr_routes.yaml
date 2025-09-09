@@ -1,0 +1,38 @@
+rmr:
+  default_routes:
+    - e2term:36421
+    - a1mediator:8080
+    - appmgr:8082
+
+  routes:
+    e2_setup:
+      - e2mgr:5000
+      - e2term:36421
+    
+    subscription:
+      - submgr:4560
+      - e2mgr:5000
+    
+    indication:
+      - xapps:4560
+      - rtmgr:4561
+    
+    ric_control:
+      - a1mediator:8080
+      - e2mgr:5000
+
+  connection_pool:
+    max_connections: 10
+    idle_timeout: 5m
+    connection_timeout: 10s
+
+  retry_policy:
+    max_retries: 3
+    backoff_strategy: exponential
+    initial_backoff: 100ms
+    max_backoff: 5s
+
+  telemetry:
+    enabled: true
+    metrics_endpoint: /metrics/rmr
+    log_routing_errors: true

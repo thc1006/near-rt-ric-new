@@ -14,30 +14,9 @@ import (
 	"time"
 )
 
-// HorizontalScaler manages automatic scaling of stateless components
-type HorizontalScaler struct {
-	scalingPolicies map[string]*ScalingPolicy
-	instances       map[string]*InstanceGroup
-	metrics         *ScalingMetrics
-	scaleExecutor   *ScaleExecutor
-	mu              sync.RWMutex
-}
+// HorizontalScaler type is now defined in types.go to avoid redeclaration
 
-// ScalingPolicy defines scaling behavior for a component
-type ScalingPolicy struct {
-	ComponentName    string
-	MinInstances     int
-	MaxInstances     int
-	TargetCPU        float64 // Target CPU utilization (0.0-1.0)
-	TargetMemory     float64 // Target memory utilization (0.0-1.0)
-	TargetLatency    time.Duration
-	TargetThroughput int64 // Requests per second
-	ScaleUpCooldown  time.Duration
-	ScaleDownCooldown time.Duration
-	ScaleUpThreshold  float64 // Threshold to trigger scale up
-	ScaleDownThreshold float64 // Threshold to trigger scale down
-	Enabled          bool
-}
+// ScalingPolicy type is now defined in types.go to avoid redeclaration
 
 // InstanceGroup manages a group of instances for a component
 type InstanceGroup struct {
@@ -84,17 +63,6 @@ type ScalingMetrics struct {
 	mu              sync.RWMutex
 }
 
-// ResourceUsage tracks resource utilization
-type ResourceUsage struct {
-	CPUUsage       float64
-	MemoryUsage    float64
-	NetworkIn      int64
-	NetworkOut     int64
-	RequestRate    float64
-	ErrorRate      float64
-	AverageLatency time.Duration
-	LastUpdated    time.Time
-}
 
 // ScaleExecutor handles the actual scaling operations
 type ScaleExecutor struct {
@@ -103,40 +71,13 @@ type ScaleExecutor struct {
 	mu               sync.RWMutex
 }
 
-// KubernetesClient interface for Kubernetes operations
-type KubernetesClient interface {
-	ScaleDeployment(ctx context.Context, namespace, name string, replicas int32) error
-	GetDeploymentStatus(ctx context.Context, namespace, name string) (*DeploymentStatus, error)
-	CreateDeployment(ctx context.Context, spec *DeploymentSpec) error
-	DeleteDeployment(ctx context.Context, namespace, name string) error
-}
+// KubernetesClient interface is now defined in types.go to avoid redeclaration
 
-// DeploymentSpec defines a Kubernetes deployment specification
-type DeploymentSpec struct {
-	Name      string
-	Namespace string
-	Image     string
-	Replicas  int32
-	Resources *ResourceRequirements
-	Labels    map[string]string
-	Env       map[string]string
-}
+// DeploymentSpec type is now defined in types.go to avoid redeclaration
 
-// ResourceRequirements defines resource requirements for a deployment
-type ResourceRequirements struct {
-	CPURequest    string
-	CPULimit      string
-	MemoryRequest string
-	MemoryLimit   string
-}
+// ResourceRequirements type is now defined in types.go to avoid redeclaration
 
-// DeploymentStatus represents the status of a deployment
-type DeploymentStatus struct {
-	ReadyReplicas     int32
-	AvailableReplicas int32
-	UnavailableReplicas int32
-	UpdatedReplicas   int32
-}
+// DeploymentStatus type is now defined in types.go to avoid redeclaration
 
 // AutoScaler manages automatic scaling decisions
 type AutoScaler struct {

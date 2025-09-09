@@ -102,40 +102,6 @@ func NewInteroperabilityComplianceTest(runner *ComplianceTestRunner) *Interopera
 	}
 }
 
-// runInteroperabilityTest executes interoperability compliance tests
-func (r *ComplianceTestRunner) runInteroperabilityTest(ctx context.Context, test ComplianceTest) TestResult {
-	interopTest := NewInteroperabilityComplianceTest(r)
-	
-	switch test.ID {
-	case "interop-001":
-		return interopTest.testThirdPartyE2NodeIntegration(ctx, test)
-	case "interop-002":
-		return interopTest.testSMOIntegration(ctx, test)
-	case "interop-003":
-		return interopTest.testMultiVendorCompatibility(ctx, test)
-	case "interop-004":
-		return interopTest.testProtocolVersionCompatibility(ctx, test)
-	case "interop-005":
-		return interopTest.testDataFormatCompatibility(ctx, test)
-	case "interop-006":
-		return interopTest.testServiceModelInteroperability(ctx, test)
-	case "interop-007":
-		return interopTest.testCrossVendorPolicyExchange(ctx, test)
-	case "interop-008":
-		return interopTest.testManagementInterfaceCompatibility(ctx, test)
-	case "interop-009":
-		return interopTest.testScalabilityWithThirdParty(ctx, test)
-	case "interop-010":
-		return interopTest.testFailoverWithThirdParty(ctx, test)
-	default:
-		return TestResult{
-			TestID:  test.ID,
-			Status:  StatusError,
-			Message: fmt.Sprintf("Unknown interoperability test: %s", test.ID),
-		}
-	}
-}
-
 // testThirdPartyE2NodeIntegration validates integration with third-party E2 nodes
 func (t *InteroperabilityComplianceTest) testThirdPartyE2NodeIntegration(ctx context.Context, test ComplianceTest) TestResult {
 	result := TestResult{

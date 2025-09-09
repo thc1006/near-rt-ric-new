@@ -175,36 +175,9 @@ type CircularLogBuffer struct {
 	count    int
 }
 
-// LogEntry represents a structured log entry
-type LogEntry struct {
-	ID            string                 `json:"id"`
-	Timestamp     time.Time              `json:"timestamp"`
-	Level         LogLevel               `json:"level"`
-	Component     string                 `json:"component"`
-	Message       string                 `json:"message"`
-	CorrelationID string                 `json:"correlationId"`
-	Fields        map[string]interface{} `json:"fields"`
-	StackTrace    string                 `json:"stackTrace,omitempty"`
-}
+// LogEntry type is now defined in types.go to avoid redeclaration
 
-// ResourceMonitor monitors system resources for connection pooling
-type ResourceMonitor struct {
-	mu               sync.RWMutex
-	cpuUsage         float64
-	memoryUsage      float64
-	networkUsage     float64
-	diskUsage        float64
-	connectionCount  int64
-	
-	// Thresholds
-	cpuThreshold     float64
-	memoryThreshold  float64
-	networkThreshold float64
-	
-	// Monitoring interval
-	interval         time.Duration
-	lastCheck        time.Time
-}
+// ResourceMonitor type is now defined in types.go to avoid redeclaration
 
 // NewProductionHardeningManager creates a new production hardening manager
 func NewProductionHardeningManager(config *ProductionHardeningConfig) *ProductionHardeningManager {

@@ -1,0 +1,238 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cu-up
+  namespace: oran-network-functions
+  labels:
+    app: cu-up
+    component: user-plane
+    interface: e1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cu-up
+  template:
+    metadata:
+      labels:
+        app: cu-up
+        component: user-plane
+        interface: e1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9091"
+        k8s.v1.cni.cncf.io/networks: |
+          [{
+            "name": "sriov-net",
+            "interface": "net1",
+            "ips": ["10.10.1.10/24"]
+          }]
+    spec:
+      serviceAccountName: cu-up-sa
+      containers:
+      - name: cu-up
+        image: oaisoftwarealliance/oai-gnb:v2.0.0
+        command: ["/opt/oai-gnb/bin/nr-softmodem"]
+        args: ["-O", "/etc/oai/cu-up.conf", "--sa", "--cu-up"]
+        resources:
+          requests:
+            cpu: 4
+            memory: 8Gi
+            hugepages-1Gi: 2Gi
+            intel.com/intel_sriov_netdevice: "1"
+          limits:
+            cpu: 8
+            memory: 16Gi
+            hugepages-1Gi: 2Gi
+            intel.com/intel_sriov_netdevice: "1"
+        env:
+        - name: CU_UP_ID
+          value: "1"
+        - name: PLMN_MCC
+          value: "001"
+        - name: PLMN_MNC
+          value: "01"
+        - name: CU_CP_IP
+          valueFrom:
+            configMapKeyRef:
+              name: cu-up-config
+              key: cu.cp.address
+        - name: UPF_IP
+          valueFrom:
+            configMapKeyRef:
+              name: cu-up-config
+              key: upf.address
+        - name: TZ
+          value: "UTC"
+        ports:
+        - containerPort: 38462  # E1 interface
+          name: e1
+          protocol: SCTP
+        - containerPort: 2152   # GTP-U
+          name: gtpu
+          protocol: UDP
+        - containerPort: 9091   # Metrics
+          name: metrics
+          protocol: TCP
+        volumeMounts:
+        - name: config
+          mountPath: /etc/oai
+        - name: hugepage
+          mountPath: /dev/hugepages
+        - name: shared-data
+          mountPath: /shared
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 9091
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 9091
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          capabilities:
+            add: ["IPC_LOCK", "NET_ADMIN", "SYS_NICE"]
+          runAsUser: 0
+      volumes:
+      - name: config
+        configMap:
+          name: cu-up-config
+      - name: hugepage
+        emptyDir:
+          medium: HugePages
+      - name: shared-data
+        emptyDir: {}
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: intel.feature.node.kubernetes.io/network-sriov
+                operator: In
+                values: ["true"]
+      tolerations:
+      - key: dedicated
+        operator: Equal
+        value: cu
+        effect: NoSchedule
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cu-up-service
+  namespace: oran-network-functions
+  labels:
+    app: cu-up
+    component: user-plane
+spec:
+  selector:
+    app: cu-up
+  ports:
+  - name: e1
+    port: 38462
+    targetPort: 38462
+    protocol: SCTP
+  - name: gtpu
+    port: 2152
+    targetPort: 2152
+    protocol: UDP
+  - name: metrics
+    port: 9091
+    targetPort: 9091
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cu-up-config
+  namespace: oran-network-functions
+data:
+  cu.cp.address: "cu-cp-service.oran-network-functions.svc.cluster.local"
+  upf.address: "10.100.2.10"
+  cu-up.conf: |
+    Active_gNBs = ( "cu-up-01" );
+    gNBs = (
+      {
+        gNB_ID = 1;
+        gNB_name = "CU-UP-01";
+        
+        # gNB CU-UP Configuration
+        gNB_CU_UP_ID = 1;
+        enable_cu_cp = "no";
+        enable_cu_up = "yes";
+        enable_du = "no";
+        
+        # E1 Interface Configuration
+        e1_interface = {
+          type = "up";
+          ipv4_cuup = "0.0.0.0";
+          port_cuup = 38462;
+          ipv4_cucp_e1 = "cu-cp-service.oran-network-functions.svc.cluster.local";
+          port_cucp_e1 = 38462;
+        };
+        
+        # GTP-U Configuration
+        gtp_u = {
+          gtpu_ipv4_address = "0.0.0.0";
+          gtpu_port = 2152;
+          upf_ipv4_address = "10.100.2.10";
+        };
+        
+        # PDCP Configuration
+        pdcp = {
+          integrity_protection_algorithm = "NIA2";
+          ciphering_algorithm = "NEA0";
+        };
+        
+        # QoS Configuration
+        qos = {
+          default_drb_qos_flow = {
+            qci = 9;
+            allocation_retention_priority = {
+              priority_level = 15;
+              pre_emption_capability = "NOT_PREEMPT";
+              pre_emption_vulnerability = "NOT_PREEMPTABLE";
+            };
+            gbr_qos_flow_information = {
+              max_flow_bit_rate_dl = 1000000;
+              max_flow_bit_rate_ul = 1000000;
+              guaranteed_flow_bit_rate_dl = 1000000;
+              guaranteed_flow_bit_rate_ul = 1000000;
+            };
+          };
+        };
+        
+        # Network Slicing
+        network_slicing = {
+          slice_1 = {
+            sst = 1;
+            sd = "0x000001";
+            dnn = "internet";
+          };
+          slice_2 = {
+            sst = 2;
+            sd = "0x000002";
+            dnn = "enterprise";
+          };
+        };
+      }
+    );
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cu-up-sa
+  namespace: oran-network-functions

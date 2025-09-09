@@ -555,4 +555,4 @@ class DashboardAPI {
 const dashboardAPI = new DashboardAPI();
 
 export default dashboardAPI;
-export { APIError };
+export { APIError, API_BASE_URL, WS_URL };

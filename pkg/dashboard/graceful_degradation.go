@@ -13,18 +13,7 @@ import (
 	"time"
 )
 
-// GracefulDegradationManager manages graceful degradation of services
-type GracefulDegradationManager struct {
-	mu                sync.RWMutex
-	services          map[string]*ServiceHealth
-	degradationRules  map[string]*DegradationRule
-	fallbackHandlers  map[string]FallbackHandler
-	healthCheckers    map[string]HealthChecker
-	isRunning         bool
-	ctx               context.Context
-	cancel            context.CancelFunc
-	checkInterval     time.Duration
-}
+// GracefulDegradationManager - type definition moved to advanced_smo_implementations_clean.go
 
 // ServiceHealth represents the health status of a service
 type ServiceHealth struct {
@@ -110,17 +99,7 @@ type DegradationAction struct {
 	Parameters map[string]interface{} `json:"parameters"`
 }
 
-// ActionType represents the type of degradation action
-type ActionType string
-
-const (
-	ActionFallback        ActionType = "FALLBACK"
-	ActionRateLimit       ActionType = "RATE_LIMIT"
-	ActionCircuitBreaker  ActionType = "CIRCUIT_BREAKER"
-	ActionLoadShedding    ActionType = "LOAD_SHEDDING"
-	ActionCaching         ActionType = "CACHING"
-	ActionRetry           ActionType = "RETRY"
-)
+// ActionType type is now defined in types.go to avoid redeclaration
 
 // FallbackHandler defines the interface for fallback handlers
 type FallbackHandler interface {
@@ -128,19 +107,7 @@ type FallbackHandler interface {
 	GetFallbackType() string
 }
 
-// HealthChecker defines the interface for health checkers
-type HealthChecker interface {
-	CheckHealth(ctx context.Context) (*HealthCheckResult, error)
-	GetServiceName() string
-}
 
-// HealthCheckResult represents the result of a health check
-type HealthCheckResult struct {
-	Healthy      bool                   `json:"healthy"`
-	ResponseTime time.Duration          `json:"responseTime"`
-	ErrorMessage string                 `json:"errorMessage,omitempty"`
-	Metadata     map[string]interface{} `json:"metadata,omitempty"`
-}
 
 // NewGracefulDegradationManager creates a new graceful degradation manager
 func NewGracefulDegradationManager() *GracefulDegradationManager {

@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oran-service-models
+  namespace: oran-config
+data:
+  registered_models: |
+    {
+      "e2_service_models": [
+        {
+          "name": "ORAN-E2SM-RC",
+          "version": "1.0.0",
+          "capabilities": [
+            "RAN_CONTROL",
+            "QOS_MANAGEMENT",
+            "LOAD_BALANCING"
+          ]
+        },
+        {
+          "name": "ORAN-E2SM-KPM",
+          "version": "2.0.0",
+          "capabilities": [
+            "KEY_PERFORMANCE_METRICS",
+            "MONITORING"
+          ]
+        }
+      ],
+      "a1_service_models": [
+        {
+          "name": "ORAN-A1-PMS",
+          "version": "1.1.0",
+          "capabilities": [
+            "POLICY_MANAGEMENT",
+            "ADMISSION_CONTROL"
+          ]
+        }
+      ]
+    }
