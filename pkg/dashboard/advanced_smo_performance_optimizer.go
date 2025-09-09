@@ -373,7 +373,7 @@ func (aspo *AdvancedSMOPerformanceOptimizer) OptimizeForThroughput(targetIPS int
 	}
 
 	// Update configuration
-	aspo.config.TargetThroughputIPS = targetIPS
+	aspo.config.TargetThroughputIPS = float64(targetIPS)
 
 	return nil
 }

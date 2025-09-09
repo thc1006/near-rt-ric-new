@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -471,6 +472,24 @@ func (s SubscriptionStatus) String() string {
 	}
 }
 
+// A1MediatorClient interface for A1 Mediator operations  
+type A1MediatorClient interface {
+	GetHealth(ctx context.Context) (*A1Health, error)
+	GetPolicyTypes(ctx context.Context) (*PolicyTypeListResponse, error)
+	GetPolicyType(ctx context.Context, policyTypeID PolicyTypeID) (*PolicyType, error)
+	CreatePolicyType(ctx context.Context, policyTypeID PolicyTypeID, request *PolicyTypeRequest) error
+	DeletePolicyType(ctx context.Context, policyTypeID PolicyTypeID) error
+	GetPolicyInstances(ctx context.Context, policyTypeID PolicyTypeID) (*PolicyInstanceListResponse, error)
+	GetPolicyInstance(ctx context.Context, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID) (*PolicyInstance, error)
+	CreatePolicyInstance(ctx context.Context, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID, request *PolicyInstanceRequest) error
+	UpdatePolicyInstance(ctx context.Context, policyTypeID PolicyTypeID, update *PolicyInstanceUpdate) error
+	DeletePolicyInstance(ctx context.Context, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID) error
+	GetPolicyInstanceStatus(ctx context.Context, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID) (*PolicyStatus, error)
+	GetStats(ctx context.Context) (*A1Stats, error)
+	ValidatePolicy(ctx context.Context, policyTypeID PolicyTypeID, policy json.RawMessage) (*PolicyValidationResult, error)
+	IsConnected() bool
+}
+
 // A1MediatorClientImpl represents the concrete implementation of A1 Mediator client
 type A1MediatorClientImpl struct {
 	BaseURL    string
@@ -497,6 +516,7 @@ func (c *A1MediatorClientImpl) SetAuthToken(token string) {
 	defer c.mu.Unlock()
 	c.AuthToken = token
 }
+
 
 // A1MediatorClientImpl methods are defined in a1_mediator_client.go
 
@@ -1403,6 +1423,344 @@ type NephioTestReport struct {
 	Errors              []string               `json:"errors,omitempty"`
 	Metadata            map[string]interface{} `json:"metadata,omitempty"`
 }
+
+// Missing types that need to be added
+
+// E2NodeConfigurationUpdate represents configuration update information
+type E2NodeConfigurationUpdate struct {
+	UpdateID    string     `json:"updateId"`
+	Status      string     `json:"status"`
+	RequestedAt time.Time  `json:"requestedAt"`
+	CompletedAt *time.Time `json:"completedAt,omitempty"`
+}
+
+// SimulatedSubscription represents a subscription in the simulator
+type SimulatedSubscription struct {
+	SubscriptionID   string               `json:"subscriptionId"`
+	ServiceModelOID  string               `json:"serviceModelOid"`
+	E2NodeID         string               `json:"e2NodeId"`
+	Actions          []SubscriptionAction `json:"actions"`
+	ReportingPeriod  time.Duration        `json:"reportingPeriod"`
+	IsActive         bool                 `json:"isActive"`
+	CreatedAt        time.Time            `json:"createdAt"`
+}
+
+// RMRMessage represents a message in the RMR (RIC Message Router) protocol
+type RMRMessage struct {
+	MessageType    uint32            `json:"messageType"`
+	SubscriptionID string            `json:"subscriptionId,omitempty"`
+	Payload        []byte            `json:"payload"`
+	Source         string            `json:"source"`
+	Destination    string            `json:"destination"`
+	TransactionID  string            `json:"transactionId,omitempty"`
+	Headers        map[string]string `json:"headers,omitempty"`
+	Timestamp      time.Time         `json:"timestamp"`
+}
+
+// E2SMKPMMetrics represents KPM service model metrics
+type E2SMKPMMetrics struct {
+	E2NodeID          string            `json:"e2NodeId"`
+	MeasurementData   []MeasurementData `json:"measurementData"`
+	GranularityPeriod int64             `json:"granularityPeriod"`
+	Timestamp         time.Time         `json:"timestamp"`
+	SubscriptionID    string            `json:"subscriptionId"`
+}
+
+// MeasurementData represents measurement data point
+type MeasurementData struct {
+	MeasurementID    uint32            `json:"measurementId"`
+	MeasurementValue interface{}       `json:"measurementValue"`
+	MeasurementType  string            `json:"measurementType"`
+	Labels           map[string]string `json:"labels"`
+}
+
+// NETCONFClient represents a NETCONF protocol client
+type NETCONFClient struct {
+	Host           string            `json:"host"`
+	Port           int               `json:"port"`
+	Username       string            `json:"username"`
+	Password       string            `json:"password,omitempty"`
+	Timeout        time.Duration     `json:"timeout"`
+	Capabilities   []string          `json:"capabilities"`
+	SessionID      string            `json:"sessionId,omitempty"`
+	Connected      bool              `json:"connected"`
+	LastActivity   time.Time         `json:"lastActivity"`
+}
+
+// ProcessingStats tracks processing statistics
+type ProcessingStats struct {
+	MessagesProcessed uint64        `json:"messagesProcessed"`
+	ProcessingTime    time.Duration `json:"processingTime"`
+	ErrorCount        uint64        `json:"errorCount"`
+	ThroughputMbps    float64       `json:"throughputMbps"`
+}
+
+// LatencyMeasurement represents a latency measurement operation
+type LatencyMeasurement struct {
+	OperationID   string                 `json:"operationId"`
+	OperationType string                 `json:"operationType"`
+	StartTime     time.Time              `json:"startTime"`
+	EndTime       *time.Time             `json:"endTime,omitempty"`
+	LatencyMs     float64                `json:"latencyMs"`
+	Status        string                 `json:"status"`
+	Metadata      map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// ResponseTimeMetrics represents statistical metrics for response times
+type ResponseTimeMetrics struct {
+	Average       float64 `json:"average"`
+	Min           float64 `json:"min"`
+	Max           float64 `json:"max"`
+	P50           float64 `json:"p50"`
+	P95           float64 `json:"p95"`
+	P99           float64 `json:"p99"`
+	StandardDev   float64 `json:"standardDev"`
+	TotalSamples  int     `json:"totalSamples"`
+}
+
+// PolicyConflict represents a policy conflict
+type PolicyConflict struct {
+	ConflictID          string                 `json:"conflictId"`
+	ConflictType        string                 `json:"conflictType"`
+	ConflictingPolicies []PolicyInstanceID     `json:"conflictingPolicies"`
+	Description         string                 `json:"description"`
+	Severity            string                 `json:"severity"`
+	Resolution          string                 `json:"resolution,omitempty"`
+	DetectedAt          time.Time              `json:"detectedAt"`
+	ResolvedAt          *time.Time             `json:"resolvedAt,omitempty"`
+	Metadata            map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// PolicyDistributionRequest represents a request to distribute a policy to xApps
+type PolicyDistributionRequest struct {
+	PolicyInstanceID PolicyInstanceID `json:"policy_instance_id"`
+	PolicyTypeID     PolicyTypeID     `json:"policy_type_id"`
+	Policy           json.RawMessage  `json:"policy"`
+	TargetXApps      []string         `json:"target_xapps"`
+}
+
+// PolicyComplianceRequest represents a request to check policy compliance
+type PolicyComplianceRequest struct {
+	PolicyInstanceID PolicyInstanceID `json:"policy_instance_id"`
+	XAppID           string           `json:"xapp_id"`
+}
+
+// XAppClient represents a client for communicating with an xApp
+type XAppClient struct {
+	ID       string `json:"id"`
+	Endpoint string `json:"endpoint"`
+}
+
+// PolicyDistributionStatus represents the status of policy distribution
+type PolicyDistributionStatus struct {
+	PolicyInstanceID PolicyInstanceID `json:"policy_instance_id"`
+	XAppID           string           `json:"xapp_id"`
+	Status           string           `json:"status"`
+	Message          string           `json:"message,omitempty"`
+	LastUpdate       time.Time        `json:"last_update"`
+}
+
+// PolicyComplianceReport represents a policy compliance report
+type PolicyComplianceReport struct {
+	PolicyInstanceID PolicyInstanceID `json:"policy_instance_id"`
+	XAppID           string           `json:"xapp_id"`
+	ComplianceStatus string           `json:"compliance_status"`
+	Violations       []string         `json:"violations,omitempty"`
+	LastCheck        time.Time        `json:"last_check"`
+}
+
+// ProductionHealthChecker represents a production health checker
+type ProductionHealthChecker struct {
+	Components       map[string]RICComponentHealth `json:"components"`
+	LastCheck        time.Time                     `json:"last_check"`
+	CheckInterval    time.Duration                 `json:"check_interval"`
+	AlertThresholds  map[string]float64            `json:"alert_thresholds"`
+	mu               sync.RWMutex                  `json:"-"`
+}
+
+// RICComponentHealth represents the health status of a RIC component
+type RICComponentHealth struct {
+	ComponentName string                 `json:"component_name"`
+	Status        HealthStatus           `json:"status"`
+	LastCheck     time.Time              `json:"last_check"`
+	ResponseTime  time.Duration          `json:"response_time"`
+	ErrorRate     float64                `json:"error_rate"`
+	Uptime        time.Duration          `json:"uptime"`
+	Details       map[string]interface{} `json:"details,omitempty"`
+}
+
+// ServiceModelClient represents a client for service model operations
+type ServiceModelClient struct {
+	ID       string `json:"id"`
+	Endpoint string `json:"endpoint"`
+}
+
+// ServiceModelSubscription represents a service model subscription
+type ServiceModelSubscription struct {
+	ID            string            `json:"id"`
+	ServiceModel  string            `json:"serviceModel"`
+	EventTypes    []string          `json:"eventTypes"`
+	CreatedAt     time.Time         `json:"createdAt"`
+	LastActivity  time.Time         `json:"lastActivity"`
+	Active        bool              `json:"active"`
+}
+
+// ServiceModelEventType represents types of service model events
+type ServiceModelEventType string
+
+const (
+	ServiceModelEventTypeRegistration   ServiceModelEventType = "registration"
+	ServiceModelEventTypeDeregistration ServiceModelEventType = "deregistration"
+	ServiceModelEventTypeUpdate         ServiceModelEventType = "update"
+	ServiceModelEventTypeError          ServiceModelEventType = "error"
+)
+
+// ServiceModelEventHandler represents a handler function for service model events
+type ServiceModelEventHandler func(event ServiceModelEvent)
+
+// ServiceModelEvent represents a service model event
+type ServiceModelEvent struct {
+	Type      ServiceModelEventType  `json:"type"`
+	ModelID   string                 `json:"modelId"`
+	Timestamp time.Time              `json:"timestamp"`
+	Data      map[string]interface{} `json:"data"`
+}
+
+// ServiceModelAPIConfig represents configuration for service model API
+type ServiceModelAPIConfig struct {
+	MaxConcurrentOps int           `json:"maxConcurrentOps"`
+	RequestTimeout   time.Duration `json:"requestTimeout"`
+	RetryAttempts    int           `json:"retryAttempts"`
+	EnableEvents     bool          `json:"enableEvents"`
+}
+
+// ServiceModelAPI struct for service model operations
+type ServiceModelAPI struct {
+	mu               sync.RWMutex                                     `json:"-"`
+	registry         *ServiceModelRegistry                            `json:"-"`
+	clients          map[string]*ServiceModelClient                   `json:"-"`
+	subscriptions    map[string]*ServiceModelSubscription             `json:"-"`
+	eventHandlers    map[ServiceModelEventType][]ServiceModelEventHandler `json:"-"`
+	config           *ServiceModelAPIConfig                           `json:"-"`
+}
+
+// ServiceModelCapabilities represents capabilities of a service model
+type ServiceModelCapabilities struct {
+	ServiceModelType      ServiceModelType `json:"serviceModelType"`
+	Version               string           `json:"version"`
+	SupportedOperations   []string         `json:"supportedOperations"`
+	SupportedMessageTypes []string         `json:"supportedMessageTypes"`
+	SupportsIndications   bool             `json:"supportsIndications"`
+	SupportsControl       bool             `json:"supportsControl"`
+	MaxConcurrentOps      int              `json:"maxConcurrentOps"`
+	LastUpdated           time.Time        `json:"lastUpdated"`
+}
+
+// ServiceModelStatistics represents statistics for service models
+type ServiceModelStatistics struct {
+	ServiceModelType      ServiceModelType `json:"serviceModelType"`
+	IndicationsProcessed  uint64           `json:"indicationsProcessed"`
+	ControlsProcessed     uint64           `json:"controlsProcessed"`
+	ValidationErrors      uint64           `json:"validationErrors"`
+	ProcessingErrors      uint64           `json:"processingErrors"`
+	AverageProcessingTime time.Duration    `json:"averageProcessingTime"`
+	LastProcessedAt       time.Time        `json:"lastProcessedAt"`
+	TotalProcessingTime   time.Duration    `json:"totalProcessingTime"`
+}
+
+// ServiceModelDefinition represents a service model definition
+type ServiceModelDefinition struct {
+	OID           string                   `json:"oid"`
+	Name          string                   `json:"name"`
+	Type          ServiceModelType         `json:"type"`
+	Version       string                   `json:"version"`
+	Description   string                   `json:"description"`
+	Capabilities  []ServiceModelCapability `json:"capabilities"`
+	RANFunctions  []RANFunction            `json:"ranFunctions"`
+	LastUpdated   time.Time                `json:"lastUpdated"`
+}
+
+// ServiceModelCapability represents a capability of a service model
+type ServiceModelCapability struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Version     string `json:"version"`
+}
+
+// OptimizedHTTPClient represents an optimized HTTP client
+type OptimizedHTTPClient struct {
+	*http.Client
+	MaxIdleConns        int           `json:"maxIdleConns"`
+	MaxConnsPerHost     int           `json:"maxConnsPerHost"`
+	IdleConnTimeout     time.Duration `json:"idleConnTimeout"`
+	RequestTimeout      time.Duration `json:"requestTimeout"`
+	MaxRetries          int           `json:"maxRetries"`
+	RetryDelay          time.Duration `json:"retryDelay"`
+}
+
+// PolicyAPI represents a policy management API
+type PolicyAPI struct {
+	BaseURL    string                 `json:"baseUrl"`
+	Client     *OptimizedHTTPClient   `json:"-"`
+	Headers    map[string]string      `json:"headers"`
+	Timeout    time.Duration          `json:"timeout"`
+	Config     map[string]interface{} `json:"config,omitempty"`
+}
+
+// EnrichmentAPI represents an enrichment information API
+type EnrichmentAPI struct {
+	BaseURL    string                 `json:"baseUrl"`
+	Client     *OptimizedHTTPClient   `json:"-"`
+	Headers    map[string]string      `json:"headers"`
+	Timeout    time.Duration          `json:"timeout"`
+	Config     map[string]interface{} `json:"config,omitempty"`
+}
+
+// DMAAPClient represents a DMAAP client
+type DMAAPClient struct {
+	BaseURL     string                 `json:"baseUrl"`
+	Client      *OptimizedHTTPClient   `json:"-"`
+	TopicPrefix string                 `json:"topicPrefix"`
+	ConsumerID  string                 `json:"consumerId"`
+	Config      map[string]interface{} `json:"config,omitempty"`
+}
+
+// SubscriptionListResponse represents a response with subscription list
+type SubscriptionListResponse struct {
+	Subscriptions []Subscription `json:"subscriptions"`
+	TotalCount    int            `json:"totalCount"`
+	Page          int            `json:"page"`
+	PageSize      int            `json:"pageSize"`
+}
+
+// SubscriptionUpdate represents an update to a subscription
+type SubscriptionUpdate struct {
+	SubscriptionID string                 `json:"subscriptionId"`
+	Updates        map[string]interface{} `json:"updates"`
+	UpdatedAt      time.Time              `json:"updatedAt"`
+	UpdatedBy      string                 `json:"updatedBy,omitempty"`
+}
+
+// Action represents a subscription action (simplified version)
+type Action struct {
+	ActionID   int                    `json:"actionId"`
+	ActionType string                 `json:"actionType"`
+	Definition map[string]interface{} `json:"definition"`
+}
+
+// NodeStatus represents the status of a node
+type NodeStatus struct {
+	NodeID       string                 `json:"nodeId"`
+	Status       string                 `json:"status"`
+	LastSeen     time.Time              `json:"lastSeen"`
+	Health       HealthStatus           `json:"health"`
+	Metrics      map[string]interface{} `json:"metrics,omitempty"`
+	Version      string                 `json:"version,omitempty"`
+	Address      string                 `json:"address,omitempty"`
+}
+
+
+
 
 // Additional missing types for various components
 

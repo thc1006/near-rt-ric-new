@@ -602,7 +602,7 @@ func (t *SecurityComplianceTest) testVulnerabilityProtection(ctx context.Context
 	}
 	
 	for _, vuln := range vulnerabilities {
-		if err := t.testVulnerabilityProtection(ctx, vuln); err != nil {
+		if err := t.testSpecificVulnerabilityProtection(ctx, vuln); err != nil {
 			result.Status = StatusFailed
 			result.Message = fmt.Sprintf("Vulnerability protection test failed for %s: %v", vuln, err)
 			result.Evidence = append(result.Evidence, Evidence{
@@ -794,7 +794,7 @@ func (t *SecurityComplianceTest) testAuditLogIntegrity(ctx context.Context) erro
 	return nil
 }
 
-func (t *SecurityComplianceTest) testVulnerabilityProtection(ctx context.Context, vulnerability string) error {
+func (t *SecurityComplianceTest) testSpecificVulnerabilityProtection(ctx context.Context, vulnerability string) error {
 	// This would test vulnerability protection in a real implementation
 	return nil
 }

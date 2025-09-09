@@ -76,9 +76,33 @@ type E2NodeMetrics struct {
 	Throughput      float64
 }
 type AdvancedPerformanceConfig struct {
-	MemoryPoolSizeMB     int
-	E2ConnectionPoolSize int
-	WebSocketPoolSize    int
+	MemoryPoolSizeMB            int
+	E2ConnectionPoolSize        int
+	WebSocketPoolSize           int
+	MaxProcessingLatencyMs      float64
+	TargetThroughputIPS         float64
+	MaxConcurrentE2Nodes        int
+	DashboardConcurrentUsers    int
+	EnableZeroCopy              bool
+	EnableSIMDAcceleration      bool
+	EnableHugePages             bool
+	EnableCPUAffinity           bool
+	ZeroCopyBufferSize          int
+	SIMDInstructionSet          string
+	E2IndicationBatchSize       int
+	CriticalPathCores           []int
+	ProfilingInterval           time.Duration
+	SMOEndpoint                 string
+	NonRTRICEndpoint            string
+	PolicyManagerEndpoint       string
+	RAppManagerEndpoint         string
+	SMOHealthCheckInterval      time.Duration
+	SMORequestTimeout           time.Duration
+	CircuitBreakerThreshold     int
+	PorchAPIEndpoint            string
+	OCloudManagerEndpoint       string
+	PackageRepoEndpoint         string
+	NephioHealthCheckInterval   time.Duration
 }
 type ProcessingResult struct {
 	NodeID           string
@@ -364,9 +388,76 @@ func (pts *PerformanceTestSuite) RunAllPerformanceTests(ctx context.Context) (*T
 		},
 	}, nil
 }
-type A1MediatorClient struct {
+type SimpleA1MediatorClient struct {
 	endpoint string
 	mu       sync.RWMutex
+}
+
+// GetHealth returns the health status of the A1 Mediator
+func (c *SimpleA1MediatorClient) GetHealth(ctx context.Context) (*HealthStatus, error) {
+	// Implementation would check A1 Mediator health
+	status := HealthStatusHealthy
+	return &status, nil
+}
+
+// GetPolicyTypes returns all policy types
+func (c *SimpleA1MediatorClient) GetPolicyTypes(ctx context.Context) ([]PolicyType, error) {
+	// Implementation would fetch policy types from A1 Mediator
+	return []PolicyType{}, nil
+}
+
+// GetPolicyType returns a specific policy type
+func (c *SimpleA1MediatorClient) GetPolicyType(ctx context.Context, typeID PolicyTypeID) (*PolicyType, error) {
+	// Implementation would fetch specific policy type
+	return &PolicyType{PolicyTypeID: typeID}, nil
+}
+
+// CreatePolicyType creates a new policy type
+func (c *SimpleA1MediatorClient) CreatePolicyType(ctx context.Context, typeID PolicyTypeID, request *PolicyTypeRequest) error {
+	// Implementation would create policy type in A1 Mediator
+	return nil
+}
+
+// DeletePolicyType deletes a policy type
+func (c *SimpleA1MediatorClient) DeletePolicyType(ctx context.Context, typeID PolicyTypeID) error {
+	// Implementation would delete policy type from A1 Mediator
+	return nil
+}
+
+// GetPolicyInstances returns policy instances for a type
+func (c *SimpleA1MediatorClient) GetPolicyInstances(ctx context.Context, typeID PolicyTypeID) ([]PolicyInstance, error) {
+	// Implementation would fetch policy instances
+	return []PolicyInstance{}, nil
+}
+
+// GetPolicyInstance returns a specific policy instance
+func (c *SimpleA1MediatorClient) GetPolicyInstance(ctx context.Context, typeID PolicyTypeID, instanceID PolicyInstanceID) (*PolicyInstance, error) {
+	// Implementation would fetch specific policy instance
+	return &PolicyInstance{PolicyInstanceID: instanceID, PolicyTypeID: typeID}, nil
+}
+
+// CreatePolicyInstance creates a new policy instance
+func (c *SimpleA1MediatorClient) CreatePolicyInstance(ctx context.Context, typeID PolicyTypeID, instance *PolicyInstance) error {
+	// Implementation would create policy instance
+	return nil
+}
+
+// UpdatePolicyInstance updates a policy instance
+func (c *SimpleA1MediatorClient) UpdatePolicyInstance(ctx context.Context, typeID PolicyTypeID, instanceID PolicyInstanceID, instance *PolicyInstance) error {
+	// Implementation would update policy instance
+	return nil
+}
+
+// DeletePolicyInstance deletes a policy instance
+func (c *SimpleA1MediatorClient) DeletePolicyInstance(ctx context.Context, typeID PolicyTypeID, instanceID PolicyInstanceID) error {
+	// Implementation would delete policy instance
+	return nil
+}
+
+// GetPolicyInstanceStatus returns the status of a policy instance
+func (c *SimpleA1MediatorClient) GetPolicyInstanceStatus(ctx context.Context, typeID PolicyTypeID, instanceID PolicyInstanceID) (*PolicyStatus, error) {
+	// Implementation would get policy instance status
+	return &PolicyStatus{}, nil
 }
 type TestSummary struct {
 	TestsRun    int

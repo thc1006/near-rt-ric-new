@@ -21,26 +21,26 @@ import (
 // NewA1MediatorClient creates a new A1 Mediator client
 func NewA1MediatorClient(httpClient *http.Client, endpoint string) A1MediatorClient {
 	return &A1MediatorClientImpl{
-		httpClient: httpClient,
-		endpoint:   endpoint,
+		HTTPClient: httpClient,
+		BaseURL:    endpoint,
 	}
 }
 
 // IsConnected checks if the A1 Mediator client is connected
 func (c *A1MediatorClientImpl) IsConnected() bool {
-	if c.httpClient == nil || c.endpoint == "" {
+	if c.HTTPClient == nil || c.BaseURL == "" {
 		return false
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", c.endpoint+"/a1-p/healthcheck", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", c.BaseURL+"/a1-p/healthcheck", nil)
 	if err != nil {
 		return false
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return false
 	}
@@ -51,11 +51,11 @@ func (c *A1MediatorClientImpl) IsConnected() bool {
 
 // GetHealth retrieves health information from A1 Mediator
 func (c *A1MediatorClientImpl) GetHealth(ctx context.Context) (*A1Health, error) {
-	if c.httpClient == nil || c.endpoint == "" {
+	if c.HTTPClient == nil || c.BaseURL == "" {
 		return nil, fmt.Errorf("A1 Mediator client not configured")
 	}
 
-	url := fmt.Sprintf("%s/a1-p/healthcheck", c.endpoint)
+	url := fmt.Sprintf("%s/a1-p/healthcheck", c.BaseURL)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -63,7 +63,7 @@ func (c *A1MediatorClientImpl) GetHealth(ctx context.Context) (*A1Health, error)
 
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		log.Printf("Failed to get health from A1 Mediator: %v", err)
 		return &A1Health{
@@ -98,11 +98,11 @@ func (c *A1MediatorClientImpl) GetHealth(ctx context.Context) (*A1Health, error)
 
 // GetPolicyTypes retrieves all policy types from A1 Mediator
 func (c *A1MediatorClientImpl) GetPolicyTypes(ctx context.Context) (*PolicyTypeListResponse, error) {
-	if c.httpClient == nil || c.endpoint == "" {
+	if c.HTTPClient == nil || c.BaseURL == "" {
 		return &PolicyTypeListResponse{PolicyTypes: []PolicyType{}, Total: 0}, nil
 	}
 
-	url := fmt.Sprintf("%s/a1-p/policytypes", c.endpoint)
+	url := fmt.Sprintf("%s/a1-p/policytypes", c.BaseURL)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -110,7 +110,7 @@ func (c *A1MediatorClientImpl) GetPolicyTypes(ctx context.Context) (*PolicyTypeL
 
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		log.Printf("Failed to get policy types from A1 Mediator: %v", err)
 		return &PolicyTypeListResponse{PolicyTypes: []PolicyType{}, Total: 0}, nil
@@ -147,11 +147,11 @@ func (c *A1MediatorClientImpl) GetPolicyTypes(ctx context.Context) (*PolicyTypeL
 
 // GetPolicyType retrieves a specific policy type from A1 Mediator
 func (c *A1MediatorClientImpl) GetPolicyType(ctx context.Context, policyTypeID PolicyTypeID) (*PolicyType, error) {
-	if c.httpClient == nil || c.endpoint == "" {
+	if c.HTTPClient == nil || c.BaseURL == "" {
 		return nil, fmt.Errorf("A1 Mediator client not configured")
 	}
 
-	url := fmt.Sprintf("%s/a1-p/policytypes/%s", c.endpoint, policyTypeID)
+	url := fmt.Sprintf("%s/a1-p/policytypes/%s", c.BaseURL, policyTypeID)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -159,7 +159,7 @@ func (c *A1MediatorClientImpl) GetPolicyType(ctx context.Context, policyTypeID P
 
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get policy type from A1 Mediator: %w", err)
 	}
@@ -183,11 +183,11 @@ func (c *A1MediatorClientImpl) GetPolicyType(ctx context.Context, policyTypeID P
 
 // CreatePolicyType creates a new policy type in A1 Mediator
 func (c *A1MediatorClientImpl) CreatePolicyType(ctx context.Context, policyTypeID PolicyTypeID, request *PolicyTypeRequest) error {
-	if c.httpClient == nil || c.endpoint == "" {
+	if c.HTTPClient == nil || c.BaseURL == "" {
 		return fmt.Errorf("A1 Mediator client not configured")
 	}
 
-	url := fmt.Sprintf("%s/a1-p/policytypes/%s", c.endpoint, policyTypeID)
+	url := fmt.Sprintf("%s/a1-p/policytypes/%s", c.BaseURL, policyTypeID)
 
 	jsonData, err := json.Marshal(request.Schema)
 	if err != nil {
@@ -202,7 +202,7 @@ func (c *A1MediatorClientImpl) CreatePolicyType(ctx context.Context, policyTypeI
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to create policy type: %w", err)
 	}
@@ -219,11 +219,11 @@ func (c *A1MediatorClientImpl) CreatePolicyType(ctx context.Context, policyTypeI
 
 // DeletePolicyType deletes a policy type from A1 Mediator
 func (c *A1MediatorClientImpl) DeletePolicyType(ctx context.Context, policyTypeID PolicyTypeID) error {
-	if c.httpClient == nil || c.endpoint == "" {
+	if c.HTTPClient == nil || c.BaseURL == "" {
 		return fmt.Errorf("A1 Mediator client not configured")
 	}
 
-	url := fmt.Sprintf("%s/a1-p/policytypes/%s", c.endpoint, policyTypeID)
+	url := fmt.Sprintf("%s/a1-p/policytypes/%s", c.BaseURL, policyTypeID)
 	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -231,7 +231,7 @@ func (c *A1MediatorClientImpl) DeletePolicyType(ctx context.Context, policyTypeI
 
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to delete policy type: %w", err)
 	}
@@ -252,11 +252,11 @@ func (c *A1MediatorClientImpl) DeletePolicyType(ctx context.Context, policyTypeI
 
 // GetPolicyInstances retrieves all policy instances for a policy type from A1 Mediator
 func (c *A1MediatorClientImpl) GetPolicyInstances(ctx context.Context, policyTypeID PolicyTypeID) (*PolicyInstanceListResponse, error) {
-	if c.httpClient == nil || c.endpoint == "" {
+	if c.HTTPClient == nil || c.BaseURL == "" {
 		return &PolicyInstanceListResponse{PolicyInstances: []PolicyInstance{}, Total: 0}, nil
 	}
 
-	url := fmt.Sprintf("%s/a1-p/policytypes/%s/policies", c.endpoint, policyTypeID)
+	url := fmt.Sprintf("%s/a1-p/policytypes/%s/policies", c.BaseURL, policyTypeID)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -264,7 +264,7 @@ func (c *A1MediatorClientImpl) GetPolicyInstances(ctx context.Context, policyTyp
 
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		log.Printf("Failed to get policy instances from A1 Mediator: %v", err)
 		return &PolicyInstanceListResponse{PolicyInstances: []PolicyInstance{}, Total: 0}, nil
@@ -301,11 +301,11 @@ func (c *A1MediatorClientImpl) GetPolicyInstances(ctx context.Context, policyTyp
 
 // GetPolicyInstance retrieves a specific policy instance from A1 Mediator
 func (c *A1MediatorClientImpl) GetPolicyInstance(ctx context.Context, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID) (*PolicyInstance, error) {
-	if c.httpClient == nil || c.endpoint == "" {
+	if c.HTTPClient == nil || c.BaseURL == "" {
 		return nil, fmt.Errorf("A1 Mediator client not configured")
 	}
 
-	url := fmt.Sprintf("%s/a1-p/policytypes/%s/policies/%s", c.endpoint, policyTypeID, policyInstanceID)
+	url := fmt.Sprintf("%s/a1-p/policytypes/%s/policies/%s", c.BaseURL, policyTypeID, policyInstanceID)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -313,7 +313,7 @@ func (c *A1MediatorClientImpl) GetPolicyInstance(ctx context.Context, policyType
 
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get policy instance from A1 Mediator: %w", err)
 	}
@@ -333,22 +333,22 @@ func (c *A1MediatorClientImpl) GetPolicyInstance(ctx context.Context, policyType
 	}
 
 	return &PolicyInstance{
-		ID:        policyInstanceID,
-		TypeID:    policyTypeID,
-		Policy:    policyData,
-		Status:    PolicyStatus{Status: "ACTIVE", LastUpdate: time.Now()},
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		PolicyInstanceID: policyInstanceID,
+		PolicyTypeID:     policyTypeID,
+		PolicyData:       map[string]interface{}{"data": policyData},
+		Status:           "ACTIVE",
+		CreatedAt:        time.Now(),
+		LastModified:     time.Now(),
 	}, nil
 }
 
 // CreatePolicyInstance creates a new policy instance in A1 Mediator
 func (c *A1MediatorClientImpl) CreatePolicyInstance(ctx context.Context, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID, request *PolicyInstanceRequest) error {
-	if c.httpClient == nil || c.endpoint == "" {
+	if c.HTTPClient == nil || c.BaseURL == "" {
 		return fmt.Errorf("A1 Mediator client not configured")
 	}
 
-	url := fmt.Sprintf("%s/a1-p/policytypes/%s/policies/%s", c.endpoint, policyTypeID, policyInstanceID)
+	url := fmt.Sprintf("%s/a1-p/policytypes/%s/policies/%s", c.BaseURL, policyTypeID, policyInstanceID)
 
 	jsonData, err := json.Marshal(request.Policy)
 	if err != nil {
@@ -363,7 +363,7 @@ func (c *A1MediatorClientImpl) CreatePolicyInstance(ctx context.Context, policyT
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to create policy instance: %w", err)
 	}
@@ -380,11 +380,11 @@ func (c *A1MediatorClientImpl) CreatePolicyInstance(ctx context.Context, policyT
 
 // UpdatePolicyInstance updates an existing policy instance in A1 Mediator
 func (c *A1MediatorClientImpl) UpdatePolicyInstance(ctx context.Context, policyTypeID PolicyTypeID, update *PolicyInstanceUpdate) error {
-	if c.httpClient == nil || c.endpoint == "" {
+	if c.HTTPClient == nil || c.BaseURL == "" {
 		return fmt.Errorf("A1 Mediator client not configured")
 	}
 
-	url := fmt.Sprintf("%s/a1-p/policytypes/%s/policies/%s", c.endpoint, policyTypeID, update.PolicyInstanceID)
+	url := fmt.Sprintf("%s/a1-p/policytypes/%s/policies/%s", c.BaseURL, policyTypeID, update.PolicyInstanceID)
 
 	jsonData, err := json.Marshal(update.Policy)
 	if err != nil {
@@ -399,7 +399,7 @@ func (c *A1MediatorClientImpl) UpdatePolicyInstance(ctx context.Context, policyT
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to update policy instance: %w", err)
 	}
@@ -416,11 +416,11 @@ func (c *A1MediatorClientImpl) UpdatePolicyInstance(ctx context.Context, policyT
 
 // DeletePolicyInstance deletes a policy instance from A1 Mediator
 func (c *A1MediatorClientImpl) DeletePolicyInstance(ctx context.Context, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID) error {
-	if c.httpClient == nil || c.endpoint == "" {
+	if c.HTTPClient == nil || c.BaseURL == "" {
 		return fmt.Errorf("A1 Mediator client not configured")
 	}
 
-	url := fmt.Sprintf("%s/a1-p/policytypes/%s/policies/%s", c.endpoint, policyTypeID, policyInstanceID)
+	url := fmt.Sprintf("%s/a1-p/policytypes/%s/policies/%s", c.BaseURL, policyTypeID, policyInstanceID)
 	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -428,7 +428,7 @@ func (c *A1MediatorClientImpl) DeletePolicyInstance(ctx context.Context, policyT
 
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to delete policy instance: %w", err)
 	}
@@ -449,11 +449,11 @@ func (c *A1MediatorClientImpl) DeletePolicyInstance(ctx context.Context, policyT
 
 // GetPolicyInstanceStatus retrieves the status of a policy instance from A1 Mediator
 func (c *A1MediatorClientImpl) GetPolicyInstanceStatus(ctx context.Context, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID) (*PolicyStatus, error) {
-	if c.httpClient == nil || c.endpoint == "" {
+	if c.HTTPClient == nil || c.BaseURL == "" {
 		return nil, fmt.Errorf("A1 Mediator client not configured")
 	}
 
-	url := fmt.Sprintf("%s/a1-p/policytypes/%s/policies/%s/status", c.endpoint, policyTypeID, policyInstanceID)
+	url := fmt.Sprintf("%s/a1-p/policytypes/%s/policies/%s/status", c.BaseURL, policyTypeID, policyInstanceID)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -461,7 +461,7 @@ func (c *A1MediatorClientImpl) GetPolicyInstanceStatus(ctx context.Context, poli
 
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get policy instance status from A1 Mediator: %w", err)
 	}
@@ -480,7 +480,7 @@ func (c *A1MediatorClientImpl) GetPolicyInstanceStatus(ctx context.Context, poli
 		// If status endpoint doesn't return structured data, create default status
 		status = PolicyStatus{
 			Status:     "ACTIVE",
-			LastUpdate: time.Now(),
+			LastUpdated: time.Now(),
 		}
 	}
 
@@ -489,7 +489,7 @@ func (c *A1MediatorClientImpl) GetPolicyInstanceStatus(ctx context.Context, poli
 
 // GetStats retrieves statistics from A1 Mediator
 func (c *A1MediatorClientImpl) GetStats(ctx context.Context) (*A1Stats, error) {
-	if c.httpClient == nil || c.endpoint == "" {
+	if c.HTTPClient == nil || c.BaseURL == "" {
 		return &A1Stats{
 			PolicyTypesByStatus:     make(map[string]uint32),
 			PolicyInstancesByType:   make(map[string]uint32),
@@ -524,13 +524,13 @@ func (c *A1MediatorClientImpl) GetStats(ctx context.Context) (*A1Stats, error) {
 	// Count policy instances by type and status
 	var totalInstances uint32
 	for _, policyType := range policyTypes.PolicyTypes {
-		instances, err := c.GetPolicyInstances(ctx, policyType.ID)
+		instances, err := c.GetPolicyInstances(ctx, policyType.PolicyTypeID)
 		if err != nil {
-			log.Printf("Failed to get policy instances for type %s: %v", policyType.ID, err)
+			log.Printf("Failed to get policy instances for type %s: %v", policyType.PolicyTypeID, err)
 			continue
 		}
 
-		stats.PolicyInstancesByType[string(policyType.ID)] = instances.Total
+		stats.PolicyInstancesByType[string(policyType.PolicyTypeID)] = instances.Total
 		totalInstances += instances.Total
 
 		// Count by status (assuming all are active for now)
@@ -571,8 +571,10 @@ func (c *A1MediatorClientImpl) ValidatePolicy(ctx context.Context, policyTypeID 
 // parsePolicyType parses raw policy type data into PolicyType struct
 func (c *A1MediatorClientImpl) parsePolicyType(typeID string, rawPolicyType map[string]interface{}) (*PolicyType, error) {
 	policyType := &PolicyType{
-		ID:        PolicyTypeID(typeID),
-		CreatedAt: time.Now(),
+		PolicyTypeID: PolicyTypeID(typeID),
+		Name:         "",
+		Description:  "",
+		Schema:       make(map[string]interface{}),
 	}
 
 	// Extract name if available
@@ -588,11 +590,7 @@ func (c *A1MediatorClientImpl) parsePolicyType(typeID string, rawPolicyType map[
 	}
 
 	// The entire response is the schema
-	schemaBytes, err := json.Marshal(rawPolicyType)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal policy type schema: %w", err)
-	}
-	policyType.Schema = json.RawMessage(schemaBytes)
+	policyType.Schema = rawPolicyType
 
 	return policyType, nil
 }
