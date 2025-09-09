@@ -46,6 +46,7 @@ type E2APMessage struct {
 	Timestamp      time.Time       `json:"timestamp"`
 	Source         string          `json:"source"`
 	Destination    string          `json:"destination"`
+	AssociationID  string          `json:"associationId"`          // 添加缺失的 AssociationID 欄位
 }
 
 // E2APMessageType represents the type of E2AP message
@@ -827,6 +828,8 @@ type RANParameter struct {
 	ParameterName           string            `json:"parameterName"`
 	ParameterValue          interface{}       `json:"parameterValue"`
 	ParameterType           string            `json:"parameterType"`
+	Name                    string            `json:"name"`               // 添加缺失的 Name 欄位
+	Value                   interface{}       `json:"value"`              // 添加缺失的 Value 欄位
 }
 
 // E2SMNIIndicationHeader represents NI indication header
@@ -836,6 +839,7 @@ type E2SMNIIndicationHeader struct {
 	InterfaceDirection      string            `json:"interfaceDirection"`
 	Timestamp               time.Time         `json:"timestamp"`
 	EventType               string            `json:"eventType"`
+	InterfaceID             string            `json:"interfaceId"`             // 添加缺失的 InterfaceID 欄位
 }
 
 // E2SMNIIndicationMessage represents NI indication message
@@ -844,17 +848,19 @@ type E2SMNIIndicationMessage struct {
 	InterfaceMessage        []byte            `json:"interfaceMessage"`
 	EventTriggerDefinition  []byte            `json:"eventTriggerDefinition"`
 	ActionDefinition        []byte            `json:"actionDefinition"`
+	MessageType             string            `json:"messageType"`             // 添加缺失的 MessageType 欄位
+	ProtocolIEs             []ProtocolIE      `json:"protocolIEs"`            // 添加缺失的 ProtocolIEs 欄位
 }
-
-// Service Model Management Types - centralized to avoid redeclarations
 
 // ProtocolIE represents a protocol information element
 type ProtocolIE struct {
-	ID          uint32      `json:"id"`
-	Criticality string      `json:"criticality"`
-	Value       interface{} `json:"value"`
-	TypeName    string      `json:"typeName"`
+	ID                      int32             `json:"id"`
+	Criticality             string            `json:"criticality"`
+	Value                   interface{}       `json:"value"`
+	TypeName                string            `json:"typeName"`            // 添加缺失的 TypeName 欄位
 }
+
+// Service Model Management Types - centralized to avoid redeclarations
 
 // ServiceModelDefinition represents a complete service model definition
 type ServiceModelDefinition struct {

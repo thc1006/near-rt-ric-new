@@ -15,17 +15,23 @@ import (
 
 // E2ETestReport represents the result of an E2E test execution
 type E2ETestReport struct {
-	Status       string                 `json:"status"`
-	StartTime    time.Time             `json:"startTime"`
-	EndTime      time.Time             `json:"endTime"`
-	Duration     time.Duration         `json:"duration"`
-	Metrics      E2ETestMetrics        `json:"metrics"`
-	TestResults  []E2ETestResult       `json:"testResults"`
-	Errors       []string              `json:"errors,omitempty"`
-	SuiteID      string                `json:"suiteId"`
-	Config       E2ETestConfig         `json:"config"`
-	Scenarios    []ScenarioResult      `json:"scenarios"`
-	ErrorMessage string                `json:"errorMessage,omitempty"`
+	Status              string                 `json:"status"`
+	StartTime           time.Time             `json:"startTime"`
+	EndTime             time.Time             `json:"endTime"`
+	Duration            time.Duration         `json:"duration"`
+	Metrics             E2ETestMetrics        `json:"metrics"`
+	TestResults         []E2ETestResult       `json:"testResults"`
+	Errors              []string              `json:"errors,omitempty"`
+	SuiteID             string                `json:"suiteId"`
+	Config              E2ETestConfig         `json:"config"`
+	Scenarios           []ScenarioResult      `json:"scenarios"`
+	ErrorMessage        string                `json:"errorMessage,omitempty"`
+	ComplianceResults   []TestResult          `json:"complianceResults"`
+	IntegrationResults  []TestResult          `json:"integrationResults"`
+	PerformanceResults  []TestResult          `json:"performanceResults"`
+	WorkflowResults     []TestResult          `json:"workflowResults"`
+	ResilienceResults   []TestResult          `json:"resilienceResults"`
+	SecurityResults     []TestResult          `json:"securityResults"`
 }
 
 // E2ETestMetrics contains test execution metrics
@@ -332,32 +338,42 @@ func (suite *E2ETestSuite) RunFullTestSuite(ctx context.Context) (*E2ETestReport
 
 	// Phase 3: Interface compliance tests
 	complianceResults := suite.runComplianceTests(ctx)
-	report.ComplianceResults = complianceResults
+	report.ComplianceResults = suite.convertMapToSlice(complianceResults)
 
 	// Phase 4: Integration tests
 	integrationResults := suite.runIntegrationTests(ctx)
-	report.IntegrationResults = integrationResults
+	report.IntegrationResults = suite.convertMapToSlice(integrationResults)
 
 	// Phase 5: Performance and load tests
 	performanceResults := suite.runPerformanceTests(ctx)
-	report.PerformanceResults = performanceResults
+	report.PerformanceResults = suite.convertMapToSlice(performanceResults)
 
 	// Phase 6: End-to-end workflow tests
 	workflowResults := suite.runWorkflowTests(ctx)
-	report.WorkflowResults = workflowResults
+	report.WorkflowResults = suite.convertMapToSlice(workflowResults)
 
 	// Phase 7: Resilience and failure tests
 	resilienceResults := suite.runResilienceTests(ctx)
-	report.ResilienceResults = resilienceResults
+	report.ResilienceResults = suite.convertMapToSlice(resilienceResults)
 
 	// Phase 8: Security and interoperability tests
 	securityResults := suite.runSecurityTests(ctx)
-	report.SecurityResults = securityResults
+	report.SecurityResults = suite.convertMapToSlice(securityResults)
 
 	// Calculate final metrics and coverage
 	report.EndTime = time.Now()
 	report.Duration = report.EndTime.Sub(report.StartTime)
-	report.Metrics = *suite.metrics
+	
+	// Convert TestMetrics to E2ETestMetrics
+	if suite.metrics != nil {
+		report.Metrics = E2ETestMetrics{
+			TotalTests:      suite.metrics.TotalScenarios,
+			PassedTests:     suite.metrics.PassedScenarios,
+			FailedTests:     suite.metrics.FailedScenarios,
+			SkippedTests:    suite.metrics.SkippedScenarios,
+			CoveragePercent: suite.metrics.CoveragePercent,
+		}
+	}
 	
 	// Determine overall test status
 	suite.calculateOverallStatus(report)
@@ -630,6 +646,15 @@ func (suite *E2ETestSuite) validateTestData(ctx context.Context) error {
 func (suite *E2ETestSuite) loadDefaultScenarios() error {
 	// Implementation to load default test scenarios
 	return nil
+}
+
+// convertMapToSlice converts map[string]TestResult to []TestResult
+func (suite *E2ETestSuite) convertMapToSlice(resultMap map[string]TestResult) []TestResult {
+	var results []TestResult
+	for _, result := range resultMap {
+		results = append(results, result)
+	}
+	return results
 }
 
 func (suite *E2ETestSuite) calculateOverallStatus(report *E2ETestReport) {

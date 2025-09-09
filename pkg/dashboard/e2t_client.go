@@ -6,6 +6,7 @@ SPDX-License-Identifier: Apache-2.0
 package dashboard
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -181,7 +182,7 @@ func (c *E2TClient) SendE2APMessage(ctx context.Context, message *E2APMessage) e
 		return fmt.Errorf("failed to marshal E2AP message: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
