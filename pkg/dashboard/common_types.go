@@ -1,246 +1,343 @@
-/*
-SPDX-FileCopyrightText: 2020-present Open Networking Foundation <info@opennetworking.org>
-SPDX-License-Identifier: Apache-2.0
-*/
-
+// Package dashboard provides common types and utilities
+// for the O-RAN Near-RT RIC Dashboard
 package dashboard
 
 import (
 	"context"
-	"net"
-	"sync"
+	"encoding/json"
 	"time"
-	"unsafe"
 )
 
-// =====================================================================
-// E2 Node and Related Types
-// =====================================================================
+// Common interfaces and utilities
 
-// E2Node type definition moved to types.go to avoid redeclaration
+// NOTE: ClientManager type moved to clients.go to avoid redeclaration
 
-// NodeMetrics represents performance metrics for an E2 node
-type NodeMetrics struct {
-	RequestCount     uint64        `json:"requestCount"`
-	ErrorCount       uint64        `json:"errorCount"`
-	AverageLatency   time.Duration `json:"averageLatency"`
-	ThroughputIPS    uint64        `json:"throughputIPS"`
-	LastHeartbeat    time.Time     `json:"lastHeartbeat"`
-	ConnectionUptime time.Duration `json:"connectionUptime"`
+// Client represents a generic client
+type Client struct {
+	ID       string
+	Type     string
+	Endpoint string
+	Active   bool
 }
 
-// OptimizedConnection represents a high-performance connection
-type OptimizedConnection struct {
-	conn            net.Conn
-	readBuffer      []byte
-	writeBuffer     []byte
-	lastActivity    time.Time
-	stats           ConnectionStats
-	mu              sync.RWMutex
+// NOTE: SubscriptionManagerClient type is in its own file
+
+// NOTE: E2TClient type moved to e2t_client.go to avoid redeclaration
+
+// NOTE: E2ManagerClient type moved to e2_manager_client.go to avoid redeclaration
+
+// NOTE: NodeStatus type moved to types.go to avoid redeclaration
+
+// APIResponse represents a generic API response
+type APIResponse struct {
+	Success   bool                   `json:"success"`
+	Message   string                 `json:"message,omitempty"`
+	Data      interface{}            `json:"data,omitempty"`
+	Error     string                 `json:"error,omitempty"`
+	Timestamp time.Time              `json:"timestamp"`
+	RequestID string                 `json:"requestId,omitempty"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// ConnectionStats tracks connection statistics
-type ConnectionStats struct {
-	BytesReceived    uint64    `json:"bytesReceived"`
-	BytesSent        uint64    `json:"bytesSent"`
-	MessagesReceived uint64    `json:"messagesReceived"`
-	MessagesSent     uint64    `json:"messagesSent"`
-	ErrorCount       uint64    `json:"errorCount"`
-	LastActivity     time.Time `json:"lastActivity"`
+// Pagination represents pagination information
+type Pagination struct {
+	Page       int `json:"page"`
+	PageSize   int `json:"pageSize"`
+	TotalPages int `json:"totalPages"`
+	TotalItems int `json:"totalItems"`
+	HasNext    bool `json:"hasNext"`
+	HasPrev    bool `json:"hasPrev"`
 }
 
-// NodeStatus represents the status of an E2 node
-type NodeStatus int
-
-const (
-	NodeStatusConnected NodeStatus = iota
-	NodeStatusDisconnected
-	NodeStatusConnecting
-	NodeStatusError
-)
-
-// =====================================================================
-// Global RIC ID Type
-// =====================================================================
-
-// GlobalRICID type definition moved to types.go to avoid redeclaration
-
-// =====================================================================
-// E2AP Message Types
-// =====================================================================
-
-// E2APMessage type definition moved to types.go to avoid redeclaration
-
-// E2MessageType represents different E2 message types
-type E2MessageType int
-
-const (
-	E2MessageTypeSetup E2MessageType = iota
-	E2MessageTypeIndication
-	E2MessageTypeControl
-	E2MessageTypeSubscription
-	E2MessageTypeConfiguration
-)
-
-// =====================================================================
-// E2 Node Component Config Update Acknowledgement
-// =====================================================================
-
-// E2NodeComponentConfigUpdateAck type definition moved to types.go to avoid redeclaration
-
-// =====================================================================
-// SIMD Operation Types
-// =====================================================================
-
-// SIMDOperation type definition moved to types.go to avoid redeclaration
-
-// SIMDDataType represents data types for SIMD operations
-type SIMDDataType int
-
-const (
-	SIMDInt8 SIMDDataType = iota
-	SIMDInt16
-	SIMDInt32
-	SIMDInt64
-	SIMDFloat32
-	SIMDFloat64
-	SIMDUint8
-	SIMDUint16
-	SIMDUint32
-	SIMDUint64
-)
-
-// =====================================================================
-// Resource Usage Types
-// =====================================================================
-
-// ResourceUsage type definition moved to types.go to avoid redeclaration
-
-// =====================================================================
-// Latency Tracker Types
-// =====================================================================
-
-// LatencyTracker type definition moved to types.go to avoid redeclaration
-
-// LatencyMeasurement tracks a single operation's latency
-type LatencyMeasurement struct {
-	OperationID   string
-	OperationType string
-	StartTime     time.Time
-	EndTime       *time.Time
-	Latency       *time.Duration
-	Metadata      map[string]interface{}
+// FilterOptions represents generic filtering options
+type FilterOptions struct {
+	Search    string                 `json:"search,omitempty"`
+	StartDate *time.Time             `json:"startDate,omitempty"`
+	EndDate   *time.Time             `json:"endDate,omitempty"`
+	Status    string                 `json:"status,omitempty"`
+	Type      string                 `json:"type,omitempty"`
+	Tags      []string               `json:"tags,omitempty"`
+	Custom    map[string]interface{} `json:"custom,omitempty"`
 }
 
-// LatencyPercentiles stores calculated percentiles
-type LatencyPercentiles struct {
-	P50     time.Duration
-	P90     time.Duration
-	P95     time.Duration
-	P99     time.Duration
-	P999    time.Duration
-	P9999   time.Duration
+// SortOptions represents sorting options
+type SortOptions struct {
+	Field     string `json:"field"`
+	Direction string `json:"direction"` // "asc" or "desc"
 }
 
-// =====================================================================
-// Load Balancing Algorithm Types
-// =====================================================================
-
-// LoadBalancingAlgorithm defines load balancing strategies
-type LoadBalancingAlgorithm int
-
-// RoundRobin and other load balancing algorithm constants moved to types.go to avoid redeclaration
-const (
-	WeightedRoundRobin LoadBalancingAlgorithm = iota + 1
-	LeastConnections
-	WeightedLeastConnections
-	ConsistentHashing
-	ResourceBased
-	LatencyBased
-)
-
-// =====================================================================
-// Health Checker Types
-// =====================================================================
-
-// HealthChecker interface definition moved to types.go to avoid redeclaration
-
-// HealthCheckResult represents the result of a health check
-type HealthCheckResult struct {
-	Healthy      bool                   `json:"healthy"`
-	ResponseTime time.Duration          `json:"responseTime"`
-	ErrorMessage string                 `json:"errorMessage,omitempty"`
-	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+// QueryRequest represents a generic query request
+type QueryRequest struct {
+	Filter     *FilterOptions `json:"filter,omitempty"`
+	Sort       *SortOptions   `json:"sort,omitempty"`
+	Pagination *Pagination    `json:"pagination,omitempty"`
 }
 
-// Backend represents a backend service instance
-type Backend struct {
-	ID           string
-	Address      string
-	Port         int
-	Weight       int
-	MaxConns     int
-	CurrentConns int64
-	IsHealthy    int32 // atomic boolean
-	LastCheck    time.Time
-	ResponseTime time.Duration
-	ErrorRate    float64
-	CPUUsage     float64
-	MemoryUsage  float64
-	mu           sync.RWMutex
+// BatchRequest represents a batch operation request
+type BatchRequest struct {
+	Operations []BatchOperation `json:"operations"`
+	Options    *BatchOptions    `json:"options,omitempty"`
 }
 
-
-// =====================================================================
-// Message Processing Types
-// =====================================================================
-
-// MessageType represents different types of messages
-type MessageType int
-
-const (
-	MessageTypeE2AP MessageType = iota
-	MessageTypeA1
-	MessageTypeO1
-)
-
-// OptimizedMessage represents an optimized message for processing
-type OptimizedMessage struct {
-	Type     MessageType
-	Data     []byte
-	Size     int
-	Metadata map[string]interface{}
+// BatchOperation represents a single operation in a batch
+type BatchOperation struct {
+	ID     string                 `json:"id"`
+	Type   string                 `json:"type"`
+	Data   map[string]interface{} `json:"data"`
+	Config map[string]interface{} `json:"config,omitempty"`
 }
 
-// ProcessedMessage represents the result of message processing
-type ProcessedMessage struct {
-	Original       *OptimizedMessage
-	Result         []byte
-	ResultSize     int
-	ProcessingTime time.Duration
-	Success        bool
-	Metadata       map[string]interface{}
+// BatchOptions represents options for batch operations
+type BatchOptions struct {
+	ContinueOnError bool          `json:"continueOnError"`
+	Timeout         time.Duration `json:"timeout"`
+	MaxConcurrency  int           `json:"maxConcurrency"`
+	RetryPolicy     *RetryPolicy  `json:"retryPolicy,omitempty"`
 }
 
-// ProcessingResult represents the result of processing operations
-type ProcessingResult struct {
-	Success        bool
-	Data           []byte
-	ProcessingTime time.Duration
-	Metadata       map[string]interface{}
+// BatchResponse represents a batch operation response
+type BatchResponse struct {
+	Results   []BatchResult `json:"results"`
+	Summary   BatchSummary  `json:"summary"`
+	Timestamp time.Time     `json:"timestamp"`
 }
 
-// =====================================================================
-// Context Helper Functions
-// =====================================================================
+// BatchResult represents the result of a single batch operation
+type BatchResult struct {
+	ID      string      `json:"id"`
+	Success bool        `json:"success"`
+	Data    interface{} `json:"data,omitempty"`
+	Error   string      `json:"error,omitempty"`
+}
 
-// GetCorrelationID gets correlation ID from context
-func GetCorrelationID(ctx context.Context) string {
-	if ctx == nil {
-		return ""
+// BatchSummary represents a summary of batch operation results
+type BatchSummary struct {
+	Total     int           `json:"total"`
+	Succeeded int           `json:"succeeded"`
+	Failed    int           `json:"failed"`
+	Duration  time.Duration `json:"duration"`
+}
+
+// NOTE: RetryPolicy type moved to e2e_testing_suite.go to avoid redeclaration
+
+// NOTE: ConfigurationManager type moved to o1_management_service.go to avoid redeclaration
+
+// NOTE: CacheEntry type moved to enhanced_dashboard_api.go to avoid redeclaration
+
+// EventBus provides event publishing and subscription capabilities
+type EventBus struct {
+	subscribers map[string][]EventHandler
+	active      bool
+}
+
+// EventHandler defines the interface for handling events
+type EventHandler interface {
+	HandleEvent(ctx context.Context, event *Event) error
+}
+
+// Event represents a system event
+type Event struct {
+	ID        string                 `json:"id"`
+	Type      string                 `json:"type"`
+	Source    string                 `json:"source"`
+	Subject   string                 `json:"subject,omitempty"`
+	Data      interface{}            `json:"data"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+	Timestamp time.Time              `json:"timestamp"`
+}
+
+// NewEventBus creates a new event bus
+func NewEventBus() *EventBus {
+	return &EventBus{
+		subscribers: make(map[string][]EventHandler),
+		active:      false,
 	}
-	if id, ok := ctx.Value("correlation_id").(string); ok {
-		return id
+}
+
+// Subscribe adds an event handler for a specific event type
+func (eb *EventBus) Subscribe(eventType string, handler EventHandler) {
+	eb.subscribers[eventType] = append(eb.subscribers[eventType], handler)
+}
+
+// Publish publishes an event to all subscribers
+func (eb *EventBus) Publish(ctx context.Context, event *Event) error {
+	if !eb.active {
+		return nil
 	}
-	return ""
+
+	handlers, exists := eb.subscribers[event.Type]
+	if !exists {
+		return nil
+	}
+
+	for _, handler := range handlers {
+		if err := handler.HandleEvent(ctx, event); err != nil {
+			// Log error but continue processing
+			continue
+		}
+	}
+
+	return nil
+}
+
+// Start starts the event bus
+func (eb *EventBus) Start() error {
+	eb.active = true
+	return nil
+}
+
+// Stop stops the event bus
+func (eb *EventBus) Stop() error {
+	eb.active = false
+	return nil
+}
+
+// Utility functions
+
+// ToJSON converts any value to JSON string
+func ToJSON(v interface{}) (string, error) {
+	bytes, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
+}
+
+// FromJSON converts JSON string to a value
+func FromJSON(jsonStr string, v interface{}) error {
+	return json.Unmarshal([]byte(jsonStr), v)
+}
+
+// Contains checks if a slice contains a specific value
+func Contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
+// Unique removes duplicate strings from a slice
+func Unique(slice []string) []string {
+	seen := make(map[string]bool)
+	result := []string{}
+	
+	for _, item := range slice {
+		if !seen[item] {
+			seen[item] = true
+			result = append(result, item)
+		}
+	}
+	
+	return result
+}
+
+// Map applies a function to each string in a slice
+func Map(slice []string, fn func(string) string) []string {
+	result := make([]string, len(slice))
+	for i, item := range slice {
+		result[i] = fn(item)
+	}
+	return result
+}
+
+// Filter filters strings in a slice based on a predicate
+func Filter(slice []string, predicate func(string) bool) []string {
+	result := []string{}
+	for _, item := range slice {
+		if predicate(item) {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+// Reduce reduces a slice of strings to a single value
+func Reduce(slice []string, initial string, reducer func(string, string) string) string {
+	result := initial
+	for _, item := range slice {
+		result = reducer(result, item)
+	}
+	return result
+}
+
+// TimeRange represents a time range
+type TimeRange struct {
+	Start time.Time `json:"start"`
+	End   time.Time `json:"end"`
+}
+
+// Duration returns the duration of the time range
+func (tr *TimeRange) Duration() time.Duration {
+	return tr.End.Sub(tr.Start)
+}
+
+// Contains checks if a time is within the range
+func (tr *TimeRange) Contains(t time.Time) bool {
+	return !t.Before(tr.Start) && !t.After(tr.End)
+}
+
+// Overlaps checks if this range overlaps with another
+func (tr *TimeRange) Overlaps(other *TimeRange) bool {
+	return tr.Start.Before(other.End) && other.Start.Before(tr.End)
+}
+
+// StatusCode represents HTTP status codes commonly used
+type StatusCode int
+
+const (
+	StatusOK                  StatusCode = 200
+	StatusCreated            StatusCode = 201
+	StatusAccepted           StatusCode = 202
+	StatusNoContent          StatusCode = 204
+	StatusBadRequest         StatusCode = 400
+	StatusUnauthorized       StatusCode = 401
+	StatusForbidden          StatusCode = 403
+	StatusNotFound           StatusCode = 404
+	StatusMethodNotAllowed   StatusCode = 405
+	StatusConflict           StatusCode = 409
+	StatusUnprocessableEntity StatusCode = 422
+	StatusInternalServerError StatusCode = 500
+	StatusBadGateway         StatusCode = 502
+	StatusServiceUnavailable StatusCode = 503
+	StatusGatewayTimeout     StatusCode = 504
+)
+
+// String returns the string representation of the status code
+func (sc StatusCode) String() string {
+	switch sc {
+		case StatusOK:
+			return "OK"
+		case StatusCreated:
+			return "Created"
+		case StatusAccepted:
+			return "Accepted"
+		case StatusNoContent:
+			return "No Content"
+		case StatusBadRequest:
+			return "Bad Request"
+		case StatusUnauthorized:
+			return "Unauthorized"
+		case StatusForbidden:
+			return "Forbidden"
+		case StatusNotFound:
+			return "Not Found"
+		case StatusMethodNotAllowed:
+			return "Method Not Allowed"
+		case StatusConflict:
+			return "Conflict"
+		case StatusUnprocessableEntity:
+			return "Unprocessable Entity"
+		case StatusInternalServerError:
+			return "Internal Server Error"
+		case StatusBadGateway:
+			return "Bad Gateway"
+		case StatusServiceUnavailable:
+			return "Service Unavailable"
+		case StatusGatewayTimeout:
+			return "Gateway Timeout"
+		default:
+			return "Unknown"
+	}
 }

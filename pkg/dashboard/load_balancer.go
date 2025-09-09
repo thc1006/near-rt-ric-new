@@ -13,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
 )
 
 // LoadBalancer manages load distribution across multiple instances
@@ -23,8 +24,6 @@ type LoadBalancer struct {
 	metrics      *LoadBalancerMetrics
 	mu           sync.RWMutex
 }
-
-
 
 // HealthCheckerImpl is the concrete implementation of HealthChecker interface
 type HealthCheckerImpl struct {
@@ -133,7 +132,6 @@ type FailoverPolicy struct {
 	RecoveryTimeout time.Duration
 	AutoFailback    bool
 }
-
 
 // NewLoadBalancer creates a new load balancer
 func NewLoadBalancer(algorithm LoadBalancingAlgorithm) *LoadBalancer {
@@ -778,4 +776,3 @@ func (fm *FailoverManager) RecordFailure(backendID string) {
 		cb.RecordFailure()
 	}
 }
-

@@ -13,55 +13,17 @@ import (
 	"time"
 )
 
-// ServiceModelRegistry manages all service model implementations
-type ServiceModelRegistry struct {
-	mu           sync.RWMutex
-	serviceModels map[ServiceModelType]ServiceModelAPI
-	capabilities  map[ServiceModelType]*ServiceModelCapabilities
-	statistics    map[ServiceModelType]*ServiceModelStatistics
-}
+// ServiceModelRegistry type is now defined in types.go to avoid redeclaration
 
 // ServiceModelInterface is defined in service_model_api.go to avoid redeclaration
 
 // ServiceModelType and constants are now defined in types.go to avoid redeclaration
 
-// ServiceModelCapabilities represents the capabilities of a service model
-type ServiceModelCapabilities struct {
-	ServiceModelType     ServiceModelType `json:"serviceModelType"`
-	Version              string           `json:"version"`
-	SupportedOperations  []string         `json:"supportedOperations"`
-	SupportedMessageTypes []string        `json:"supportedMessageTypes"`
-	SupportsIndications  bool             `json:"supportsIndications"`
-	SupportsControl      bool             `json:"supportsControl"`
-	MaxConcurrentOps     int              `json:"maxConcurrentOps"`
-	LastUpdated          time.Time        `json:"lastUpdated"`
-}
+// ServiceModelCapabilities is now defined in types.go to avoid redeclaration
 
-// ServiceModelStatistics represents statistics for a service model
-type ServiceModelStatistics struct {
-	ServiceModelType      ServiceModelType `json:"serviceModelType"`
-	IndicationsProcessed  uint64           `json:"indicationsProcessed"`
-	ControlsProcessed     uint64           `json:"controlsProcessed"`
-	ValidationErrors      uint64           `json:"validationErrors"`
-	ProcessingErrors      uint64           `json:"processingErrors"`
-	AverageProcessingTime time.Duration    `json:"averageProcessingTime"`
-	LastProcessedAt       time.Time        `json:"lastProcessedAt"`
-	TotalProcessingTime   time.Duration    `json:"totalProcessingTime"`
-}
+// ServiceModelStatistics is now defined in types.go to avoid redeclaration
 
-// NewServiceModelRegistry creates a new service model registry
-func NewServiceModelRegistry() *ServiceModelRegistry {
-	registry := &ServiceModelRegistry{
-		serviceModels: make(map[ServiceModelType]ServiceModelAPI),
-		capabilities:  make(map[ServiceModelType]*ServiceModelCapabilities),
-		statistics:    make(map[ServiceModelType]*ServiceModelStatistics),
-	}
-	
-	// Initialize service models
-	registry.initializeServiceModels()
-	
-	return registry
-}
+// NewServiceModelRegistry function is now defined in types.go to avoid redeclaration
 
 // RegisterServiceModel registers a service model implementation
 func (r *ServiceModelRegistry) RegisterServiceModel(api ServiceModelAPI) error {
@@ -110,104 +72,98 @@ func (r *ServiceModelRegistry) GetServiceModel(serviceModelType ServiceModelType
 
 // ProcessIndication processes an indication message using the appropriate service model
 func (r *ServiceModelRegistry) ProcessIndication(ctx context.Context, serviceModelType ServiceModelType, header []byte, message []byte) (interface{}, error) {
-	startTime := time.Now()
-	
 	api, err := r.GetServiceModel(serviceModelType)
 	if err != nil {
-		r.updateStatistics(serviceModelType, false, false, time.Since(startTime))
 		return nil, err
 	}
 	
+	// Update statistics
+	r.updateStatistics(serviceModelType, "indication")
+	
+	// Process the indication
+	startTime := time.Now()
 	result, err := api.ProcessIndication(ctx, header, message)
+	processingTime := time.Since(startTime)
+	
+	// Update processing time statistics
+	r.updateProcessingTime(serviceModelType, processingTime)
+	
 	if err != nil {
-		r.updateStatistics(serviceModelType, false, false, time.Since(startTime))
-		return nil, fmt.Errorf("failed to process indication: %w", err)
+		r.incrementErrorCount(serviceModelType, "processing")
+		return nil, fmt.Errorf("failed to process indication for %s: %w", serviceModelType, err)
 	}
 	
-	r.updateStatistics(serviceModelType, true, false, time.Since(startTime))
 	return result, nil
 }
 
 // ProcessControl processes a control message using the appropriate service model
 func (r *ServiceModelRegistry) ProcessControl(ctx context.Context, serviceModelType ServiceModelType, header []byte, message []byte) (interface{}, error) {
-	startTime := time.Now()
-	
 	api, err := r.GetServiceModel(serviceModelType)
 	if err != nil {
-		r.updateStatistics(serviceModelType, false, true, time.Since(startTime))
 		return nil, err
 	}
 	
-	result, err := api.ProcessControl(ctx, header, message)
-	if err != nil {
-		r.updateStatistics(serviceModelType, false, true, time.Since(startTime))
-		return nil, fmt.Errorf("failed to process control: %w", err)
+	// Check if service model supports control
+	if !r.supportsControl(serviceModelType) {
+		return nil, fmt.Errorf("service model %s does not support control messages", serviceModelType)
 	}
 	
-	r.updateStatistics(serviceModelType, true, true, time.Since(startTime))
+	// Update statistics
+	r.updateStatistics(serviceModelType, "control")
+	
+	// Process the control message
+	startTime := time.Now()
+	result, err := api.ProcessControl(ctx, header, message)
+	processingTime := time.Since(startTime)
+	
+	// Update processing time statistics
+	r.updateProcessingTime(serviceModelType, processingTime)
+	
+	if err != nil {
+		r.incrementErrorCount(serviceModelType, "processing")
+		return nil, fmt.Errorf("failed to process control for %s: %w", serviceModelType, err)
+	}
+	
 	return result, nil
 }
 
-// ValidateMessage validates a message using the appropriate service model
+// ValidateMessage validates a message against a service model
 func (r *ServiceModelRegistry) ValidateMessage(serviceModelType ServiceModelType, messageType string, data []byte) error {
 	api, err := r.GetServiceModel(serviceModelType)
 	if err != nil {
 		return err
 	}
 	
-	if err := api.ValidateMessage(messageType, data); err != nil {
-		r.incrementValidationErrors(serviceModelType)
-		return fmt.Errorf("message validation failed: %w", err)
+	err = api.ValidateMessage(messageType, data)
+	if err != nil {
+		r.incrementErrorCount(serviceModelType, "validation")
+		return fmt.Errorf("validation failed for %s/%s: %w", serviceModelType, messageType, err)
 	}
 	
 	return nil
 }
 
-// GetCapabilities returns capabilities for a service model
+// GetCapabilities returns the capabilities of a service model
 func (r *ServiceModelRegistry) GetCapabilities(serviceModelType ServiceModelType) (*ServiceModelCapabilities, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	
 	capabilities, exists := r.capabilities[serviceModelType]
 	if !exists {
-		return nil, fmt.Errorf("capabilities for service model %s not found", serviceModelType)
+		return nil, fmt.Errorf("capabilities not found for service model %s", serviceModelType)
 	}
 	
 	return capabilities, nil
 }
 
-// GetAllCapabilities returns capabilities for all registered service models
-func (r *ServiceModelRegistry) GetAllCapabilities() map[ServiceModelType]*ServiceModelCapabilities {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	
-	capabilities := make(map[ServiceModelType]*ServiceModelCapabilities)
-	for serviceModelType, cap := range r.capabilities {
-		capabilities[serviceModelType] = &ServiceModelCapabilities{
-			ServiceModelType:      cap.ServiceModelType,
-			Version:               cap.Version,
-			SupportedOperations:   make([]string, len(cap.SupportedOperations)),
-			SupportedMessageTypes: make([]string, len(cap.SupportedMessageTypes)),
-			SupportsIndications:   cap.SupportsIndications,
-			SupportsControl:       cap.SupportsControl,
-			MaxConcurrentOps:      cap.MaxConcurrentOps,
-			LastUpdated:           cap.LastUpdated,
-		}
-		copy(capabilities[serviceModelType].SupportedOperations, cap.SupportedOperations)
-		copy(capabilities[serviceModelType].SupportedMessageTypes, cap.SupportedMessageTypes)
-	}
-	
-	return capabilities
-}
-
-// GetStatistics returns statistics for a service model
+// GetStatistics returns the statistics of a service model
 func (r *ServiceModelRegistry) GetStatistics(serviceModelType ServiceModelType) (*ServiceModelStatistics, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	
 	stats, exists := r.statistics[serviceModelType]
 	if !exists {
-		return nil, fmt.Errorf("statistics for service model %s not found", serviceModelType)
+		return nil, fmt.Errorf("statistics not found for service model %s", serviceModelType)
 	}
 	
 	return stats, nil
@@ -218,85 +174,26 @@ func (r *ServiceModelRegistry) GetAllStatistics() map[ServiceModelType]*ServiceM
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	
-	statistics := make(map[ServiceModelType]*ServiceModelStatistics)
-	for serviceModelType, stats := range r.statistics {
-		statistics[serviceModelType] = &ServiceModelStatistics{
-			ServiceModelType:      stats.ServiceModelType,
-			IndicationsProcessed:  stats.IndicationsProcessed,
-			ControlsProcessed:     stats.ControlsProcessed,
-			ValidationErrors:      stats.ValidationErrors,
-			ProcessingErrors:      stats.ProcessingErrors,
-			AverageProcessingTime: stats.AverageProcessingTime,
-			LastProcessedAt:       stats.LastProcessedAt,
-			TotalProcessingTime:   stats.TotalProcessingTime,
-		}
+	result := make(map[ServiceModelType]*ServiceModelStatistics)
+	for modelType, stats := range r.statistics {
+		// Create a copy to prevent external modification
+		statsCopy := *stats
+		result[modelType] = &statsCopy
 	}
 	
-	return statistics
+	return result
 }
 
-// GetRegisteredServiceModels returns list of registered service model types
-func (r *ServiceModelRegistry) GetRegisteredServiceModels() []ServiceModelType {
+// GetSupportedServiceModels returns a list of supported service model types
+func (r *ServiceModelRegistry) GetSupportedServiceModels() []ServiceModelType {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	
-	serviceModels := make([]ServiceModelType, 0, len(r.serviceModels))
-	for serviceModelType := range r.serviceModels {
-		serviceModels = append(serviceModels, serviceModelType)
-	}
-	
-	return serviceModels
+	return r.supportedTypes
 }
 
-// ProcessKPMIndication processes KPM indication (legacy method for compatibility)
-func (r *ServiceModelRegistry) ProcessKPMIndication(header []byte, message []byte) (*E2SMKPMIndicationHeader, *E2SMKPMIndicationMessage, error) {
-	// This is a compatibility method - in practice, use ProcessIndication
-	return &E2SMKPMIndicationHeader{}, &E2SMKPMIndicationMessage{}, nil
-}
-
-// ProcessRCIndication processes RC indication (legacy method for compatibility)
-func (r *ServiceModelRegistry) ProcessRCIndication(header []byte, message []byte) (*E2SMRCIndicationHeader, *E2SMRCIndicationMessage, error) {
-	// This is a compatibility method - in practice, use ProcessIndication
-	return &E2SMRCIndicationHeader{}, &E2SMRCIndicationMessage{}, nil
-}
-
-// ProcessRCControl processes RC control (legacy method for compatibility)
-func (r *ServiceModelRegistry) ProcessRCControl(header []byte, message []byte) (*E2SMRCControlHeader, *E2SMRCControlMessage, error) {
-	// This is a compatibility method - in practice, use ProcessControl
-	return &E2SMRCControlHeader{}, &E2SMRCControlMessage{}, nil
-}
-
-// ProcessNIIndication processes NI indication (legacy method for compatibility)
-func (r *ServiceModelRegistry) ProcessNIIndication(header []byte, message []byte) (*E2SMNIIndicationHeader, *E2SMNIIndicationMessage, error) {
-	// This is a compatibility method - in practice, use ProcessIndication
-	return &E2SMNIIndicationHeader{}, &E2SMNIIndicationMessage{}, nil
-}
-
-// Private methods
-
-func (r *ServiceModelRegistry) initializeServiceModels() {
-	// Register KPM service model
-	kmpAPI := NewE2SMKPMApi(r)
-	if err := r.RegisterServiceModel(kmpAPI); err != nil {
-		log.Printf("Failed to register E2SM-KPM: %v", err)
-	}
-	
-	// Register RC service model
-	rcAPI := NewE2SMRCApi(r)
-	if err := r.RegisterServiceModel(rcAPI); err != nil {
-		log.Printf("Failed to register E2SM-RC: %v", err)
-	}
-	
-	// Register NI service model
-	niAPI := NewE2SMNIApi(r)
-	if err := r.RegisterServiceModel(niAPI); err != nil {
-		log.Printf("Failed to register E2SM-NI: %v", err)
-	}
-	
-	log.Printf("Initialized %d service models", len(r.serviceModels))
-}
-
-func (r *ServiceModelRegistry) updateStatistics(serviceModelType ServiceModelType, success bool, isControl bool, processingTime time.Duration) {
+// updateStatistics updates processing statistics for a service model
+func (r *ServiceModelRegistry) updateStatistics(serviceModelType ServiceModelType, operationType string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	
@@ -305,124 +202,263 @@ func (r *ServiceModelRegistry) updateStatistics(serviceModelType ServiceModelTyp
 		return
 	}
 	
-	if success {
-		if isControl {
-			stats.ControlsProcessed++
-		} else {
-			stats.IndicationsProcessed++
-		}
-	} else {
-		stats.ProcessingErrors++
-	}
-	
-	// Update processing time statistics
-	stats.TotalProcessingTime += processingTime
-	totalOps := stats.IndicationsProcessed + stats.ControlsProcessed
-	if totalOps > 0 {
-		stats.AverageProcessingTime = stats.TotalProcessingTime / time.Duration(totalOps)
+	switch operationType {
+	case "indication":
+		stats.IndicationsProcessed++
+	case "control":
+		stats.ControlsProcessed++
 	}
 	
 	stats.LastProcessedAt = time.Now()
 }
 
-func (r *ServiceModelRegistry) incrementValidationErrors(serviceModelType ServiceModelType) {
+// updateProcessingTime updates the average processing time for a service model
+func (r *ServiceModelRegistry) updateProcessingTime(serviceModelType ServiceModelType, processingTime time.Duration) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	
-	if stats, exists := r.statistics[serviceModelType]; exists {
-		stats.ValidationErrors++
+	stats, exists := r.statistics[serviceModelType]
+	if !exists {
+		return
+	}
+	
+	// Update total processing time
+	stats.TotalProcessingTime += processingTime
+	
+	// Calculate new average
+	totalOperations := stats.IndicationsProcessed + stats.ControlsProcessed
+	if totalOperations > 0 {
+		stats.AverageProcessingTime = stats.TotalProcessingTime / time.Duration(totalOperations)
 	}
 }
 
+// incrementErrorCount increments the error count for a service model
+func (r *ServiceModelRegistry) incrementErrorCount(serviceModelType ServiceModelType, errorType string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	
+	stats, exists := r.statistics[serviceModelType]
+	if !exists {
+		return
+	}
+	
+	switch errorType {
+	case "validation":
+		stats.ValidationErrors++
+	case "processing":
+		stats.ProcessingErrors++
+	}
+}
+
+// getServiceModelVersion returns the version of a service model
 func (r *ServiceModelRegistry) getServiceModelVersion(serviceModelType ServiceModelType) string {
 	switch serviceModelType {
 	case ServiceModelTypeKPM:
-		return "v2.0"
+		return "2.0"
 	case ServiceModelTypeRC:
-		return "v1.0"
+		return "1.0"
 	case ServiceModelTypeNI:
-		return "v1.0"
+		return "1.0"
 	default:
-		return "v1.0"
+		return "1.0"
 	}
 }
 
+// getSupportedMessageTypes returns the supported message types for a service model
 func (r *ServiceModelRegistry) getSupportedMessageTypes(serviceModelType ServiceModelType) []string {
 	switch serviceModelType {
 	case ServiceModelTypeKPM:
-		return []string{
-			"kmp-indication-header",
-			"kmp-indication-message",
-		}
+		return []string{"E2SM-KPM-IndicationHeader", "E2SM-KPM-IndicationMessage"}
 	case ServiceModelTypeRC:
-		return []string{
-			"rc-indication-header",
-			"rc-indication-message",
-			"rc-control-header",
-			"rc-control-message",
-		}
+		return []string{"E2SM-RC-ControlHeader", "E2SM-RC-ControlMessage", "E2SM-RC-ControlOutcome"}
 	case ServiceModelTypeNI:
-		return []string{
-			"ni-indication-header",
-			"ni-indication-message",
-		}
+		return []string{"E2SM-NI-IndicationHeader", "E2SM-NI-IndicationMessage"}
 	default:
 		return []string{}
 	}
 }
 
+// supportsControl checks if a service model supports control messages
 func (r *ServiceModelRegistry) supportsControl(serviceModelType ServiceModelType) bool {
 	switch serviceModelType {
-	case ServiceModelTypeKPM:
-		return false // KPM is indication-only
 	case ServiceModelTypeRC:
-		return true // RC supports control operations
-	case ServiceModelTypeNI:
-		return false // NI is primarily indication-only
+		return true
+	case ServiceModelTypeKPM, ServiceModelTypeNI:
+		return false
 	default:
 		return false
 	}
 }
 
-// Data structures for compatibility
-
-// E2SMKPMIndicationHeader type is now defined in types.go to avoid redeclaration
-
-// E2SMKPMIndicationMessage type is now defined in types.go to avoid redeclaration
-
-// E2SMKPMMetrics type is now defined in types.go to avoid redeclaration
-
-// MeasurementInfo type is now defined in types.go to avoid redeclaration
-
-// E2SMRCIndicationHeader represents RC indication header
-type E2SMRCIndicationHeader struct {
-	RICIndicationHeaderFormat uint32 `json:"ricIndicationHeaderFormat"`
-	UEIdentity               string `json:"ueIdentity,omitempty"`
-	RANParameterID           uint32 `json:"ranParameterId,omitempty"`
-	RANParameterName         string `json:"ranParameterName,omitempty"`
+// InitializeDefaultServiceModels initializes the registry with default service models
+func (r *ServiceModelRegistry) InitializeDefaultServiceModels() error {
+	// Register E2SM-KPM
+	kpmAPI := &E2SMKPMServiceModel{}
+	if err := r.RegisterServiceModel(kpmAPI); err != nil {
+		return fmt.Errorf("failed to register E2SM-KPM: %w", err)
+	}
+	
+	// Register E2SM-RC
+	rcAPI := &E2SMRCServiceModel{}
+	if err := r.RegisterServiceModel(rcAPI); err != nil {
+		return fmt.Errorf("failed to register E2SM-RC: %w", err)
+	}
+	
+	// Register E2SM-NI
+	niAPI := &E2SMNIServiceModel{}
+	if err := r.RegisterServiceModel(niAPI); err != nil {
+		return fmt.Errorf("failed to register E2SM-NI: %w", err)
+	}
+	
+	// Update supported types
+	r.mu.Lock()
+	r.supportedTypes = []ServiceModelType{
+		ServiceModelTypeKPM,
+		ServiceModelTypeRC,
+		ServiceModelTypeNI,
+	}
+	r.mu.Unlock()
+	
+	log.Println("Initialized default service models")
+	return nil
 }
 
-// E2SMRCIndicationMessage represents RC indication message
-type E2SMRCIndicationMessage struct {
-	RICIndicationMessageFormat uint32                 `json:"ricIndicationMessageFormat"`
-	RANParameterList          []RANParameter         `json:"ranParameterList"`
-	AdditionalInfo            map[string]interface{} `json:"additionalInfo,omitempty"`
+// ResetStatistics resets the statistics for a specific service model or all models
+func (r *ServiceModelRegistry) ResetStatistics(serviceModelType ...ServiceModelType) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	
+	if len(serviceModelType) == 0 {
+		// Reset all statistics
+		for modelType := range r.statistics {
+			r.statistics[modelType] = &ServiceModelStatistics{
+				ServiceModelType: modelType,
+				LastProcessedAt:  time.Now(),
+			}
+		}
+	} else {
+		// Reset specific service model statistics
+		for _, modelType := range serviceModelType {
+			if _, exists := r.statistics[modelType]; exists {
+				r.statistics[modelType] = &ServiceModelStatistics{
+					ServiceModelType: modelType,
+					LastProcessedAt:  time.Now(),
+				}
+			}
+		}
+	}
 }
 
-// E2SMRCControlHeader type is now defined in types.go to avoid redeclaration
+// GetServiceModelCount returns the number of registered service models
+func (r *ServiceModelRegistry) GetServiceModelCount() int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	
+	return len(r.serviceModels)
+}
 
-// E2SMRCControlMessage type is now defined in types.go to avoid redeclaration
+// IsServiceModelRegistered checks if a service model is registered
+func (r *ServiceModelRegistry) IsServiceModelRegistered(serviceModelType ServiceModelType) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	
+	_, exists := r.serviceModels[serviceModelType]
+	return exists
+}
 
-// RANParameter type is now defined in types.go to avoid redeclaration
+// E2SMKPMServiceModel implements ServiceModelAPI for E2SM-KPM
+type E2SMKPMServiceModel struct{}
 
-// E2SMNIIndicationHeader type is now defined in types.go to avoid redeclaration
+func (m *E2SMKPMServiceModel) GetServiceModelType() ServiceModelType {
+	return ServiceModelTypeKPM
+}
 
-// E2SMNIIndicationMessage type is now defined in types.go to avoid redeclaration
+func (m *E2SMKPMServiceModel) GetSupportedOperations() []string {
+	return []string{"report", "subscribe", "indication"}
+}
 
-// ProtocolIE represents a protocol information element
-type ProtocolIE struct {
-	ID          uint32      `json:"id"`
-	Criticality string      `json:"criticality"`
-	Value       interface{} `json:"value"`
-	TypeName    string      `json:"typeName"`
+func (m *E2SMKPMServiceModel) ProcessIndication(ctx context.Context, header []byte, message []byte) (interface{}, error) {
+	// Process KPM indication
+	return map[string]interface{}{
+		"type": "kpm_indication",
+		"data": string(message),
+	}, nil
+}
+
+func (m *E2SMKPMServiceModel) ProcessControl(ctx context.Context, header []byte, message []byte) (interface{}, error) {
+	return nil, fmt.Errorf("E2SM-KPM does not support control messages")
+}
+
+func (m *E2SMKPMServiceModel) ValidateMessage(messageType string, data []byte) error {
+	// Validate KPM message
+	if len(data) == 0 {
+		return fmt.Errorf("empty message data")
+	}
+	return nil
+}
+
+// E2SMRCServiceModel implements ServiceModelAPI for E2SM-RC
+type E2SMRCServiceModel struct{}
+
+func (m *E2SMRCServiceModel) GetServiceModelType() ServiceModelType {
+	return ServiceModelTypeRC
+}
+
+func (m *E2SMRCServiceModel) GetSupportedOperations() []string {
+	return []string{"control", "policy", "indication"}
+}
+
+func (m *E2SMRCServiceModel) ProcessIndication(ctx context.Context, header []byte, message []byte) (interface{}, error) {
+	// Process RC indication
+	return map[string]interface{}{
+		"type": "rc_indication",
+		"data": string(message),
+	}, nil
+}
+
+func (m *E2SMRCServiceModel) ProcessControl(ctx context.Context, header []byte, message []byte) (interface{}, error) {
+	// Process RC control
+	return map[string]interface{}{
+		"type": "rc_control",
+		"data": string(message),
+	}, nil
+}
+
+func (m *E2SMRCServiceModel) ValidateMessage(messageType string, data []byte) error {
+	// Validate RC message
+	if len(data) == 0 {
+		return fmt.Errorf("empty message data")
+	}
+	return nil
+}
+
+// E2SMNIServiceModel implements ServiceModelAPI for E2SM-NI
+type E2SMNIServiceModel struct{}
+
+func (m *E2SMNIServiceModel) GetServiceModelType() ServiceModelType {
+	return ServiceModelTypeNI
+}
+
+func (m *E2SMNIServiceModel) GetSupportedOperations() []string {
+	return []string{"monitor", "analyze", "indication"}
+}
+
+func (m *E2SMNIServiceModel) ProcessIndication(ctx context.Context, header []byte, message []byte) (interface{}, error) {
+	// Process NI indication
+	return map[string]interface{}{
+		"type": "ni_indication",
+		"data": string(message),
+	}, nil
+}
+
+func (m *E2SMNIServiceModel) ProcessControl(ctx context.Context, header []byte, message []byte) (interface{}, error) {
+	return nil, fmt.Errorf("E2SM-NI does not support control messages")
+}
+
+func (m *E2SMNIServiceModel) ValidateMessage(messageType string, data []byte) error {
+	// Validate NI message
+	if len(data) == 0 {
+		return fmt.Errorf("empty message data")
+	}
+	return nil
 }

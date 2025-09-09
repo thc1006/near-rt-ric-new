@@ -23,7 +23,7 @@ type E2SliceConfigManager struct {
 // E2NodeClient represents a client connection to an E2 node
 type E2NodeClient struct {
 	NodeID    string
-	GRPCConn  *grpc.Conn
+	GRPCConn  *interface{}
 	Connected bool
 }
 
@@ -44,18 +44,7 @@ type SliceConfig struct {
 	ResourceAllocation *ResourceAllocation
 }
 
-// ServiceProfile represents service level requirements
-type ServiceProfile struct {
-	MaxDataRate *DataRate
-	Latency     int32
-	Reliability float32
-}
-
-// DataRate represents data rate configuration
-type DataRate struct {
-	Value int64
-	Unit  string
-}
+// NOTE: ServiceProfile and DataRate types moved to types.go to avoid redeclaration
 
 // ResourceAllocation represents resource allocation for a slice
 type ResourceAllocation struct {

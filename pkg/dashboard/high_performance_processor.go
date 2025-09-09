@@ -17,33 +17,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// HighPerformanceMessageProcessor implements zero-copy, SIMD-optimized message processing
-type HighPerformanceMessageProcessor struct {
-	// Processing pipelines for different message types
-	pipelines       map[MessageType]*MessagePipeline
-	
-	// Zero-copy buffer management
-	bufferPools     map[int]*ZeroCopyBufferPool
-	
-	// SIMD and batch processing
-	simdProcessor   *SIMDProcessor
-	batchProcessor  *BatchProcessor
-	
-	// Performance optimizations
-	cpuAffinity     *CPUAffinityManager
-	memoryManager   *AdvancedMemoryManager
-	
-	// Metrics and monitoring
-	stats           ProcessingStats
-	latencyTracker  *LatencyTracker
-	
-	// Configuration
-	config          *ProcessorConfig
-	
-	// State management
-	running         int32
-	mu              sync.RWMutex
-}
+// HighPerformanceMessageProcessor type is now defined in types.go to avoid redeclaration
 
 // ProcessorConfig defines high-performance processing parameters
 type ProcessorConfig struct {
@@ -78,48 +52,7 @@ type ProcessorConfig struct {
 	PreferredNUMANode       int           `json:"preferredNUMANode"`
 }
 
-// ProcessingStats tracks detailed processing statistics
-type ProcessingStats struct {
-	// Message processing
-	TotalProcessed          uint64
-	ProcessedByType         map[MessageType]uint64
-	ProcessingErrors        uint64
-	ErrorsByType            map[MessageType]uint64
-	
-	// Latency metrics
-	MinLatencyNs            uint64
-	MaxLatencyNs            uint64
-	AvgLatencyNs            uint64
-	P50LatencyNs            uint64
-	P95LatencyNs            uint64
-	P99LatencyNs            uint64
-	P999LatencyNs           uint64
-	
-	// Throughput metrics
-	CurrentMPS              uint64 // Messages per second
-	PeakMPS                 uint64
-	
-	// Resource utilization
-	CPUCycles               uint64
-	MemoryAllocated         uint64
-	CacheMisses             uint64
-	
-	// Zero-copy metrics
-	ZeroCopyOperations      uint64
-	MemoryCopyOperations    uint64
-	MemoryCopyBytes         uint64
-	
-	// SIMD metrics
-	SIMDOperations          uint64
-	ScalarOperations        uint64
-	
-	// Batch processing
-	BatchesProcessed        uint64
-	AvgBatchSize            float64
-	BatchEfficiency         float64
-	
-	LastUpdated             time.Time
-}
+// ProcessingStats type is now defined in types.go to avoid redeclaration
 
 // ZeroCopyBufferPool manages zero-copy buffers for different sizes
 type ZeroCopyBufferPool struct {
@@ -151,15 +84,7 @@ type SIMDStats struct {
 	Performance         map[string]time.Duration
 }
 
-// BatchProcessor handles batch processing optimizations
-type BatchProcessor struct {
-	batchSize       int
-	timeout         time.Duration
-	batches         map[MessageType]*MessageBatch
-	flushTicker     *time.Ticker
-	stats           BatchStats
-	mu              sync.RWMutex
-}
+// BatchProcessor type is now defined in types.go to avoid redeclaration
 
 // MessageBatch represents a batch of messages for processing
 type MessageBatch struct {

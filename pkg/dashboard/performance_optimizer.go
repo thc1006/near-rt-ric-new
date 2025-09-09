@@ -72,37 +72,13 @@ type ThreadPool struct {
 
 // Worker type is now defined in types.go to avoid redeclaration
 
-// WorkItem represents work to be processed
-type WorkItem struct {
-	ID        uint64
-	Type      WorkType
-	Data      unsafe.Pointer // Zero-copy data pointer
-	Size      int
-	Priority  Priority
-	Timestamp time.Time
-	Callback  func(result WorkResult)
-}
+// WorkItem type is now defined in types.go to avoid redeclaration
 
-// WorkResult contains processing results
-type WorkResult struct {
-	ID        uint64
-	Success   bool
-	Data      unsafe.Pointer
-	Size      int
-	Duration  time.Duration
-	Error     error
-}
+// WorkResult type is now defined in types.go to avoid redeclaration
 
-// WorkType defines the type of work
-type WorkType int
+// WorkType type is now defined in types.go to avoid redeclaration
 
-const (
-	WorkTypeE2APMessage WorkType = iota
-	WorkTypeSubscription
-	WorkTypeIndication
-	WorkTypeControl
-	WorkTypePolicyUpdate
-)
+// WorkType constants are now defined in types.go to avoid redeclaration
 
 // Priority type and constants are now defined in types.go to avoid redeclaration
 
@@ -861,15 +837,6 @@ func (po *PerformanceOptimizer) GetMetrics() PerformanceMetrics {
 	}
 }
 
-// PerformanceMetrics contains performance metrics
-type PerformanceMetrics struct {
-	ProcessedMessages uint64
-	AverageLatency    time.Duration
-	Throughput        uint64
-	MemoryStats       MemoryStats
-	GCStats           runtime.MemStats
-	ProfileData       map[string]*ProfileData
-}
 
 // Start starts the performance optimizer
 func (po *PerformanceOptimizer) Start(ctx context.Context) error {

@@ -19,18 +19,7 @@ import (
 
 // SMO Client Implementation for O-RAN L Release
 
-// SMOClient manages SMO integration for O-RAN L Release
-type SMOClient struct {
-	endpoint        string
-	client          *OptimizedHTTPClient
-	circuitBreaker  *CircuitBreaker
-	rateLimiter     *RateLimiter
-	cache           *ResponseCache
-	stats           SMOClientStats
-	config          *SMOClientConfig
-	running         int32
-	mu              sync.RWMutex
-}
+// SMOClient type is now defined in types.go to avoid redeclaration
 
 // SMOClientConfig defines SMO client configuration
 type SMOClientConfig struct {
@@ -44,99 +33,19 @@ type SMOClientConfig struct {
 	TLSSkipVerify       bool          `json:"tlsSkipVerify"`
 }
 
-// SMOClientStats tracks SMO client statistics
-type SMOClientStats struct {
-	RequestsTotal       uint64    `json:"requestsTotal"`
-	RequestsSuccess     uint64    `json:"requestsSuccess"`
-	RequestsFailure     uint64    `json:"requestsFailure"`
-	AverageLatencyMs    float64   `json:"averageLatencyMs"`
-	CacheHits           uint64    `json:"cacheHits"`
-	CacheMisses         uint64    `json:"cacheMisses"`
-	CircuitBreakerTrips uint64    `json:"circuitBreakerTrips"`
-	LastRequestTime     time.Time `json:"lastRequestTime"`
-}
+// SMOClientStats type is now defined in types.go to avoid redeclaration
 
-// NonRTRICClient manages Non-RT RIC integration
-type NonRTRICClient struct {
-	endpoint        string
-	client          *OptimizedHTTPClient
-	policyAPI       *PolicyAPI
-	enrichmentAPI   *EnrichmentAPI
-	dmaapClient     *DMAAPClient
-	stats           NonRTRICStats
-	config          *NonRTRICConfig
-	running         int32
-	mu              sync.RWMutex
-}
-
-// NonRTRICConfig defines Non-RT RIC client configuration
-type NonRTRICConfig struct {
-	Endpoint            string        `json:"endpoint"`
-	PolicyServiceURL    string        `json:"policyServiceUrl"`
-	EnrichmentServiceURL string       `json:"enrichmentServiceUrl"`
-	DMaaPURL            string        `json:"dmaapUrl"`
-	Timeout             time.Duration `json:"timeout"`
-	MaxRetries          int           `json:"maxRetries"`
-}
-
-// NonRTRICStats tracks Non-RT RIC statistics
-type NonRTRICStats struct {
-	PolicyRequests      uint64 `json:"policyRequests"`
-	EnrichmentRequests  uint64 `json:"enrichmentRequests"`
-	DMaaPMessages       uint64 `json:"dmaapMessages"`
-	SuccessRate         float64 `json:"successRate"`
-	AverageLatencyMs    float64 `json:"averageLatencyMs"`
-}
-
-// PolicyManager manages A1 policy operations
-type PolicyManager struct {
-	policies        map[string]*PolicyDefinition
-	policyTypes     map[string]*PolicyType
-	activeJobs      map[string]*EnrichmentJob
-	nonRTRICClient  *NonRTRICClient
-	stats           PolicyManagerStats
-	mu              sync.RWMutex
-}
+// PolicyManager type is now defined in types.go to avoid redeclaration
 
 // PolicyDefinition represents an A1 policy
-type PolicyDefinition struct {
-	PolicyID      string                 `json:"policyId"`
-	PolicyTypeID  string                 `json:"policyTypeId"`
-	ServiceID     string                 `json:"serviceId"`
-	RICInstance   string                 `json:"ricInstance"`
-	PolicyData    map[string]interface{} `json:"policyData"`
-	Status        PolicyStatus           `json:"status"`
-	CreatedAt     time.Time             `json:"createdAt"`
-	UpdatedAt     time.Time             `json:"updatedAt"`
-}
+// PolicyDefinition is now defined in types.go to avoid redeclaration
 
-// PolicyType represents a policy type definition
-type PolicyType struct {
-	PolicyTypeID  string      `json:"policyTypeId"`
-	Name          string      `json:"name"`
-	Description   string      `json:"description"`
-	Schema        interface{} `json:"schema"`
-	CreatedAt     time.Time   `json:"createdAt"`
-}
+// PolicyType type is now defined in types.go to avoid redeclaration
 
-// PolicyStatus represents policy status
-type PolicyStatus string
-
-const (
-	PolicyStatusActive   PolicyStatus = "ACTIVE"
-	PolicyStatusInactive PolicyStatus = "INACTIVE"
-	PolicyStatusError    PolicyStatus = "ERROR"
-	PolicyStatusDeleted  PolicyStatus = "DELETED"
-)
+// PolicyStatus type and constants are now defined in types.go to avoid redeclaration
 
 // PolicyManagerStats tracks policy manager statistics
-type PolicyManagerStats struct {
-	TotalPolicies       uint64 `json:"totalPolicies"`
-	ActivePolicies      uint64 `json:"activePolicies"`
-	PolicyViolations    uint64 `json:"policyViolations"`
-	EnrichmentJobs      uint64 `json:"enrichmentJobs"`
-	PolicyUpdateRate    float64 `json:"policyUpdateRate"`
-}
+// PolicyManagerStats is now defined in types.go to avoid redeclaration
 
 // RAppManager manages rApp lifecycle
 type RAppManager struct {
@@ -218,17 +127,7 @@ type RAppResourceUsage struct {
 // Nephio R5 Components
 
 // PorchClient manages Nephio Porch integration
-type PorchClient struct {
-	endpoint        string
-	kubeClient      KubernetesClient
-	packageRepo     *PackageRepository
-	packageRevision *PackageRevisionManager
-	validator       *PackageValidator
-	stats           PorchStats
-	config          *PorchConfig
-	running         int32
-	mu              sync.RWMutex
-}
+// PorchClient type is now defined in types.go to avoid redeclaration
 
 // PorchConfig defines Porch client configuration
 type PorchConfig struct {
@@ -239,27 +138,11 @@ type PorchConfig struct {
 }
 
 // PorchStats tracks Porch statistics
-type PorchStats struct {
-	PackageRevisions    uint64 `json:"packageRevisions"`
-	SuccessfulDeploys   uint64 `json:"successfulDeploys"`
-	FailedDeploys       uint64 `json:"failedDeploys"`
-	AvgDeployTimeMs     float64 `json:"avgDeployTimeMs"`
-}
+// PorchStats type is now defined in types.go to avoid redeclaration
 
-// PackageRepository represents a Nephio package repository
-type PackageRepository struct {
-	Name        string            `json:"name"`
-	Type        string            `json:"type"`
-	URL         string            `json:"url"`
-	Branch      string            `json:"branch"`
-	Credentials map[string]string `json:"credentials"`
-}
+// NOTE: PackageRepository type moved to types.go to avoid redeclaration
 
-// PackageRevisionManager manages package revisions
-type PackageRevisionManager struct {
-	revisions   map[string]*PackageRevision
-	mu          sync.RWMutex
-}
+// NOTE: PackageRevisionManager type moved to types.go to avoid redeclaration
 
 // PackageRevision represents a Nephio package revision
 type PackageRevision struct {
@@ -294,12 +177,7 @@ type ReadinessGate struct {
 	Message       string `json:"message"`
 }
 
-// PackageTask represents a package task
-type PackageTask struct {
-	Type    string                 `json:"type"`
-	Function string                `json:"function"`
-	Config  map[string]interface{} `json:"config"`
-}
+// PackageTask type is now defined in types.go to avoid redeclaration
 
 // KubernetesResource represents a Kubernetes resource
 type KubernetesResource struct {
@@ -310,16 +188,7 @@ type KubernetesResource struct {
 }
 
 // OCloudManager manages O-Cloud resources for Nephio R5
-type OCloudManager struct {
-	endpoint        string
-	resourcePools   map[string]*ResourcePool
-	energyManager   *EnergyManager
-	scalingPolicy   *ScalingPolicy
-	stats           OCloudStats
-	config          *OCloudConfig
-	running         int32
-	mu              sync.RWMutex
-}
+// OCloudManager type is now defined in types.go to avoid redeclaration
 
 // OCloudConfig defines O-Cloud configuration
 type OCloudConfig struct {
@@ -330,26 +199,9 @@ type OCloudConfig struct {
 }
 
 // OCloudStats tracks O-Cloud statistics
-type OCloudStats struct {
-	TotalResourcePools  uint64  `json:"totalResourcePools"`
-	ActiveResourcePools uint64  `json:"activeResourcePools"`
-	PowerConsumption    float64 `json:"powerConsumption"`
-	EnergyEfficiency    float64 `json:"energyEfficiency"`
-	NetworkThroughput   float64 `json:"networkThroughput"`
-}
+// OCloudStats type is now defined in types.go to avoid redeclaration
 
-// ResourcePool represents an O-Cloud resource pool
-type ResourcePool struct {
-	ID              string            `json:"id"`
-	Name            string            `json:"name"`
-	Type            string            `json:"type"`
-	Location        ResourceLocation  `json:"location"`
-	Capacity        ResourceCapacity  `json:"capacity"`
-	Available       ResourceCapacity  `json:"available"`
-	PowerConsumption float64          `json:"powerConsumption"`
-	EnergyProfile   EnergyProfile     `json:"energyProfile"`
-	Status          ResourcePoolStatus `json:"status"`
-}
+// NOTE: ResourcePool type moved to types.go to avoid redeclaration
 
 // ResourceLocation represents resource pool location
 type ResourceLocation struct {
@@ -677,15 +529,7 @@ func (nrc *NonRTRICClient) Connect(ctx context.Context) error {
 
 // Additional component implementations would follow...
 
-// NewPolicyManager creates a new policy manager
-func NewPolicyManager() *PolicyManager {
-	return &PolicyManager{
-		policies:    make(map[string]*PolicyDefinition),
-		policyTypes: make(map[string]*PolicyType),
-		activeJobs:  make(map[string]*EnrichmentJob),
-		stats:       PolicyManagerStats{},
-	}
-}
+// NewPolicyManager function is now defined in types.go to avoid redeclaration
 
 // Start starts the policy manager
 func (pm *PolicyManager) Start(ctx context.Context) error {
@@ -799,34 +643,34 @@ func (ocm *OCloudManager) optimizeEnergyConsumption() {
 }
 
 // Additional placeholder implementations for supporting types...
-type OptimizedHTTPClient struct{}
+// NOTE: OptimizedHTTPClient type moved to types.go to avoid redeclaration
 func NewOptimizedHTTPClient(timeout time.Duration) *OptimizedHTTPClient { return &OptimizedHTTPClient{} }
 
-type PolicyAPI struct{}
+// NOTE: PolicyAPI type moved to types.go to avoid redeclaration  
 func NewPolicyAPI() *PolicyAPI { return &PolicyAPI{} }
 func (pa *PolicyAPI) Initialize(url string) error { return nil }
 
-type EnrichmentAPI struct{}
+// NOTE: EnrichmentAPI type moved to types.go to avoid redeclaration
 func NewEnrichmentAPI() *EnrichmentAPI { return &EnrichmentAPI{} }
 func (ea *EnrichmentAPI) Initialize(url string) error { return nil }
 
-type DMAAPClient struct{}
+// NOTE: DMAAPClient type moved to types.go to avoid redeclaration
 func NewDMAAPClient() *DMAAPClient { return &DMAAPClient{} }
 func (dc *DMAAPClient) Initialize(url string) error { return nil }
 
-type EnrichmentJob struct{}
+// EnrichmentJob type is now defined in types.go to avoid redeclaration
 
-type EnergyManager struct{}
+// NOTE: EnergyManager type moved to types.go to avoid redeclaration
 func NewEnergyManager() *EnergyManager { return &EnergyManager{} }
 
-type ScalingPolicy struct{}
+// ScalingPolicy type is now defined in types.go to avoid redeclaration
 
 type DeploymentManager struct{}
 
-type KubernetesClient interface{}
+// KubernetesClient interface is now defined in types.go to avoid redeclaration
 
-type PackageValidator struct{}
+// NOTE: PackageValidator type moved to types.go to avoid redeclaration
 
-type RateLimiter struct{}
+// NOTE: RateLimiter type moved to types.go to avoid redeclaration
 
 type RAppLifecycleManager struct{}

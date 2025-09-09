@@ -16,65 +16,16 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-// PolicyManager manages policy lifecycle, validation, conflicts, and distribution
-type PolicyManager struct {
-	a1Client           *A1MediatorClient
-	xappClients        map[string]*XAppClient // Map of xApp ID to client
-	policyTypes        map[PolicyTypeID]*PolicyType
-	policyInstances    map[PolicyInstanceID]*PolicyInstance
-	conflicts          map[string]*PolicyConflict
-	distributionStatus map[PolicyInstanceID]map[string]*PolicyDistributionStatus
-	complianceReports  map[PolicyInstanceID]map[string]*PolicyComplianceReport
-	mutex              sync.RWMutex
+// PolicyManager type is now defined in types.go to avoid redeclaration
 
-	// Channels for async operations
-	distributionChan chan *PolicyDistributionRequest
-	complianceChan   chan *PolicyComplianceRequest
-	stopChan         chan struct{}
-}
+// PolicyDistributionRequest type is now defined in types.go to avoid redeclaration
 
-// PolicyDistributionRequest represents a request to distribute a policy to xApps
-type PolicyDistributionRequest struct {
-	PolicyInstanceID PolicyInstanceID
-	PolicyTypeID     PolicyTypeID
-	Policy           json.RawMessage
-	TargetXApps      []string
-}
-
-// PolicyComplianceRequest represents a request to check policy compliance
-type PolicyComplianceRequest struct {
-	PolicyInstanceID PolicyInstanceID
-	XAppID           string
-}
+// PolicyComplianceRequest type is now defined in types.go to avoid redeclaration
 
 // XAppClient represents a client for communicating with xApps
-type XAppClient struct {
-	ID       string
-	Endpoint string
-	// Add other client fields as needed
-}
+// XAppClient is now defined in types.go to avoid redeclaration
 
-// NewPolicyManager creates a new policy manager
-func NewPolicyManager(a1Client *A1MediatorClient) *PolicyManager {
-	pm := &PolicyManager{
-		a1Client:           a1Client,
-		xappClients:        make(map[string]*XAppClient),
-		policyTypes:        make(map[PolicyTypeID]*PolicyType),
-		policyInstances:    make(map[PolicyInstanceID]*PolicyInstance),
-		conflicts:          make(map[string]*PolicyConflict),
-		distributionStatus: make(map[PolicyInstanceID]map[string]*PolicyDistributionStatus),
-		complianceReports:  make(map[PolicyInstanceID]map[string]*PolicyComplianceReport),
-		distributionChan:   make(chan *PolicyDistributionRequest, 100),
-		complianceChan:     make(chan *PolicyComplianceRequest, 100),
-		stopChan:           make(chan struct{}),
-	}
-
-	// Start background workers
-	go pm.distributionWorker()
-	go pm.complianceWorker()
-
-	return pm
-}
+// NewPolicyManager function is now defined in types.go to avoid redeclaration
 
 // Stop stops the policy manager and its background workers
 func (pm *PolicyManager) Stop() {

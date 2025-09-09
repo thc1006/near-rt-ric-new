@@ -264,26 +264,9 @@ type SystemLoadTracker struct {
 	lastUpdate          time.Time
 }
 
-// ResponseCache provides intelligent response caching
-type ResponseCache struct {
-	cache               map[string]*CacheEntry
-	maxSize             int
-	ttl                 time.Duration
-	hits                uint64
-	misses              uint64
-	evictions           uint64
-	mu                  sync.RWMutex
-}
+// NOTE: ResponseCache type moved to types.go to avoid redeclaration
 
-// CacheEntry represents a cached response
-type CacheEntry struct {
-	Data                []byte
-	ContentType         string
-	Timestamp           time.Time
-	AccessCount         int
-	LastAccess          time.Time
-	ETag                string
-}
+// NOTE: CacheEntry type moved to types.go to avoid redeclaration
 
 // NewEnhancedDashboardAPI creates a new enhanced dashboard API
 func NewEnhancedDashboardAPI(config *DashboardConfig, smoOptimizer *SMOPerformanceOptimizer) *EnhancedDashboardAPI {

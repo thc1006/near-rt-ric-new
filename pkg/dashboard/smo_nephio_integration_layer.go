@@ -7,8 +7,8 @@ package dashboard
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -238,14 +238,7 @@ type RAppDeploymentRequest struct {
 	TargetClusters          []string               `json:"targetClusters"`
 }
 
-// ResourceRequirements defines resource requirements for rApp deployment
-type ResourceRequirements struct {
-	CPU                     string                 `json:"cpu"`
-	Memory                  string                 `json:"memory"`
-	Storage                 string                 `json:"storage"`
-	NetworkBandwidth        string                 `json:"networkBandwidth"`
-	GPURequirement          bool                   `json:"gpuRequirement"`
-}
+// ResourceRequirements type is now defined in types.go to avoid redeclaration
 
 // Nephio R5 Integration Types
 
@@ -260,12 +253,7 @@ type PackageRevisionRequest struct {
 	Tasks                   []PackageTask          `json:"tasks"`
 }
 
-// PackageTask represents a task to be performed on the package
-type PackageTask struct {
-	Type                    string                 `json:"type"`
-	Function                string                 `json:"function"`
-	ConfigMap               map[string]interface{} `json:"configMap"`
-}
+// PackageTask type is now defined in types.go to avoid redeclaration
 
 // OCloudResourceRequest represents an O-Cloud resource provisioning request
 type OCloudResourceRequest struct {
@@ -617,7 +605,7 @@ func (layer *SMONephioIntegrationLayer) metricsCollectionLoop(ctx context.Contex
 		select {
 		case <-ctx.Done():
 			return
-		case <-timer.C:
+		case <-ticker.C:
 			layer.collectDetailedMetrics()
 		}
 	}

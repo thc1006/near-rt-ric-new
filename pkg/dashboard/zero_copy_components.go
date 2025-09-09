@@ -19,16 +19,7 @@ import (
 
 // Zero-Copy Buffer Pool Implementation
 
-// ZeroCopyBufferPool manages zero-copy buffers for high-performance message processing
-type ZeroCopyBufferPool struct {
-	size            int
-	pool            sync.Pool
-	allocatedCount  uint64
-	reusedCount     uint64
-	totalAllocated  uint64
-	stats           BufferPoolStats
-	mu              sync.RWMutex
-}
+// NOTE: ZeroCopyBufferPool type moved to high_performance_processor.go to avoid redeclaration
 
 // BufferPoolStats tracks buffer pool statistics
 type BufferPoolStats struct {

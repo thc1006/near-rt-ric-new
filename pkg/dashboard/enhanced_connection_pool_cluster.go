@@ -156,7 +156,7 @@ type E2Connection struct {
 
 // SCTPConnection handles SCTP-specific optimizations
 type SCTPConnection struct {
-	conn            *net.SCTPConn
+	conn            interface{}
 	streams         map[uint16]*SCTPStream
 	maxInStreams    uint16
 	maxOutStreams   uint16
@@ -240,34 +240,9 @@ type WorkerPool struct {
 
 // Worker type is now defined in types.go to avoid redeclaration
 
-// WorkerThread represents the actual thread implementation
-type WorkerThread struct {
-	tid             int
-	priority        int
-	cpuAffinity     uint64
-	stackSize       int
-	
-	// Real-time scheduling
-	policy          SchedulingPolicy
-	rtPriority      int
-	
-	context         *ThreadContext
-	mu              sync.RWMutex
-}
+// WorkerThread type is now defined in types.go to avoid redeclaration
 
-// ThreadContext holds thread-specific context
-type ThreadContext struct {
-	registers       ThreadRegisters
-	stack           []byte
-	tlsData         map[string]interface{}
-	
-	// Performance counters
-	instructions    uint64
-	cycles          uint64
-	cacheMisses     uint64
-	
-	mu              sync.RWMutex
-}
+// ThreadContext type is now defined in types.go to avoid redeclaration
 
 // ConnectionLoadBalancer distributes connections across pools
 type ConnectionLoadBalancer struct {

@@ -27,43 +27,14 @@ const (
 	SliceStateTerminating SliceState = "TERMINATING"
 )
 
-// NetworkSlice represents a complete network slice configuration
-type NetworkSlice struct {
-	ID             uuid.UUID        `json:"id"`
-	Name           string           `json:"name"`
-	Type           SliceType        `json:"type"`
-	State          SliceState       `json:"state"`
-	Tenant         string           `json:"tenant"`
-	ServiceProfile ServiceProfile   `json:"serviceProfile"`
-	ResourceQuota  ResourceQuota    `json:"resourceQuota"`
-	SLA            SliceSLA         `json:"sla"`
-	Placement      PlacementPolicy  `json:"placement"`
-	CreatedAt      time.Time        `json:"createdAt"`
-	UpdatedAt      time.Time        `json:"updatedAt"`
-}
-
-// ServiceProfile defines the performance characteristics of a slice
-type ServiceProfile struct {
-	MaxDataRate struct {
-		Downlink int `json:"downlink"` // Mbps
-		Uplink   int `json:"uplink"`   // Mbps
-	} `json:"maxDataRate"`
-	Latency          int     `json:"latency"`          // ms
-	Reliability      float64 `json:"reliability"`       // percentage
-	MaxConcurrentUEs int     `json:"maxConcurrentUEs"`
-}
+// NOTE: NetworkSlice and ServiceProfile types moved to types.go to avoid redeclaration
 
 // ResourceQuota defines compute, network, and storage resources
 type ResourceQuota struct {
 	Compute struct {
-		CPU struct {
-			Min int `json:"min"`
-			Max int `json:"max"`
-		} `json:"cpu"`
-		Memory struct {
-			Min int `json:"min"` // GB
-			Max int `json:"max"`
-		} `json:"memory"`
+		CPU    int `json:"cpu"`    // vCPUs
+		Memory int `json:"memory"` // GB
+		GPU    int `json:"gpu"`    // units
 	} `json:"compute"`
 	Network struct {
 		Bandwidth struct {

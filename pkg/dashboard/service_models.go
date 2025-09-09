@@ -14,25 +14,7 @@ import (
 
 // ServiceModelType and constants are now defined in types.go to avoid redeclaration
 
-// ServiceModelCapability represents a capability of a service model
-type ServiceModelCapability struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Version     string `json:"version"`
-	Supported   bool   `json:"supported"`
-}
-
-// ServiceModelDefinition represents a complete service model definition
-type ServiceModelDefinition struct {
-	OID           string                    `json:"oid"`
-	Name          string                    `json:"name"`
-	Type          ServiceModelType          `json:"type"`
-	Version       string                    `json:"version"`
-	Description   string                    `json:"description"`
-	Capabilities  []ServiceModelCapability  `json:"capabilities"`
-	RANFunctions  []RANFunction            `json:"ranFunctions"`
-	LastUpdated   time.Time                `json:"lastUpdated"`
-}
+// ServiceModelCapability and ServiceModelDefinition are now defined in types.go to avoid redeclaration
 
 // E2SMKPMMetrics type is now defined in types.go to avoid redeclaration
 
@@ -52,30 +34,11 @@ type ServiceModelDefinition struct {
 
 // E2SMNIIndicationMessage type is now defined in types.go to avoid redeclaration
 
-// ProtocolIE represents a protocol information element
-type ProtocolIE struct {
-	ID           uint32      `json:"id"`
-	Criticality  string      `json:"criticality"`
-	Value        interface{} `json:"value"`
-	TypeName     string      `json:"typeName"`
-}
+// ProtocolIE type is now defined in types.go to avoid redeclaration
 
-// ServiceModelRegistry manages service model definitions and capabilities
-type ServiceModelRegistry struct {
-	models map[string]*ServiceModelDefinition
-}
+// ServiceModelRegistry type is now defined in types.go to avoid redeclaration
 
-// NewServiceModelRegistry creates a new service model registry
-func NewServiceModelRegistry() *ServiceModelRegistry {
-	registry := &ServiceModelRegistry{
-		models: make(map[string]*ServiceModelDefinition),
-	}
-	
-	// Initialize with standard O-RAN service models
-	registry.initializeStandardModels()
-	
-	return registry
-}
+// NewServiceModelRegistry function is now defined in types.go to avoid redeclaration
 
 // initializeStandardModels initializes the registry with standard O-RAN service models
 func (r *ServiceModelRegistry) initializeStandardModels() {
@@ -215,24 +178,7 @@ func (r *ServiceModelRegistry) initializeStandardModels() {
 	r.models[niModel.OID] = niModel
 }
 
-// RegisterServiceModel registers a new service model
-func (r *ServiceModelRegistry) RegisterServiceModel(model *ServiceModelDefinition) error {
-	if model.OID == "" {
-		return fmt.Errorf("service model OID cannot be empty")
-	}
-	
-	model.LastUpdated = time.Now()
-	r.models[model.OID] = model
-	
-	log.Printf("Registered service model: %s (%s)", model.Name, model.OID)
-	return nil
-}
 
-// GetServiceModel retrieves a service model by OID
-func (r *ServiceModelRegistry) GetServiceModel(oid string) (*ServiceModelDefinition, bool) {
-	model, exists := r.models[oid]
-	return model, exists
-}
 
 // GetAllServiceModels returns all registered service models
 func (r *ServiceModelRegistry) GetAllServiceModels() map[string]*ServiceModelDefinition {

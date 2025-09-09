@@ -16,11 +16,7 @@ import (
 	"time"
 )
 
-// A1MediatorClient provides client interface for A1 Mediator component
-type A1MediatorClient struct {
-	httpClient *http.Client
-	endpoint   string
-}
+// A1MediatorClient type is now defined in types.go to avoid redeclaration
 
 // NewA1MediatorClient creates a new A1 Mediator client
 func NewA1MediatorClient(httpClient *http.Client, endpoint string) *A1MediatorClient {
