@@ -1,22 +1,16 @@
 package e2e
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"os"
 	"os/exec"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -511,9 +505,9 @@ func (suite *E2ETestSuite) TestCompleteE2NodeOnboardingWorkflow() {
 			result := suite.testResults.E2NodeOnboardingTests[node.ID]
 			
 			// Step 1: E2 Setup Procedure
-			start := time.Now()
+			setupStart := time.Now()
 			setupSuccess := suite.performE2Setup(node)
-			result.SetupTime = time.Since(start)
+			result.SetupTime = time.Since(setupStart)
 			result.OnboardingSuccess = setupSuccess
 			
 			if !setupSuccess {
@@ -549,9 +543,9 @@ func (suite *E2ETestSuite) TestCompleteE2NodeOnboardingWorkflow() {
 			}
 			
 			// Step 6: Node Decommissioning
-			start = time.Now()
+			decommissionStart := time.Now()
 			decommissionSuccess := suite.decommissionE2Node(node)
-			result.DecommissionTime = time.Since(start)
+			result.DecommissionTime = time.Since(decommissionStart)
 			if !decommissionSuccess {
 				result.Errors = append(result.Errors, "Node decommission failed")
 			}
@@ -623,7 +617,6 @@ func (suite *E2ETestSuite) TestPolicyCreationDistributionEnforcement() {
 			}
 			
 			// Step 1: Policy Creation
-			start := time.Now()
 			creationSuccess := suite.createA1Policy(testPolicy)
 			result.CreationSuccess = creationSuccess
 			if !creationSuccess {
@@ -719,9 +712,9 @@ func (suite *E2ETestSuite) TestXAppDeploymentOperations() {
 			}
 			
 			// Step 1: xApp Deployment
-			start := time.Now()
+			deployStart := time.Now()
 			deploymentSuccess := suite.deployXApp(testXApp)
-			result.DeploymentTime = time.Since(start)
+			result.DeploymentTime = time.Since(deployStart)
 			if !deploymentSuccess {
 				result.Errors = append(result.Errors, "xApp deployment failed")
 			}
@@ -748,9 +741,9 @@ func (suite *E2ETestSuite) TestXAppDeploymentOperations() {
 			}
 			
 			// Step 5: xApp Undeployment
-			start = time.Now()
+			undeployStart := time.Now()
 			undeploymentSuccess := suite.undeployXApp(testXApp.name)
-			result.UndeploymentTime = time.Since(start)
+			result.UndeploymentTime = time.Since(undeployStart)
 			if !undeploymentSuccess {
 				result.Errors = append(result.Errors, "xApp undeployment failed")
 			}
@@ -818,7 +811,7 @@ func (suite *E2ETestSuite) TestFailureScenarioRecovery() {
 			}
 			
 			// Step 2: Inject Failure
-			start := time.Now()
+			failureStart := time.Now()
 			failureInjected := suite.injectFailure(scenario.component, scenario.failureType)
 			result.FailureInjected = failureInjected
 			if !failureInjected {
@@ -827,7 +820,7 @@ func (suite *E2ETestSuite) TestFailureScenarioRecovery() {
 			
 			// Step 3: Wait for System Recovery
 			recoverySuccess := suite.waitForRecovery(scenario.component, 5*time.Minute)
-			result.RecoveryTime = time.Since(start)
+			result.RecoveryTime = time.Since(failureStart)
 			if !recoverySuccess {
 				result.Errors = append(result.Errors, "System recovery failed")
 			}
@@ -1282,10 +1275,10 @@ func (suite *E2ETestSuite) executeLoadTest(concurrentNodes, requestsPerNode int,
 			defer wg.Done()
 			
 			for j := 0; j < requestsPerNode; j++ {
-				start := time.Now()
+				reqStart := time.Now()
 				// Simulate API request
 				time.Sleep(time.Duration(10+nodeID%20) * time.Millisecond)
-				responseTime := time.Since(start)
+				responseTime := time.Since(reqStart)
 				
 				mutex.Lock()
 				responseTimes = append(responseTimes, responseTime)

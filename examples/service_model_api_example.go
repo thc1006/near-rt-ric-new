@@ -1,3 +1,5 @@
+//go:build service_model_api_example
+
 /*
 SPDX-FileCopyrightText: 2020-present Open Networking Foundation <info@opennetworking.org>
 SPDX-License-Identifier: Apache-2.0

@@ -12,215 +12,6 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-// NephioR5IntegrationTest implements comprehensive testing for Nephio R5 deployments
-type NephioR5IntegrationTest struct {
-	config         *NephioR5Config
-	logger         *logrus.Logger
-	kubeClient     kubernetes.Interface
-	porchClient    *PorchClient
-	gitOpsClient   *GitOpsClient
-	packageManager *PackageManager
-	metrics        *NephioTestMetrics
-}
-
-// NephioR5Config holds configuration for Nephio R5 testing
-type NephioR5Config struct {
-	// Nephio R5 Endpoints
-	PorchAPIEndpoint      string `json:"porchApiEndpoint"`
-	PackageRegistryURL    string `json:"packageRegistryUrl"`
-	GitOpsRepoURL         string `json:"gitOpsRepoUrl"`
-	ConfigSyncEndpoint    string `json:"configSyncEndpoint"`
-	
-	// Kubernetes Configuration
-	KubeConfig            string `json:"kubeConfig"`
-	TargetNamespace       string `json:"targetNamespace"`
-	WorkloadClusters      []WorkloadClusterConfig `json:"workloadClusters"`
-	
-	// Package Configuration
-	PackageRepository     string `json:"packageRepository"`
-	PackageCatalogURL     string `json:"packageCatalogUrl"`
-	TestPackages          []TestPackageConfig `json:"testPackages"`
-	
-	// GitOps Configuration
-	GitProvider           string `json:"gitProvider"`
-	GitUsername           string `json:"gitUsername"`
-	GitToken              string `json:"gitToken"`
-	
-	// Test Parameters
-	TestTimeout           time.Duration `json:"testTimeout"`
-	PackageValidationTimeout time.Duration `json:"packageValidationTimeout"`
-	DeploymentTimeout     time.Duration `json:"deploymentTimeout"`
-}
-
-// WorkloadClusterConfig defines configuration for target workload clusters
-type WorkloadClusterConfig struct {
-	Name              string            `json:"name"`
-	Endpoint          string            `json:"endpoint"`
-	Region            string            `json:"region"`
-	Provider          string            `json:"provider"`
-	Capabilities      []string          `json:"capabilities"`
-	Labels            map[string]string `json:"labels"`
-	ResourceQuotas    ResourceQuotas    `json:"resourceQuotas"`
-}
-
-// TestPackageConfig defines test package specifications
-type TestPackageConfig struct {
-	Name              string                 `json:"name"`
-	Repository        string                 `json:"repository"`
-	Version           string                 `json:"version"`
-	Dependencies      []string               `json:"dependencies"`
-	ConfigurationData map[string]interface{} `json:"configurationData"`
-	TargetClusters    []string               `json:"targetClusters"`
-	ValidationRules   []ValidationRule       `json:"validationRules"`
-}
-
-// ResourceQuotas defines resource limits for clusters
-type ResourceQuotas struct {
-	CPU                string `json:"cpu"`
-	Memory             string `json:"memory"`
-	Storage            string `json:"storage"`
-	MaxPods            int    `json:"maxPods"`
-	MaxServices        int    `json:"maxServices"`
-}
-
-// ValidationRule defines package validation criteria
-type ValidationRule struct {
-	Type        string                 `json:"type"`
-	Rule        string                 `json:"rule"`
-	Parameters  map[string]interface{} `json:"parameters"`
-	Severity    string                 `json:"severity"`
-}
-
-// PorchClient provides interface to Porch API
-type PorchClient struct {
-	endpoint   string
-	httpClient *http.Client
-	logger     *logrus.Logger
-}
-
-// GitOpsClient provides interface to GitOps operations
-type GitOpsClient struct {
-	repoURL    string
-	username   string
-	token      string
-	httpClient *http.Client
-	logger     *logrus.Logger
-}
-
-// PackageManager handles package operations
-type PackageManager struct {
-	porchClient *PorchClient
-	gitOpsClient *GitOpsClient
-	logger      *logrus.Logger
-}
-
-// NephioTestMetrics tracks Nephio-specific test metrics
-type NephioTestMetrics struct {
-	// Package Operations
-	PackagesCreated       int                     `json:"packagesCreated"`
-	PackagesDeployed      int                     `json:"packagesDeployed"`
-	PackagesFailed        int                     `json:"packagesFailed"`
-	PackageRevisions      int                     `json:"packageRevisions"`
-	PackageVariants       int                     `json:"packageVariants"`
-	
-	// Deployment Metrics
-	DeploymentSuccesses   int                     `json:"deploymentSuccesses"`
-	DeploymentFailures    int                     `json:"deploymentFailures"`
-	AverageDeploymentTime time.Duration           `json:"averageDeploymentTime"`
-	
-	// GitOps Metrics
-	GitCommits            int                     `json:"gitCommits"`
-	GitSyncSuccesses      int                     `json:"gitSyncSuccesses"`
-	GitSyncFailures       int                     `json:"gitSyncFailures"`
-	
-	// Porch Metrics
-	PorchOperations       int                     `json:"porchOperations"`
-	PorchAPILatency       time.Duration           `json:"porchApiLatency"`
-	PorchErrors           int                     `json:"porchErrors"`
-	
-	// Multi-cluster Metrics
-	ClustersTargeted      int                     `json:"clustersTargeted"`
-	ClusterDeployments    map[string]int          `json:"clusterDeployments"`
-	CrossClusterLatency   map[string]time.Duration `json:"crossClusterLatency"`
-	
-	// Resource Metrics
-	ResourceUtilization   map[string]float64      `json:"resourceUtilization"`
-	NetworkTopologyChanges int                    `json:"networkTopologyChanges"`
-}
-
-// PackageRevision represents a Nephio package revision
-type PackageRevision struct {
-	Name              string                 `json:"name"`
-	Namespace         string                 `json:"namespace"`
-	Repository        string                 `json:"repository"`
-	Package           string                 `json:"package"`
-	Revision          string                 `json:"revision"`
-	Lifecycle         string                 `json:"lifecycle"`
-	WorkspaceName     string                 `json:"workspaceName"`
-	Tasks             []PackageTask          `json:"tasks"`
-	Resources         []KubernetesResource   `json:"resources"`
-	ReadinessGates    []ReadinessGate        `json:"readinessGates"`
-	Conditions        []PackageCondition     `json:"conditions"`
-}
-
-// PackageTask represents a package transformation task
-type PackageTask struct {
-	Type        string                 `json:"type"`
-	Image       string                 `json:"image"`
-	ConfigMap   map[string]interface{} `json:"configMap"`
-}
-
-// KubernetesResource represents a Kubernetes resource in a package
-type KubernetesResource struct {
-	APIVersion string                 `json:"apiVersion"`
-	Kind       string                 `json:"kind"`
-	Metadata   map[string]interface{} `json:"metadata"`
-	Spec       map[string]interface{} `json:"spec"`
-}
-
-// ReadinessGate defines package readiness criteria
-type ReadinessGate struct {
-	ConditionType string `json:"conditionType"`
-}
-
-// PackageCondition represents package status conditions
-type PackageCondition struct {
-	Type               string    `json:"type"`
-	Status             string    `json:"status"`
-	LastTransitionTime time.Time `json:"lastTransitionTime"`
-	Reason             string    `json:"reason"`
-	Message            string    `json:"message"`
-}
-
-// PackageVariant represents a package variant for multi-cluster deployment
-type PackageVariant struct {
-	Name        string                 `json:"name"`
-	Namespace   string                 `json:"namespace"`
-	Upstream    PackageVariantUpstream `json:"upstream"`
-	Downstream  PackageVariantDownstream `json:"downstream"`
-	Injectors   []Injector             `json:"injectors"`
-}
-
-// PackageVariantUpstream defines the upstream package reference
-type PackageVariantUpstream struct {
-	Repository string `json:"repository"`
-	Package    string `json:"package"`
-	Revision   string `json:"revision"`
-}
-
-// PackageVariantDownstream defines the downstream package configuration
-type PackageVariantDownstream struct {
-	Repository string `json:"repository"`
-	Package    string `json:"package"`
-}
-
-// Injector defines configuration injection for package variants
-type Injector struct {
-	Name   string                 `json:"name"`
-	Image  string                 `json:"image"`
-	Config map[string]interface{} `json:"config"`
-}
-
 // NewNephioR5IntegrationTest creates a new Nephio R5 integration test instance
 func NewNephioR5IntegrationTest(config *NephioR5Config, logger *logrus.Logger) (*NephioR5IntegrationTest, error) {
 	if config == nil {
@@ -506,24 +297,6 @@ func (nt *NephioR5IntegrationTest) runPerformanceTests(ctx context.Context) map[
 	results["scale-testing"] = nt.testScaleCapabilities(ctx)
 
 	return results
-}
-
-// NephioTestReport represents the comprehensive Nephio R5 test results
-type NephioTestReport struct {
-	TestID                      string                  `json:"testId"`
-	StartTime                   time.Time               `json:"startTime"`
-	EndTime                     time.Time               `json:"endTime"`
-	Duration                    time.Duration           `json:"duration"`
-	Config                      NephioR5Config          `json:"config"`
-	Metrics                     NephioTestMetrics       `json:"metrics"`
-	PorchTestResults           map[string]TestResult    `json:"porchTestResults"`
-	GitOpsTestResults          map[string]TestResult    `json:"gitOpsTestResults"`
-	MultiClusterTestResults    map[string]TestResult    `json:"multiClusterTestResults"`
-	PackageVariantTestResults  map[string]TestResult    `json:"packageVariantTestResults"`
-	ConfigManagementTestResults map[string]TestResult   `json:"configManagementTestResults"`
-	EndToEndTestResults        map[string]TestResult    `json:"endToEndTestResults"`
-	PerformanceTestResults     map[string]TestResult    `json:"performanceTestResults"`
-	Recommendations            []string                 `json:"recommendations"`
 }
 
 // Placeholder implementations for test methods
@@ -847,4 +620,124 @@ func (nt *NephioR5IntegrationTest) testScaleCapabilities(ctx context.Context) Te
 		Timestamp: time.Now(),
 		Duration:  120 * time.Second,
 	}
+}
+
+// WorkloadClusterConfig defines configuration for target workload clusters
+type WorkloadClusterConfig struct {
+	Name              string            `json:"name"`
+	Endpoint          string            `json:"endpoint"`
+	Region            string            `json:"region"`
+	Provider          string            `json:"provider"`
+	Capabilities      []string          `json:"capabilities"`
+	Labels            map[string]string `json:"labels"`
+	ResourceQuotas    ResourceQuotas    `json:"resourceQuotas"`
+}
+
+// TestPackageConfig defines test package specifications
+type TestPackageConfig struct {
+	Name              string                 `json:"name"`
+	Repository        string                 `json:"repository"`
+	Version           string                 `json:"version"`
+	Dependencies      []string               `json:"dependencies"`
+	ConfigurationData map[string]interface{} `json:"configurationData"`
+	TargetClusters    []string               `json:"targetClusters"`
+	ValidationRules   []ValidationRule       `json:"validationRules"`
+}
+
+// ResourceQuotas defines resource limits for clusters
+type ResourceQuotas struct {
+	CPU                string `json:"cpu"`
+	Memory             string `json:"memory"`
+	Storage            string `json:"storage"`
+	MaxPods            int    `json:"maxPods"`
+	MaxServices        int    `json:"maxServices"`
+}
+
+// ValidationRule defines package validation criteria
+type ValidationRule struct {
+	Type        string                 `json:"type"`
+	Rule        string                 `json:"rule"`
+	Parameters  map[string]interface{} `json:"parameters"`
+	Severity    string                 `json:"severity"`
+}
+
+// GitOpsClient provides interface to GitOps operations
+type GitOpsClient struct {
+	repoURL    string
+	username   string
+	token      string
+	httpClient *http.Client
+	logger     *logrus.Logger
+}
+
+// NephioTestMetrics tracks Nephio-specific test metrics
+type NephioTestMetrics struct {
+	// Package Operations
+	PackagesCreated       int                     `json:"packagesCreated"`
+	PackagesDeployed      int                     `json:"packagesDeployed"`
+	PackagesFailed        int                     `json:"packagesFailed"`
+	PackageRevisions      int                     `json:"packageRevisions"`
+	PackageVariants       int                     `json:"packageVariants"`
+	
+	// Deployment Metrics
+	DeploymentSuccesses   int                     `json:"deploymentSuccesses"`
+	DeploymentFailures    int                     `json:"deploymentFailures"`
+	AverageDeploymentTime time.Duration           `json:"averageDeploymentTime"`
+	
+	// GitOps Metrics
+	GitCommits            int                     `json:"gitCommits"`
+	GitSyncSuccesses      int                     `json:"gitSyncSuccesses"`
+	GitSyncFailures       int                     `json:"gitSyncFailures"`
+	
+	// Porch Metrics
+	PorchOperations       int                     `json:"porchOperations"`
+	PorchAPILatency       time.Duration           `json:"porchApiLatency"`
+	PorchErrors           int                     `json:"porchErrors"`
+	
+	// Multi-cluster Metrics
+	ClustersTargeted      int                     `json:"clustersTargeted"`
+	ClusterDeployments    map[string]int          `json:"clusterDeployments"`
+	CrossClusterLatency   map[string]time.Duration `json:"crossClusterLatency"`
+	
+	// Resource Metrics
+	ResourceUtilization   map[string]float64      `json:"resourceUtilization"`
+	NetworkTopologyChanges int                    `json:"networkTopologyChanges"`
+}
+
+// PackageCondition represents package status conditions
+type PackageCondition struct {
+	Type               string    `json:"type"`
+	Status             string    `json:"status"`
+	LastTransitionTime time.Time `json:"lastTransitionTime"`
+	Reason             string    `json:"reason"`
+	Message            string    `json:"message"`
+}
+
+// PackageVariant represents a package variant for multi-cluster deployment
+type PackageVariant struct {
+	Name        string                 `json:"name"`
+	Namespace   string                 `json:"namespace"`
+	Upstream    PackageVariantUpstream `json:"upstream"`
+	Downstream  PackageVariantDownstream `json:"downstream"`
+	Injectors   []Injector             `json:"injectors"`
+}
+
+// PackageVariantUpstream defines the upstream package reference
+type PackageVariantUpstream struct {
+	Repository string `json:"repository"`
+	Package    string `json:"package"`
+	Revision   string `json:"revision"`
+}
+
+// PackageVariantDownstream defines the downstream package configuration
+type PackageVariantDownstream struct {
+	Repository string `json:"repository"`
+	Package    string `json:"package"`
+}
+
+// Injector defines configuration injection for package variants
+type Injector struct {
+	Name   string                 `json:"name"`
+	Image  string                 `json:"image"`
+	Config map[string]interface{} `json:"config"`
 }

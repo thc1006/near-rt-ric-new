@@ -8,11 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 // IntegrationTestSuite provides comprehensive integration testing with real O-RAN SC components
@@ -255,7 +256,7 @@ func (suite *IntegrationTestSuite) isComponentReady(componentName string) (bool,
 	// Check pod status using Kubernetes API
 	pods, err := suite.kubeClient.CoreV1().Pods(suite.namespace).List(context.TODO(), 
 		metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("app=%s", componentName),
+			LabelSelector: labels.Set{"app": componentName}.String(),
 		})
 	
 	if err != nil {

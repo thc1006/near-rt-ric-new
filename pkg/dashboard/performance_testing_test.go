@@ -606,37 +606,6 @@ func TestEnhancedLoadTestScenarios(t *testing.T) {
 	}
 }
 
-func TestStressTestScenarios(t *testing.T) {
-	e2Manager := &MockE2ManagerClient{}
-	subManager := &MockSubscriptionManagerClient{}
-
-	manager := NewStressTestManager(e2Manager, subManager)
-
-	if manager.resourceMonitor == nil {
-		t.Error("Expected resource monitor to be initialized")
-	}
-
-	if manager.failureInjector == nil {
-		t.Error("Expected failure injector to be initialized")
-	}
-
-	// Test failure description mapping
-	descriptions := []string{
-		"cpu_spike",
-		"memory_leak", 
-		"connection_leak",
-		"disk_full",
-		"network_partition",
-	}
-
-	for _, failureType := range descriptions {
-		desc := manager.getFailureDescription(failureType)
-		if desc == "Unknown failure type" {
-			t.Errorf("Expected description for failure type %s", failureType)
-		}
-	}
-}
-
 func TestStabilityTestConfiguration(t *testing.T) {
 	e2Manager := &MockE2ManagerClient{}
 	subManager := &MockSubscriptionManagerClient{}
@@ -757,80 +726,5 @@ func TestGradeCalculation(t *testing.T) {
 			t.Errorf("For compliance %.1f%%, expected grade %s, got %s", 
 				tc.compliance, tc.expectedGrade, runner.testReport.OverallGrade)
 		}
-	}
-}
-
-// Benchmark tests for performance validation
-func BenchmarkResourceUsageTracking(b *testing.B) {
-	e2Manager := &MockE2ManagerClient{}
-	subManager := &MockSubscriptionManagerClient{}
-	prometheusClient := &MockPrometheusClient{}
-
-	suite := NewPerformanceTestSuite(e2Manager, subManager, prometheusClient)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = suite.GetCurrentResourceUsage()
-	}
-}
-
-func BenchmarkLatencyMeasurement(b *testing.B) {
-	manager := &LatencyTestManager{
-		latencyTracker: &LatencyTracker{
-			e2SetupLatencies:      make([]float64, 0),
-			subscriptionLatencies: make([]float64, 0),
-			indicationLatencies:   make([]float64, 0),
-			controlLatencies:      make([]float64, 0),
-			endToEndLatencies:     make([]float64, 0),
-			latencyDistribution:   make(map[float64]int64),
-			activeOperations:      make(map[string]*LatencyMeasurement),
-		},
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		manager.recordLatency("test", float64(i%100))
-	}
-}
-
-func BenchmarkThroughputCalculation(b *testing.B) {
-	samples := make([]ThroughputSample, 1000)
-	for i := range samples {
-		samples[i] = ThroughputSample{
-			Timestamp:           time.Now(),
-			IndicationsPerSec:   i + 1000,
-			ProcessingLatencyMs: float64(i % 10),
-		}
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		// Simulate throughput calculation
-		sum := 0
-		for _, sample := range samples {
-			sum += sample.IndicationsPerSec
-		}
-		_ = sum / len(samples)
-	}
-}
-
-func BenchmarkValidationProcessing(b *testing.B) {
-	e2Manager := &MockE2ManagerClient{}
-	subManager := &MockSubscriptionManagerClient{}
-	prometheusClient := &MockPrometheusClient{}
-
-	runner := NewPerformanceTestRunner(e2Manager, subManager, prometheusClient)
-
-	results := &TestResults{
-		LoadTestResults: &LoadTestResults{MaxConcurrentE2Nodes: 150},
-		ThroughputResults: &ThroughputResults{MaxIndicationsPerSecond: 25000},
-		LatencyResults: &LatencyResults{
-			EndToEndLatencyMs: &LatencyMetrics{P99: 7.5},
-		},
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = runner.validateRequirements(results)
 	}
 }

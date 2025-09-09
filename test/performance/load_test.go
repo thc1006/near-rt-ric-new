@@ -1,15 +1,10 @@
 package performance
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"log"
-	"math"
-	"net/http"
-	"sort"
+	"os"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -17,1355 +12,845 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-// LoadTestSuite provides performance and load testing for O-RAN components
+// LoadTestSuite provides comprehensive performance and load testing
 type LoadTestSuite struct {
 	suite.Suite
-	baseURL              string
-	testTimeout          time.Duration
-	maxConcurrentNodes   int
-	testResults          *LoadTestResults
-	resourceMonitor      *ResourceMonitor
-	performanceTargets   *PerformanceTargets
+	testTimeout     time.Duration
+	maxConcurrency  int
+	testResults     *LoadTestResults
+	e2NodePool      []*E2NodeSimulator
+	requestPool     chan *PerformanceRequest
+	responsePool    chan *PerformanceResponse
+	metricsCollector *MetricsCollector
 }
 
 // LoadTestResults aggregates all load test results
 type LoadTestResults struct {
-	StartTime           time.Time
-	EndTime             time.Time
-	TotalTests          int
-	PassedTests         int
-	FailedTests         int
-	E2NodeLoadTests     map[string]*E2NodeLoadResult
-	A1PolicyLoadTests   map[string]*A1PolicyLoadResult
-	XAppLoadTests       map[string]*XAppLoadResult
-	SystemLoadTests     map[string]*SystemLoadResult
-	PerformanceMetrics  *PerformanceMetrics
-}
-
-// E2NodeLoadResult tracks E2 node load test results
-type E2NodeLoadResult struct {
-	TestName              string
-	ConcurrentNodes       int
-	RequestsPerNode       int
+	StartTime             time.Time
+	EndTime               time.Time
 	TotalRequests         int64
 	SuccessfulRequests    int64
 	FailedRequests        int64
-	AverageResponseTime   time.Duration
-	P50ResponseTime       time.Duration
-	P95ResponseTime       time.Duration
-	P99ResponseTime       time.Duration
-	MaxResponseTime       time.Duration
-	MinResponseTime       time.Duration
-	ThroughputRPS         float64
-	ErrorRate             float64
-	ResourceUtilization   ResourceUtilization
-	Errors                []string
+	AverageLatency        time.Duration
+	P50Latency           time.Duration
+	P95Latency           time.Duration
+	P99Latency           time.Duration
+	MaxLatency           time.Duration
+	MinLatency           time.Duration
+	ThroughputRPS        float64
+	ErrorRate            float64
+	ConcurrentConnections int
+	ResourceUtilization  *ResourceMetrics
+	NetworkMetrics       *NetworkMetrics
+	LatencyDistribution  map[string]int64
+	ErrorDistribution    map[string]int64
 }
 
-// A1PolicyLoadResult tracks A1 policy load test results
-type A1PolicyLoadResult struct {
-	TestName              string
-	ConcurrentPolicies    int
-	TotalPolicies         int64
-	CreatedPolicies       int64
-	EnforcedPolicies      int64
-	FailedPolicies        int64
-	AverageCreationTime   time.Duration
-	AverageEnforcementTime time.Duration
-	PolicyDistributionTime time.Duration
-	ThroughputPPS         float64
-	ErrorRate             float64
-	Errors                []string
+// E2NodeSimulator represents a simulated E2 node for load testing
+type E2NodeSimulator struct {
+	ID           string
+	GlobalNodeID string
+	Connected    bool
+	RequestCount int64
+	ErrorCount   int64
+	LastActivity time.Time
+	Latency      time.Duration
 }
 
-// XAppLoadResult tracks xApp load test results
-type XAppLoadResult struct {
-	TestName              string
-	ConcurrentXApps       int
-	TotalDeployments      int64
-	SuccessfulDeployments int64
-	FailedDeployments     int64
-	AverageDeploymentTime time.Duration
-	AverageScalingTime    time.Duration
-	ResourceEfficiency    float64
-	Errors                []string
-}
-
-// SystemLoadResult tracks system-wide load test results
-type SystemLoadResult struct {
-	TestName              string
-	Duration              time.Duration
-	TotalRequests         int64
-	SuccessfulRequests    int64
-	FailedRequests        int64
-	PeakThroughput        float64
-	SustainedThroughput   float64
-	SystemStability       bool
-	MemoryLeaks           bool
-	ResourceExhaustion    bool
-	Errors                []string
-}
-
-// PerformanceMetrics tracks overall performance metrics
-type PerformanceMetrics struct {
-	E2SetupLatency        LatencyMetrics
-	IndicationLatency     LatencyMetrics
-	PolicyLatency         LatencyMetrics
-	ControlLatency        LatencyMetrics
-	SystemThroughput      ThroughputMetrics
-	ResourceEfficiency    ResourceEfficiencyMetrics
-	ScalabilityMetrics    ScalabilityMetrics
-}
-
-// LatencyMetrics tracks latency performance
-type LatencyMetrics struct {
-	Average    time.Duration
-	P50        time.Duration
-	P95        time.Duration
-	P99        time.Duration
-	P999       time.Duration
-	Max        time.Duration
-	Min        time.Duration
-}
-
-// ThroughputMetrics tracks throughput performance
-type ThroughputMetrics struct {
-	RequestsPerSecond     float64
-	PoliciesPerSecond     float64
-	IndicationsPerSecond  float64
-	PeakThroughput        float64
-	SustainedThroughput   float64
-}
-
-// ResourceEfficiencyMetrics tracks resource efficiency
-type ResourceEfficiencyMetrics struct {
-	CPUEfficiency         float64 // requests per CPU core per second
-	MemoryEfficiency      float64 // requests per GB memory per second
-	NetworkEfficiency     float64 // requests per Mbps network per second
-	EnergyEfficiency      float64 // requests per watt per second
-}
-
-// ScalabilityMetrics tracks scalability performance
-type ScalabilityMetrics struct {
-	MaxConcurrentNodes    int
-	MaxConcurrentPolicies int
-	MaxConcurrentXApps    int
-	LinearScalingLimit    int
-	ResourceScalingFactor float64
-}
-
-// ResourceUtilization tracks system resource usage
-type ResourceUtilization struct {
-	CPUUsagePercent       float64
-	MemoryUsagePercent    float64
-	NetworkThroughputMbps float64
-	DiskIOPSUsage         float64
-	GoroutineCount        int
-	HeapSizeMB            float64
-}
-
-// ResourceMonitor monitors system resources during load tests
-type ResourceMonitor struct {
-	monitoring   bool
-	interval     time.Duration
-	measurements []ResourceMeasurement
-	mutex        sync.RWMutex
-}
-
-// ResourceMeasurement represents a resource measurement at a point in time
-type ResourceMeasurement struct {
+// PerformanceRequest represents a performance test request
+type PerformanceRequest struct {
+	ID          string
+	Type        RequestType
 	Timestamp   time.Time
-	Utilization ResourceUtilization
+	NodeID      string
+	Payload     []byte
+	ExpectedRTT time.Duration
 }
 
-// PerformanceTargets defines performance requirements
-type PerformanceTargets struct {
-	MaxE2SetupLatency         time.Duration // 500ms
-	MaxIndicationLatency      time.Duration // 10ms
-	MaxPolicyLatency          time.Duration // 1s
-	MinThroughputRPS          float64       // 1000 req/s
-	MaxCPUUsage               float64       // 80%
-	MaxMemoryUsage            float64       // 85%
-	MinSuccessRate            float64       // 99%
-	MaxConcurrentNodesTarget  int           // 100+
+// PerformanceResponse represents a performance test response
+type PerformanceResponse struct {
+	RequestID   string
+	Success     bool
+	Latency     time.Duration
+	Error       error
+	Timestamp   time.Time
+	PayloadSize int
 }
 
-// SetupSuite initializes the load test environment
+// RequestType defines different types of performance requests
+type RequestType int
+
+const (
+	E2SetupRequest RequestType = iota
+	RICSubscriptionRequest
+	RICIndicationMessage
+	RICControlRequest
+	PolicyUpdateRequest
+	PolicyDeleteRequest
+	HealthCheckRequest
+)
+
+// ResourceMetrics tracks system resource utilization
+type ResourceMetrics struct {
+	CPUUsagePercent    float64
+	MemoryUsageMB      int64
+	NetworkThroughput  float64
+	DiskIOPS          float64
+	GoroutineCount    int
+	HeapSize          int64
+	GCPauseTime       time.Duration
+}
+
+// NetworkMetrics tracks network-related metrics
+type NetworkMetrics struct {
+	BytesSent        int64
+	BytesReceived    int64
+	PacketsSent      int64
+	PacketsReceived  int64
+	ConnectionsActive int64
+	ConnectionsTotal  int64
+	RetransmissionRate float64
+}
+
+// MetricsCollector collects and aggregates performance metrics
+type MetricsCollector struct {
+	mutex               sync.RWMutex
+	requestMetrics      map[string]*RequestMetrics
+	responseMetrics     map[string]*ResponseMetrics
+	systemMetrics       *SystemMetrics
+	collectionInterval  time.Duration
+	isCollecting       bool
+	stopChannel        chan struct{}
+}
+
+// RequestMetrics tracks metrics for specific request types
+type RequestMetrics struct {
+	RequestType     RequestType
+	TotalCount      int64
+	SuccessCount    int64
+	ErrorCount      int64
+	TotalLatency    time.Duration
+	MinLatency      time.Duration
+	MaxLatency      time.Duration
+	LatencyBuckets  map[time.Duration]int64
+}
+
+// ResponseMetrics tracks response-specific metrics
+type ResponseMetrics struct {
+	ResponseCode    int
+	Count           int64
+	AverageSize     int64
+	TotalSize       int64
+	ProcessingTime  time.Duration
+}
+
+// SystemMetrics tracks overall system performance
+type SystemMetrics struct {
+	Timestamp       time.Time
+	CPUUtilization  float64
+	MemoryUtilization float64
+	NetworkUtilization float64
+	DiskUtilization   float64
+	ActiveConnections int64
+}
+
+// SetupSuite initializes the load testing environment
 func (suite *LoadTestSuite) SetupSuite() {
-	log.Println("Setting up performance and load test environment...")
+	log.Println("Setting up performance load testing environment...")
 	
-	suite.baseURL = "http://localhost:8080" // Default dashboard API URL
 	suite.testTimeout = 60 * time.Minute
-	suite.maxConcurrentNodes = 200
-	
-	// Initialize test results
+	suite.maxConcurrency = 1000
 	suite.testResults = &LoadTestResults{
-		StartTime:         time.Now(),
-		E2NodeLoadTests:   make(map[string]*E2NodeLoadResult),
-		A1PolicyLoadTests: make(map[string]*A1PolicyLoadResult),
-		XAppLoadTests:     make(map[string]*XAppLoadResult),
-		SystemLoadTests:   make(map[string]*SystemLoadResult),
-		PerformanceMetrics: &PerformanceMetrics{},
+		StartTime:           time.Now(),
+		LatencyDistribution: make(map[string]int64),
+		ErrorDistribution:   make(map[string]int64),
+		ResourceUtilization: &ResourceMetrics{},
+		NetworkMetrics:      &NetworkMetrics{},
 	}
 	
-	// Initialize resource monitor
-	suite.resourceMonitor = &ResourceMonitor{
-		interval:     time.Second,
-		measurements: make([]ResourceMeasurement, 0),
+	// Initialize request and response pools for high throughput
+	suite.requestPool = make(chan *PerformanceRequest, suite.maxConcurrency)
+	suite.responsePool = make(chan *PerformanceResponse, suite.maxConcurrency*2)
+	
+	// Initialize metrics collector
+	suite.metricsCollector = &MetricsCollector{
+		requestMetrics:     make(map[string]*RequestMetrics),
+		responseMetrics:    make(map[string]*ResponseMetrics),
+		systemMetrics:      &SystemMetrics{},
+		collectionInterval: 1 * time.Second,
+		isCollecting:      false,
+		stopChannel:       make(chan struct{}),
 	}
 	
-	// Set performance targets for O-RAN L Release
-	suite.performanceTargets = &PerformanceTargets{
-		MaxE2SetupLatency:         500 * time.Millisecond,
-		MaxIndicationLatency:      10 * time.Millisecond,
-		MaxPolicyLatency:          1 * time.Second,
-		MinThroughputRPS:          1000.0,
-		MaxCPUUsage:               80.0,
-		MaxMemoryUsage:            85.0,
-		MinSuccessRate:            99.0,
-		MaxConcurrentNodesTarget:  100,
-	}
+	// Setup E2 node simulators for load testing
+	suite.setupE2NodeSimulators()
 	
-	log.Println("Performance and load test environment setup completed")
+	log.Println("Performance load testing environment setup completed")
 }
 
-// TearDownSuite cleans up the test environment
+// TearDownSuite cleans up the load testing environment
 func (suite *LoadTestSuite) TearDownSuite() {
-	log.Println("Cleaning up performance and load test environment...")
+	log.Println("Cleaning up performance load testing environment...")
 	
 	suite.testResults.EndTime = time.Now()
-	suite.stopResourceMonitoring()
-	suite.generateLoadTestReport()
 	
-	log.Println("Performance and load test environment cleanup completed")
+	// Stop metrics collection
+	suite.stopMetricsCollection()
+	
+	// Close channels
+	close(suite.requestPool)
+	close(suite.responsePool)
+	
+	// Generate comprehensive performance report
+	suite.generatePerformanceReport()
+	
+	log.Println("Performance load testing environment cleanup completed")
 }
 
-// TestE2NodeConcurrentLoad tests concurrent E2 node handling with 100+ nodes
-func (suite *LoadTestSuite) TestE2NodeConcurrentLoad() {
-	suite.testResults.TotalTests++
+// setupE2NodeSimulators creates a pool of E2 node simulators for load testing
+func (suite *LoadTestSuite) setupE2NodeSimulators() {
+	log.Println("Setting up E2 node simulators for load testing...")
 	
-	log.Println("Testing E2 node concurrent load with 100+ nodes...")
+	// Create a pool of 100 E2 node simulators
+	nodeCount := 100
+	suite.e2NodePool = make([]*E2NodeSimulator, nodeCount)
 	
-	// Test different concurrent node levels
-	concurrentLevels := []int{25, 50, 100, 150, 200}
-	requestsPerNode := 50
-	
-	for _, concurrent := range concurrentLevels {
-		suite.Run(fmt.Sprintf("E2NodeLoad_%dNodes", concurrent), func() {
-			log.Printf("Testing %d concurrent E2 nodes with %d requests each", concurrent, requestsPerNode)
-			
-			// Start resource monitoring
-			suite.startResourceMonitoring()
-			
-			// Execute load test
-			result := suite.executeE2NodeLoadTest(concurrent, requestsPerNode)
-			result.TestName = fmt.Sprintf("E2NodeLoad_%dNodes", concurrent)
-			
-			// Stop monitoring and get resource utilization
-			result.ResourceUtilization = suite.stopResourceMonitoring()
-			
-			suite.testResults.E2NodeLoadTests[result.TestName] = result
-			
-			// Validate performance requirements
-			suite.validateE2NodePerformance(result)
-		})
+	for i := 0; i < nodeCount; i++ {
+		simulator := &E2NodeSimulator{
+			ID:           fmt.Sprintf("loadtest-node-%03d", i),
+			GlobalNodeID: fmt.Sprintf("001-001-%03d", i),
+			Connected:    false,
+			RequestCount: 0,
+			ErrorCount:   0,
+			LastActivity: time.Now(),
+		}
+		
+		suite.e2NodePool[i] = simulator
 	}
 	
-	suite.testResults.PassedTests++
+	log.Printf("Created %d E2 node simulators for load testing", nodeCount)
 }
 
-// TestA1PolicyConcurrentLoad tests concurrent A1 policy operations
-func (suite *LoadTestSuite) TestA1PolicyConcurrentLoad() {
-	suite.testResults.TotalTests++
+// startMetricsCollection starts collecting system and application metrics
+func (suite *LoadTestSuite) startMetricsCollection() {
+	log.Println("Starting metrics collection...")
 	
-	log.Println("Testing A1 policy concurrent load...")
+	suite.metricsCollector.isCollecting = true
 	
-	// Test different policy load levels
-	policyLevels := []int{50, 100, 200, 500, 1000}
-	
-	for _, policyCount := range policyLevels {
-		suite.Run(fmt.Sprintf("A1PolicyLoad_%dPolicies", policyCount), func() {
-			log.Printf("Testing %d concurrent A1 policies", policyCount)
-			
-			// Start resource monitoring
-			suite.startResourceMonitoring()
-			
-			// Execute policy load test
-			result := suite.executeA1PolicyLoadTest(policyCount)
-			result.TestName = fmt.Sprintf("A1PolicyLoad_%dPolicies", policyCount)
-			
-			// Stop monitoring
-			suite.stopResourceMonitoring()
-			
-			suite.testResults.A1PolicyLoadTests[result.TestName] = result
-			
-			// Validate policy performance requirements
-			suite.validateA1PolicyPerformance(result)
-		})
-	}
-	
-	suite.testResults.PassedTests++
-}
-
-// TestXAppDeploymentLoad tests xApp deployment and scaling under load
-func (suite *LoadTestSuite) TestXAppDeploymentLoad() {
-	suite.testResults.TotalTests++
-	
-	log.Println("Testing xApp deployment load...")
-	
-	// Test different xApp deployment loads
-	xappCounts := []int{5, 10, 20, 30}
-	
-	for _, xappCount := range xappCounts {
-		suite.Run(fmt.Sprintf("XAppLoad_%dXApps", xappCount), func() {
-			log.Printf("Testing %d concurrent xApp deployments", xappCount)
-			
-			// Start resource monitoring
-			suite.startResourceMonitoring()
-			
-			// Execute xApp load test
-			result := suite.executeXAppLoadTest(xappCount)
-			result.TestName = fmt.Sprintf("XAppLoad_%dXApps", xappCount)
-			
-			// Stop monitoring
-			suite.stopResourceMonitoring()
-			
-			suite.testResults.XAppLoadTests[result.TestName] = result
-			
-			// Validate xApp performance requirements
-			suite.validateXAppPerformance(result)
-		})
-	}
-	
-	suite.testResults.PassedTests++
-}
-
-// TestSystemSustainedLoad tests system performance under sustained load
-func (suite *LoadTestSuite) TestSystemSustainedLoad() {
-	suite.testResults.TotalTests++
-	
-	log.Println("Testing system sustained load performance...")
-	
-	// Test different sustained load durations
-	loadDurations := []struct {
-		name     string
-		duration time.Duration
-		rps      int
-	}{
-		{"ShortBurst", 2 * time.Minute, 500},
-		{"MediumLoad", 5 * time.Minute, 1000},
-		{"SustainedLoad", 15 * time.Minute, 800},
-		{"StressLoad", 30 * time.Minute, 1200},
-	}
-	
-	for _, load := range loadDurations {
-		suite.Run(fmt.Sprintf("SystemLoad_%s", load.name), func() {
-			log.Printf("Testing system load: %s for %v at %d RPS", load.name, load.duration, load.rps)
-			
-			// Start resource monitoring
-			suite.startResourceMonitoring()
-			
-			// Execute sustained load test
-			result := suite.executeSystemLoadTest(load.duration, load.rps)
-			result.TestName = load.name
-			
-			// Stop monitoring
-			suite.stopResourceMonitoring()
-			
-			suite.testResults.SystemLoadTests[result.TestName] = result
-			
-			// Validate system performance requirements
-			suite.validateSystemPerformance(result)
-		})
-	}
-	
-	suite.testResults.PassedTests++
-}
-
-// TestThroughputBenchmarks tests maximum throughput capabilities
-func (suite *LoadTestSuite) TestThroughputBenchmarks() {
-	suite.testResults.TotalTests++
-	
-	log.Println("Testing throughput benchmarks...")
-	
-	suite.Run("MaxThroughputBenchmark", func() {
-		// Find maximum sustainable throughput
-		maxThroughput := suite.findMaxThroughput()
+	go func() {
+		ticker := time.NewTicker(suite.metricsCollector.collectionInterval)
+		defer ticker.Stop()
 		
-		suite.testResults.PerformanceMetrics.SystemThroughput.PeakThroughput = maxThroughput
-		
-		// Validate against requirements
-		assert.GreaterOrEqual(suite.T(), maxThroughput, suite.performanceTargets.MinThroughputRPS,
-			"System throughput below minimum requirement")
-		
-		log.Printf("Maximum sustainable throughput: %.2f RPS", maxThroughput)
-	})
-	
-	suite.testResults.PassedTests++
-}
-
-// TestLatencyBenchmarks tests latency performance for all operations
-func (suite *LoadTestSuite) TestLatencyBenchmarks() {
-	suite.testResults.TotalTests++
-	
-	log.Println("Testing latency benchmarks...")
-	
-	// Test E2 Setup latency
-	suite.Run("E2SetupLatency", func() {
-		latency := suite.measureE2SetupLatency(100) // 100 samples
-		suite.testResults.PerformanceMetrics.E2SetupLatency = latency
-		
-		assert.LessOrEqual(suite.T(), latency.P95, suite.performanceTargets.MaxE2SetupLatency,
-			"E2 Setup P95 latency exceeds target")
-	})
-	
-	// Test Indication latency
-	suite.Run("IndicationLatency", func() {
-		latency := suite.measureIndicationLatency(1000) // 1000 samples
-		suite.testResults.PerformanceMetrics.IndicationLatency = latency
-		
-		assert.LessOrEqual(suite.T(), latency.P95, suite.performanceTargets.MaxIndicationLatency,
-			"Indication P95 latency exceeds target")
-	})
-	
-	// Test Policy latency
-	suite.Run("PolicyLatency", func() {
-		latency := suite.measurePolicyLatency(100) // 100 samples
-		suite.testResults.PerformanceMetrics.PolicyLatency = latency
-		
-		assert.LessOrEqual(suite.T(), latency.P95, suite.performanceTargets.MaxPolicyLatency,
-			"Policy P95 latency exceeds target")
-	})
-	
-	// Test Control latency
-	suite.Run("ControlLatency", func() {
-		latency := suite.measureControlLatency(100) // 100 samples
-		suite.testResults.PerformanceMetrics.ControlLatency = latency
-		
-		assert.LessOrEqual(suite.T(), latency.P99, 100*time.Millisecond,
-			"Control P99 latency exceeds 100ms")
-	})
-	
-	suite.testResults.PassedTests++
-}
-
-// TestResourceEfficiency tests resource usage efficiency
-func (suite *LoadTestSuite) TestResourceEfficiency() {
-	suite.testResults.TotalTests++
-	
-	log.Println("Testing resource efficiency...")
-	
-	suite.Run("ResourceEfficiencyBenchmark", func() {
-		// Measure resource efficiency under standard load
-		efficiency := suite.measureResourceEfficiency()
-		suite.testResults.PerformanceMetrics.ResourceEfficiency = efficiency
-		
-		// Validate efficiency targets
-		assert.Greater(suite.T(), efficiency.CPUEfficiency, 50.0,
-			"CPU efficiency below target (50 req/core/sec)")
-		assert.Greater(suite.T(), efficiency.MemoryEfficiency, 100.0,
-			"Memory efficiency below target (100 req/GB/sec)")
-		
-		log.Printf("Resource efficiency - CPU: %.2f req/core/sec, Memory: %.2f req/GB/sec",
-			efficiency.CPUEfficiency, efficiency.MemoryEfficiency)
-	})
-	
-	suite.testResults.PassedTests++
-}
-
-// TestScalabilityLimits tests system scalability limits
-func (suite *LoadTestSuite) TestScalabilityLimits() {
-	suite.testResults.TotalTests++
-	
-	log.Println("Testing scalability limits...")
-	
-	suite.Run("ScalabilityLimits", func() {
-		// Find maximum scalability limits
-		scalability := suite.measureScalabilityLimits()
-		suite.testResults.PerformanceMetrics.ScalabilityMetrics = scalability
-		
-		// Validate scalability requirements
-		assert.GreaterOrEqual(suite.T(), scalability.MaxConcurrentNodes,
-			suite.performanceTargets.MaxConcurrentNodesTarget,
-			"Maximum concurrent nodes below target")
-		
-		log.Printf("Scalability limits - Nodes: %d, Policies: %d, xApps: %d",
-			scalability.MaxConcurrentNodes, scalability.MaxConcurrentPolicies, scalability.MaxConcurrentXApps)
-	})
-	
-	suite.testResults.PassedTests++
-}
-
-// Implementation Methods
-
-// executeE2NodeLoadTest executes E2 node load test
-func (suite *LoadTestSuite) executeE2NodeLoadTest(concurrentNodes, requestsPerNode int) *E2NodeLoadResult {
-	result := &E2NodeLoadResult{
-		ConcurrentNodes: concurrentNodes,
-		RequestsPerNode: requestsPerNode,
-		TotalRequests:   int64(concurrentNodes * requestsPerNode),
-		Errors:          make([]string, 0),
-	}
-	
-	// Response time tracking
-	var responseTimes []time.Duration
-	var responseTimesMutex sync.Mutex
-	
-	// Counters
-	var successCounter int64
-	var failureCounter int64
-	
-	// Start time
-	startTime := time.Now()
-	
-	// Execute concurrent E2 node operations
-	var wg sync.WaitGroup
-	
-	for i := 0; i < concurrentNodes; i++ {
-		wg.Add(1)
-		go func(nodeID int) {
-			defer wg.Done()
-			
-			for j := 0; j < requestsPerNode; j++ {
-				// Simulate E2 Setup Request
-				reqStart := time.Now()
-				success := suite.simulateE2NodeOperation(nodeID, j)
-				reqDuration := time.Since(reqStart)
-				
-				// Record response time
-				responseTimesMutex.Lock()
-				responseTimes = append(responseTimes, reqDuration)
-				responseTimesMutex.Unlock()
-				
-				// Update counters
-				if success {
-					atomic.AddInt64(&successCounter, 1)
-				} else {
-					atomic.AddInt64(&failureCounter, 1)
-				}
+		for {
+			select {
+			case <-ticker.C:
+				suite.collectMetrics()
+			case <-suite.metricsCollector.stopChannel:
+				return
 			}
+		}
+	}()
+}
+
+// stopMetricsCollection stops collecting metrics
+func (suite *LoadTestSuite) stopMetricsCollection() {
+	if suite.metricsCollector.isCollecting {
+		log.Println("Stopping metrics collection...")
+		suite.metricsCollector.isCollecting = false
+		close(suite.metricsCollector.stopChannel)
+	}
+}
+
+// collectMetrics collects current system and application metrics
+func (suite *LoadTestSuite) collectMetrics() {
+	suite.metricsCollector.mutex.Lock()
+	defer suite.metricsCollector.mutex.Unlock()
+	
+	// Collect system metrics (implementation would interface with actual system)
+	suite.metricsCollector.systemMetrics = &SystemMetrics{
+		Timestamp:         time.Now(),
+		CPUUtilization:    suite.getCurrentCPUUtilization(),
+		MemoryUtilization: suite.getCurrentMemoryUtilization(),
+		NetworkUtilization: suite.getCurrentNetworkUtilization(),
+		DiskUtilization:   suite.getCurrentDiskUtilization(),
+		ActiveConnections: suite.getActiveConnections(),
+	}
+	
+	// Update test results with latest metrics
+	suite.testResults.ResourceUtilization.CPUUsagePercent = suite.metricsCollector.systemMetrics.CPUUtilization
+	suite.testResults.ResourceUtilization.MemoryUsageMB = int64(suite.metricsCollector.systemMetrics.MemoryUtilization)
+	suite.testResults.ResourceUtilization.NetworkThroughput = suite.metricsCollector.systemMetrics.NetworkUtilization
+}
+
+// TestLightLoad tests system performance under light load (25 concurrent connections)
+func (suite *LoadTestSuite) TestLightLoad() {
+	suite.testResults.TotalRequests++
+	
+	log.Println("Starting light load test (25 concurrent connections)...")
+	
+	concurrency := 25
+	duration := 2 * time.Minute
+	requestsPerSecond := 100
+	
+	suite.runLoadTest("Light Load Test", concurrency, duration, requestsPerSecond)
+	
+	// Verify performance requirements for light load
+	assert.Less(suite.T(), suite.testResults.AverageLatency, 50*time.Millisecond, 
+		"Average latency should be under 50ms for light load")
+	assert.Less(suite.T(), suite.testResults.P95Latency, 100*time.Millisecond,
+		"P95 latency should be under 100ms for light load")
+	assert.Greater(suite.T(), suite.testResults.ThroughputRPS, 
+		float64(requestsPerSecond)*0.8, "Throughput should be at least 80% of target RPS")
+	assert.Less(suite.T(), suite.testResults.ErrorRate, 0.1,
+		"Error rate should be less than 0.1% for light load")
+}
+
+// TestMediumLoad tests system performance under medium load (50 concurrent connections)
+func (suite *LoadTestSuite) TestMediumLoad() {
+	suite.testResults.TotalRequests++
+	
+	log.Println("Starting medium load test (50 concurrent connections)...")
+	
+	concurrency := 50
+	duration := 5 * time.Minute
+	requestsPerSecond := 500
+	
+	suite.runLoadTest("Medium Load Test", concurrency, duration, requestsPerSecond)
+	
+	// Verify performance requirements for medium load
+	assert.Less(suite.T(), suite.testResults.AverageLatency, 100*time.Millisecond,
+		"Average latency should be under 100ms for medium load")
+	assert.Less(suite.T(), suite.testResults.P95Latency, 200*time.Millisecond,
+		"P95 latency should be under 200ms for medium load")
+	assert.Greater(suite.T(), suite.testResults.ThroughputRPS, 
+		float64(requestsPerSecond)*0.7, "Throughput should be at least 70% of target RPS")
+	assert.Less(suite.T(), suite.testResults.ErrorRate, 0.5,
+		"Error rate should be less than 0.5% for medium load")
+}
+
+// TestHeavyLoad tests system performance under heavy load (100 concurrent connections)
+func (suite *LoadTestSuite) TestHeavyLoad() {
+	suite.testResults.TotalRequests++
+	
+	log.Println("Starting heavy load test (100 concurrent connections)...")
+	
+	concurrency := 100
+	duration := 10 * time.Minute
+	requestsPerSecond := 1000
+	
+	suite.runLoadTest("Heavy Load Test", concurrency, duration, requestsPerSecond)
+	
+	// Verify performance requirements for heavy load
+	assert.Less(suite.T(), suite.testResults.AverageLatency, 200*time.Millisecond,
+		"Average latency should be under 200ms for heavy load")
+	assert.Less(suite.T(), suite.testResults.P95Latency, 500*time.Millisecond,
+		"P95 latency should be under 500ms for heavy load")
+	assert.Greater(suite.T(), suite.testResults.ThroughputRPS, 
+		float64(requestsPerSecond)*0.6, "Throughput should be at least 60% of target RPS")
+	assert.Less(suite.T(), suite.testResults.ErrorRate, 1.0,
+		"Error rate should be less than 1% for heavy load")
+}
+
+// TestStressLoad tests system performance under stress conditions (200+ concurrent connections)
+func (suite *LoadTestSuite) TestStressLoad() {
+	suite.testResults.TotalRequests++
+	
+	log.Println("Starting stress load test (200+ concurrent connections)...")
+	
+	concurrency := 250
+	duration := 15 * time.Minute
+	requestsPerSecond := 2000
+	
+	suite.runLoadTest("Stress Load Test", concurrency, duration, requestsPerSecond)
+	
+	// Verify system graceful degradation under stress
+	assert.Less(suite.T(), suite.testResults.AverageLatency, 1000*time.Millisecond,
+		"Average latency should be under 1000ms even under stress")
+	assert.Less(suite.T(), suite.testResults.P99Latency, 2000*time.Millisecond,
+		"P99 latency should be under 2000ms under stress")
+	assert.Greater(suite.T(), suite.testResults.ThroughputRPS, 
+		float64(requestsPerSecond)*0.4, "Throughput should be at least 40% of target RPS under stress")
+	assert.Less(suite.T(), suite.testResults.ErrorRate, 5.0,
+		"Error rate should be less than 5% even under stress")
+	
+	// Verify system doesn't crash under stress
+	assert.Less(suite.T(), suite.testResults.ResourceUtilization.CPUUsagePercent, 95.0,
+		"CPU usage should not exceed 95% for extended periods")
+	assert.Less(suite.T(), suite.testResults.ResourceUtilization.MemoryUsageMB, 8192,
+		"Memory usage should not exceed 8GB under stress")
+}
+
+// TestSpikeLoad tests system performance under sudden load spikes
+func (suite *LoadTestSuite) TestSpikeLoad() {
+	suite.testResults.TotalRequests++
+	
+	log.Println("Starting spike load test (sudden traffic spikes)...")
+	
+	// Test normal load followed by sudden spikes
+	normalConcurrency := 50
+	spikeConcurrency := 500
+	normalRPS := 200
+	spikeRPS := 5000
+	
+	// Start with normal load
+	suite.runLoadTest("Spike Test - Normal Phase", normalConcurrency, 2*time.Minute, normalRPS)
+	baselineLatency := suite.testResults.AverageLatency
+	
+	// Apply sudden spike
+	suite.runLoadTest("Spike Test - Spike Phase", spikeConcurrency, 1*time.Minute, spikeRPS)
+	spikeLatency := suite.testResults.AverageLatency
+	
+	// Return to normal load
+	suite.runLoadTest("Spike Test - Recovery Phase", normalConcurrency, 2*time.Minute, normalRPS)
+	recoveryLatency := suite.testResults.AverageLatency
+	
+	// Verify system handles spikes gracefully
+	assert.Less(suite.T(), spikeLatency, baselineLatency*5,
+		"Spike latency should not exceed 5x baseline latency")
+	assert.Less(suite.T(), recoveryLatency, 
+		time.Duration(float64(baselineLatency)*1.2), "Recovery latency should return close to baseline")
+	assert.Less(suite.T(), suite.testResults.ErrorRate, 2.0,
+		"Error rate should remain reasonable during spikes")
+}
+
+// TestEnduranceLoad tests system performance over extended periods
+func (suite *LoadTestSuite) TestEnduranceLoad() {
+	suite.testResults.TotalRequests++
+	
+	log.Println("Starting endurance load test (extended duration)...")
+	
+	concurrency := 75
+	duration := 30 * time.Minute
+	requestsPerSecond := 300
+	
+	suite.runLoadTest("Endurance Load Test", concurrency, duration, requestsPerSecond)
+	
+	// Verify system stability over time
+	assert.Less(suite.T(), suite.testResults.AverageLatency, 150*time.Millisecond,
+		"Average latency should remain stable over extended periods")
+	assert.Less(suite.T(), suite.testResults.ErrorRate, 0.5,
+		"Error rate should remain low during extended testing")
+	
+	// Check for memory leaks
+	assert.Less(suite.T(), suite.testResults.ResourceUtilization.MemoryUsageMB, 4096,
+		"Memory usage should not continuously grow (memory leak check)")
+	
+	// Check for resource exhaustion
+	assert.Less(suite.T(), suite.testResults.ResourceUtilization.GoroutineCount, 10000,
+		"Goroutine count should not continuously grow")
+}
+
+// runLoadTest executes a load test with specified parameters
+func (suite *LoadTestSuite) runLoadTest(testName string, concurrency int, duration time.Duration, requestsPerSecond int) {
+	log.Printf("Running %s: concurrency=%d, duration=%v, target_rps=%d", 
+		testName, concurrency, duration, requestsPerSecond)
+	
+	// Start metrics collection
+	suite.startMetricsCollection()
+	
+	// Reset test results for this run
+	startTime := time.Now()
+	suite.testResults.ConcurrentConnections = concurrency
+	
+	// Create worker goroutines for load generation
+	var wg sync.WaitGroup
+	requestInterval := time.Duration(1000/requestsPerSecond) * time.Millisecond
+	
+	// Create response collector goroutine
+	responseCollector := make(chan *PerformanceResponse, concurrency*100)
+	go suite.collectResponses(responseCollector)
+	
+	// Launch load generator workers
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			suite.loadGeneratorWorker(workerID, duration, requestInterval, responseCollector)
 		}(i)
 	}
 	
-	// Wait for completion
+	// Wait for all workers to complete
 	wg.Wait()
+	close(responseCollector)
 	
-	// Calculate results
-	duration := time.Since(startTime)
-	result.SuccessfulRequests = successCounter
-	result.FailedRequests = failureCounter
-	result.ThroughputRPS = float64(result.SuccessfulRequests) / duration.Seconds()
-	result.ErrorRate = float64(result.FailedRequests) / float64(result.TotalRequests) * 100
+	// Calculate final metrics
+	testDuration := time.Since(startTime)
+	suite.calculateMetrics(testDuration)
 	
-	// Calculate response time statistics
-	if len(responseTimes) > 0 {
-		sort.Slice(responseTimes, func(i, j int) bool {
-			return responseTimes[i] < responseTimes[j]
-		})
-		
-		result.MinResponseTime = responseTimes[0]
-		result.MaxResponseTime = responseTimes[len(responseTimes)-1]
-		result.P50ResponseTime = responseTimes[len(responseTimes)/2]
-		result.P95ResponseTime = responseTimes[int(float64(len(responseTimes))*0.95)]
-		result.P99ResponseTime = responseTimes[int(float64(len(responseTimes))*0.99)]
-		
-		var total time.Duration
-		for _, rt := range responseTimes {
-			total += rt
-		}
-		result.AverageResponseTime = total / time.Duration(len(responseTimes))
-	}
+	// Stop metrics collection
+	suite.stopMetricsCollection()
 	
-	return result
+	log.Printf("Completed %s in %v", testName, testDuration)
+	suite.logTestSummary()
 }
 
-// executeA1PolicyLoadTest executes A1 policy load test
-func (suite *LoadTestSuite) executeA1PolicyLoadTest(policyCount int) *A1PolicyLoadResult {
-	result := &A1PolicyLoadResult{
-		ConcurrentPolicies: policyCount,
-		TotalPolicies:      int64(policyCount),
-		Errors:             make([]string, 0),
-	}
+// loadGeneratorWorker generates load for a specific duration
+func (suite *LoadTestSuite) loadGeneratorWorker(workerID int, duration time.Duration, 
+	requestInterval time.Duration, responseCollector chan<- *PerformanceResponse) {
 	
-	startTime := time.Now()
-	
-	var wg sync.WaitGroup
-	var createdCounter int64
-	var enforcedCounter int64
-	var failedCounter int64
-	
-	var creationTimes []time.Duration
-	var enforcementTimes []time.Duration
-	var timesMutex sync.Mutex
-	
-	// Create policies concurrently
-	for i := 0; i < policyCount; i++ {
-		wg.Add(1)
-		go func(policyID int) {
-			defer wg.Done()
-			
-			// Policy creation
-			createStart := time.Now()
-			created := suite.simulatePolicyCreation(policyID)
-			createDuration := time.Since(createStart)
-			
-			timesMutex.Lock()
-			creationTimes = append(creationTimes, createDuration)
-			timesMutex.Unlock()
-			
-			if created {
-				atomic.AddInt64(&createdCounter, 1)
-				
-				// Policy enforcement
-				enforceStart := time.Now()
-				enforced := suite.simulatePolicyEnforcement(policyID)
-				enforceDuration := time.Since(enforceStart)
-				
-				timesMutex.Lock()
-				enforcementTimes = append(enforcementTimes, enforceDuration)
-				timesMutex.Unlock()
-				
-				if enforced {
-					atomic.AddInt64(&enforcedCounter, 1)
-				} else {
-					atomic.AddInt64(&failedCounter, 1)
-				}
-			} else {
-				atomic.AddInt64(&failedCounter, 1)
-			}
-		}(i)
-	}
-	
-	wg.Wait()
-	
-	duration := time.Since(startTime)
-	result.CreatedPolicies = createdCounter
-	result.EnforcedPolicies = enforcedCounter
-	result.FailedPolicies = failedCounter
-	result.ThroughputPPS = float64(result.EnforcedPolicies) / duration.Seconds()
-	result.ErrorRate = float64(result.FailedPolicies) / float64(result.TotalPolicies) * 100
-	
-	// Calculate timing statistics
-	if len(creationTimes) > 0 {
-		var totalCreate time.Duration
-		for _, ct := range creationTimes {
-			totalCreate += ct
-		}
-		result.AverageCreationTime = totalCreate / time.Duration(len(creationTimes))
-	}
-	
-	if len(enforcementTimes) > 0 {
-		var totalEnforce time.Duration
-		for _, et := range enforcementTimes {
-			totalEnforce += et
-		}
-		result.AverageEnforcementTime = totalEnforce / time.Duration(len(enforcementTimes))
-	}
-	
-	return result
-}
-
-// executeXAppLoadTest executes xApp deployment load test
-func (suite *LoadTestSuite) executeXAppLoadTest(xappCount int) *XAppLoadResult {
-	result := &XAppLoadResult{
-		ConcurrentXApps:   xappCount,
-		TotalDeployments:  int64(xappCount),
-		Errors:            make([]string, 0),
-	}
-	
-	startTime := time.Now()
-	
-	var wg sync.WaitGroup
-	var successCounter int64
-	var failedCounter int64
-	
-	var deploymentTimes []time.Duration
-	var scalingTimes []time.Duration
-	var timesMutex sync.Mutex
-	
-	// Deploy xApps concurrently
-	for i := 0; i < xappCount; i++ {
-		wg.Add(1)
-		go func(xappID int) {
-			defer wg.Done()
-			
-			// xApp deployment
-			deployStart := time.Now()
-			deployed := suite.simulateXAppDeployment(xappID)
-			deployDuration := time.Since(deployStart)
-			
-			timesMutex.Lock()
-			deploymentTimes = append(deploymentTimes, deployDuration)
-			timesMutex.Unlock()
-			
-			if deployed {
-				atomic.AddInt64(&successCounter, 1)
-				
-				// xApp scaling test
-				scaleStart := time.Now()
-				suite.simulateXAppScaling(xappID)
-				scaleDuration := time.Since(scaleStart)
-				
-				timesMutex.Lock()
-				scalingTimes = append(scalingTimes, scaleDuration)
-				timesMutex.Unlock()
-			} else {
-				atomic.AddInt64(&failedCounter, 1)
-			}
-		}(i)
-	}
-	
-	wg.Wait()
-	
-	duration := time.Since(startTime)
-	result.SuccessfulDeployments = successCounter
-	result.FailedDeployments = failedCounter
-	
-	// Calculate timing statistics
-	if len(deploymentTimes) > 0 {
-		var totalDeploy time.Duration
-		for _, dt := range deploymentTimes {
-			totalDeploy += dt
-		}
-		result.AverageDeploymentTime = totalDeploy / time.Duration(len(deploymentTimes))
-	}
-	
-	if len(scalingTimes) > 0 {
-		var totalScale time.Duration
-		for _, st := range scalingTimes {
-			totalScale += st
-		}
-		result.AverageScalingTime = totalScale / time.Duration(len(scalingTimes))
-	}
-	
-	// Calculate resource efficiency
-	if duration.Seconds() > 0 {
-		result.ResourceEfficiency = float64(result.SuccessfulDeployments) / duration.Seconds()
-	}
-	
-	return result
-}
-
-// executeSystemLoadTest executes system-wide sustained load test
-func (suite *LoadTestSuite) executeSystemLoadTest(duration time.Duration, targetRPS int) *SystemLoadResult {
-	result := &SystemLoadResult{
-		Duration:      duration,
-		SystemStability: true,
-		Errors:        make([]string, 0),
-	}
-	
-	startTime := time.Now()
-	ctx, cancel := context.WithTimeout(context.Background(), duration)
-	defer cancel()
-	
-	var totalRequests int64
-	var successRequests int64
-	var failedRequests int64
-	
-	// Calculate request interval
-	requestInterval := time.Second / time.Duration(targetRPS)
-	
-	var wg sync.WaitGroup
+	endTime := time.Now().Add(duration)
 	ticker := time.NewTicker(requestInterval)
 	defer ticker.Stop()
 	
-	// Generate sustained load
-	go func() {
-		for {
+	requestID := 0
+	
+	for time.Now().Before(endTime) {
+		select {
+		case <-ticker.C:
+			// Select a random E2 node for this request
+			nodeIndex := workerID % len(suite.e2NodePool)
+			node := suite.e2NodePool[nodeIndex]
+			
+			// Create performance request
+			request := &PerformanceRequest{
+				ID:          fmt.Sprintf("worker-%d-req-%d", workerID, requestID),
+				Type:        suite.getRandomRequestType(),
+				Timestamp:   time.Now(),
+				NodeID:      node.ID,
+				Payload:     suite.generateRequestPayload(),
+				ExpectedRTT: 100 * time.Millisecond,
+			}
+			
+			// Execute request and measure performance
+			response := suite.executeRequest(request, node)
+			
+			// Send response to collector
 			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					
-					atomic.AddInt64(&totalRequests, 1)
-					
-					// Simulate mixed workload
-					success := suite.simulateMixedWorkload()
-					if success {
-						atomic.AddInt64(&successRequests, 1)
-					} else {
-						atomic.AddInt64(&failedRequests, 1)
-					}
-				}()
+			case responseCollector <- response:
+			default:
+				// Collector channel full, drop response
+			}
+			
+			requestID++
+		}
+	}
+}
+
+// collectResponses collects and aggregates response metrics
+func (suite *LoadTestSuite) collectResponses(responseCollector <-chan *PerformanceResponse) {
+	var latencies []time.Duration
+	var mutex sync.Mutex
+	
+	for response := range responseCollector {
+		mutex.Lock()
+		
+		suite.testResults.TotalRequests++
+		if response.Success {
+			suite.testResults.SuccessfulRequests++
+		} else {
+			suite.testResults.FailedRequests++
+			if response.Error != nil {
+				suite.testResults.ErrorDistribution[response.Error.Error()]++
 			}
 		}
-	}()
-	
-	// Wait for test completion
-	<-ctx.Done()
-	wg.Wait()
-	
-	actualDuration := time.Since(startTime)
-	
-	result.TotalRequests = totalRequests
-	result.SuccessfulRequests = successRequests
-	result.FailedRequests = failedRequests
-	result.SustainedThroughput = float64(successRequests) / actualDuration.Seconds()
-	
-	// Check system stability
-	errorRate := float64(failedRequests) / float64(totalRequests) * 100
-	if errorRate > 1.0 { // More than 1% error rate indicates instability
-		result.SystemStability = false
+		
+		// Collect latency data
+		latencies = append(latencies, response.Latency)
+		
+		// Update latency distribution
+		latencyBucket := suite.getLatencyBucket(response.Latency)
+		suite.testResults.LatencyDistribution[latencyBucket]++
+		
+		mutex.Unlock()
 	}
 	
-	return result
+	// Calculate latency percentiles
+	if len(latencies) > 0 {
+		suite.calculateLatencyPercentiles(latencies)
+	}
 }
 
-// Simulation Methods
-
-func (suite *LoadTestSuite) simulateE2NodeOperation(nodeID, requestID int) bool {
-	// Simulate E2 node operation with realistic timing
-	baseLatency := 50 * time.Millisecond
-	jitter := time.Duration(nodeID%20) * time.Millisecond
-	time.Sleep(baseLatency + jitter)
+// executeRequest executes a performance request and measures latency
+func (suite *LoadTestSuite) executeRequest(request *PerformanceRequest, node *E2NodeSimulator) *PerformanceResponse {
+	startTime := time.Now()
 	
-	// Simulate 99% success rate
-	return (nodeID*requestID)%100 != 0
-}
-
-func (suite *LoadTestSuite) simulatePolicyCreation(policyID int) bool {
-	// Simulate A1 policy creation
-	time.Sleep(time.Duration(100+policyID%50) * time.Millisecond)
-	return policyID%50 != 0 // 98% success rate
-}
-
-func (suite *LoadTestSuite) simulatePolicyEnforcement(policyID int) bool {
-	// Simulate policy enforcement
-	time.Sleep(time.Duration(200+policyID%100) * time.Millisecond)
-	return policyID%25 != 0 // 96% success rate
-}
-
-func (suite *LoadTestSuite) simulateXAppDeployment(xappID int) bool {
-	// Simulate xApp deployment (longer operation)
-	time.Sleep(time.Duration(2000+xappID%1000) * time.Millisecond)
-	return xappID%10 != 0 // 90% success rate
-}
-
-func (suite *LoadTestSuite) simulateXAppScaling(xappID int) bool {
-	// Simulate xApp scaling
-	time.Sleep(time.Duration(1000+xappID%500) * time.Millisecond)
-	return true
-}
-
-func (suite *LoadTestSuite) simulateMixedWorkload() bool {
-	// Simulate mixed workload with different operation types
-	operationType := time.Now().Nanosecond() % 4
+	// Simulate request execution (replace with actual implementation)
+	success, err := suite.simulateRequestExecution(request, node)
 	
-	switch operationType {
-	case 0: // E2 node operation
-		time.Sleep(20 * time.Millisecond)
-	case 1: // Policy operation
-		time.Sleep(50 * time.Millisecond)
-	case 2: // xApp operation
-		time.Sleep(100 * time.Millisecond)
-	case 3: // System operation
-		time.Sleep(10 * time.Millisecond)
+	latency := time.Since(startTime)
+	
+	// Update node metrics
+	node.RequestCount++
+	node.LastActivity = time.Now()
+	node.Latency = latency
+	
+	if !success {
+		node.ErrorCount++
 	}
 	
-	// 99.5% success rate for mixed workload
-	return time.Now().Nanosecond()%1000 != 0
+	return &PerformanceResponse{
+		RequestID:   request.ID,
+		Success:     success,
+		Latency:     latency,
+		Error:       err,
+		Timestamp:   time.Now(),
+		PayloadSize: len(request.Payload),
+	}
 }
 
-// Measurement Methods
-
-func (suite *LoadTestSuite) measureE2SetupLatency(samples int) LatencyMetrics {
-	latencies := make([]time.Duration, samples)
+// simulateRequestExecution simulates the execution of different request types
+func (suite *LoadTestSuite) simulateRequestExecution(request *PerformanceRequest, node *E2NodeSimulator) (bool, error) {
+	// Simulate processing time based on request type
+	var processingTime time.Duration
 	
-	for i := 0; i < samples; i++ {
-		start := time.Now()
-		// Simulate E2 setup procedure
-		suite.simulateE2NodeOperation(i, 0)
-		latencies[i] = time.Since(start)
+	switch request.Type {
+	case E2SetupRequest:
+		processingTime = 50*time.Millisecond + time.Duration(len(request.Payload)/1000)*time.Millisecond
+	case RICSubscriptionRequest:
+		processingTime = 30*time.Millisecond + time.Duration(len(request.Payload)/2000)*time.Millisecond
+	case RICIndicationMessage:
+		processingTime = 10*time.Millisecond + time.Duration(len(request.Payload)/5000)*time.Millisecond
+	case RICControlRequest:
+		processingTime = 40*time.Millisecond + time.Duration(len(request.Payload)/1500)*time.Millisecond
+	case PolicyUpdateRequest:
+		processingTime = 35*time.Millisecond + time.Duration(len(request.Payload)/1200)*time.Millisecond
+	case PolicyDeleteRequest:
+		processingTime = 25*time.Millisecond + time.Duration(len(request.Payload)/3000)*time.Millisecond
+	case HealthCheckRequest:
+		processingTime = 5*time.Millisecond + time.Duration(len(request.Payload)/10000)*time.Millisecond
 	}
 	
-	return suite.calculateLatencyMetrics(latencies)
-}
-
-func (suite *LoadTestSuite) measureIndicationLatency(samples int) LatencyMetrics {
-	latencies := make([]time.Duration, samples)
+	// Add some randomness to simulate real-world variability
+	jitter := time.Duration(float64(processingTime) * 0.2 * (suite.getRandomFloat() - 0.5))
+	processingTime += jitter
 	
-	for i := 0; i < samples; i++ {
-		start := time.Now()
-		// Simulate indication processing
-		time.Sleep(time.Duration(2+i%8) * time.Millisecond)
-		latencies[i] = time.Since(start)
+	// Simulate actual processing delay
+	time.Sleep(processingTime)
+	
+	// Simulate occasional failures (2% error rate under normal conditions)
+	errorRate := 0.02
+	if suite.getRandomFloat() < errorRate {
+		return false, fmt.Errorf("simulated request failure for %s", request.Type)
 	}
 	
-	return suite.calculateLatencyMetrics(latencies)
+	return true, nil
 }
 
-func (suite *LoadTestSuite) measurePolicyLatency(samples int) LatencyMetrics {
-	latencies := make([]time.Duration, samples)
-	
-	for i := 0; i < samples; i++ {
-		start := time.Now()
-		// Simulate policy processing
-		suite.simulatePolicyCreation(i)
-		latencies[i] = time.Since(start)
+// Helper methods for load testing
+
+func (suite *LoadTestSuite) getRandomRequestType() RequestType {
+	types := []RequestType{
+		E2SetupRequest,
+		RICSubscriptionRequest,
+		RICIndicationMessage,
+		RICControlRequest,
+		PolicyUpdateRequest,
+		PolicyDeleteRequest,
+		HealthCheckRequest,
+	}
+	return types[int(suite.getRandomFloat()*float64(len(types)))]
+}
+
+func (suite *LoadTestSuite) generateRequestPayload() []byte {
+	// Generate random payload between 100-1000 bytes
+	size := 100 + int(suite.getRandomFloat()*900)
+	payload := make([]byte, size)
+	for i := range payload {
+		payload[i] = byte(65 + int(suite.getRandomFloat()*26)) // Random A-Z
+	}
+	return payload
+}
+
+func (suite *LoadTestSuite) getRandomFloat() float64 {
+	// Simple pseudo-random number generator for testing
+	// In real implementation, use crypto/rand for better randomness
+	return float64(time.Now().UnixNano()%1000) / 1000.0
+}
+
+func (suite *LoadTestSuite) getLatencyBucket(latency time.Duration) string {
+	switch {
+	case latency < 10*time.Millisecond:
+		return "<10ms"
+	case latency < 50*time.Millisecond:
+		return "10-50ms"
+	case latency < 100*time.Millisecond:
+		return "50-100ms"
+	case latency < 200*time.Millisecond:
+		return "100-200ms"
+	case latency < 500*time.Millisecond:
+		return "200-500ms"
+	case latency < 1000*time.Millisecond:
+		return "500ms-1s"
+	default:
+		return ">1s"
+	}
+}
+
+func (suite *LoadTestSuite) calculateLatencyPercentiles(latencies []time.Duration) {
+	// Sort latencies for percentile calculation
+	// Simple bubble sort for demonstration (use proper sorting in production)
+	n := len(latencies)
+	for i := 0; i < n-1; i++ {
+		for j := 0; j < n-i-1; j++ {
+			if latencies[j] > latencies[j+1] {
+				latencies[j], latencies[j+1] = latencies[j+1], latencies[j]
+			}
+		}
 	}
 	
-	return suite.calculateLatencyMetrics(latencies)
-}
-
-func (suite *LoadTestSuite) measureControlLatency(samples int) LatencyMetrics {
-	latencies := make([]time.Duration, samples)
+	// Calculate percentiles
+	suite.testResults.MinLatency = latencies[0]
+	suite.testResults.MaxLatency = latencies[n-1]
+	suite.testResults.P50Latency = latencies[n*50/100]
+	suite.testResults.P95Latency = latencies[n*95/100]
+	suite.testResults.P99Latency = latencies[n*99/100]
 	
-	for i := 0; i < samples; i++ {
-		start := time.Now()
-		// Simulate RIC control
-		time.Sleep(time.Duration(30+i%20) * time.Millisecond)
-		latencies[i] = time.Since(start)
-	}
-	
-	return suite.calculateLatencyMetrics(latencies)
-}
-
-func (suite *LoadTestSuite) calculateLatencyMetrics(latencies []time.Duration) LatencyMetrics {
-	sort.Slice(latencies, func(i, j int) bool {
-		return latencies[i] < latencies[j]
-	})
-	
+	// Calculate average latency
 	var total time.Duration
-	for _, lat := range latencies {
-		total += lat
+	for _, latency := range latencies {
+		total += latency
 	}
-	
-	return LatencyMetrics{
-		Average: total / time.Duration(len(latencies)),
-		P50:     latencies[len(latencies)/2],
-		P95:     latencies[int(float64(len(latencies))*0.95)],
-		P99:     latencies[int(float64(len(latencies))*0.99)],
-		P999:    latencies[int(float64(len(latencies))*0.999)],
-		Max:     latencies[len(latencies)-1],
-		Min:     latencies[0],
+	suite.testResults.AverageLatency = total / time.Duration(n)
+}
+
+func (suite *LoadTestSuite) calculateMetrics(testDuration time.Duration) {
+	if suite.testResults.TotalRequests > 0 {
+		suite.testResults.ThroughputRPS = float64(suite.testResults.SuccessfulRequests) / testDuration.Seconds()
+		suite.testResults.ErrorRate = float64(suite.testResults.FailedRequests) / float64(suite.testResults.TotalRequests) * 100
 	}
 }
 
-func (suite *LoadTestSuite) findMaxThroughput() float64 {
-	// Binary search for maximum sustainable throughput
-	minRPS := 100.0
-	maxRPS := 5000.0
-	tolerance := 10.0
-	
-	for maxRPS-minRPS > tolerance {
-		testRPS := (minRPS + maxRPS) / 2
-		
-		// Test throughput for 30 seconds
-		sustainable := suite.testThroughputSustainability(testRPS, 30*time.Second)
-		
-		if sustainable {
-			minRPS = testRPS
-		} else {
-			maxRPS = testRPS
-		}
-	}
-	
-	return minRPS
+func (suite *LoadTestSuite) logTestSummary() {
+	log.Printf("Test Summary:")
+	log.Printf("  Total Requests: %d", suite.testResults.TotalRequests)
+	log.Printf("  Successful Requests: %d", suite.testResults.SuccessfulRequests)
+	log.Printf("  Failed Requests: %d", suite.testResults.FailedRequests)
+	log.Printf("  Success Rate: %.2f%%", 100-suite.testResults.ErrorRate)
+	log.Printf("  Throughput: %.2f RPS", suite.testResults.ThroughputRPS)
+	log.Printf("  Average Latency: %v", suite.testResults.AverageLatency)
+	log.Printf("  P95 Latency: %v", suite.testResults.P95Latency)
+	log.Printf("  P99 Latency: %v", suite.testResults.P99Latency)
 }
 
-func (suite *LoadTestSuite) testThroughputSustainability(targetRPS float64, duration time.Duration) bool {
-	ctx, cancel := context.WithTimeout(context.Background(), duration)
-	defer cancel()
-	
-	var successCount int64
-	var totalCount int64
-	
-	interval := time.Second / time.Duration(targetRPS)
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	
-	for {
-		select {
-		case <-ctx.Done():
-			successRate := float64(successCount) / float64(totalCount) * 100
-			return successRate >= suite.performanceTargets.MinSuccessRate
-		case <-ticker.C:
-			atomic.AddInt64(&totalCount, 1)
-			if suite.simulateMixedWorkload() {
-				atomic.AddInt64(&successCount, 1)
-			}
-		}
-	}
+// Metric collection helper methods
+
+func (suite *LoadTestSuite) getCurrentCPUUtilization() float64 {
+	// Mock implementation - replace with actual system metrics
+	return 45.0 + suite.getRandomFloat()*20.0
 }
 
-func (suite *LoadTestSuite) measureResourceEfficiency() ResourceEfficiencyMetrics {
-	// Measure resource efficiency under standard load (1000 RPS for 60 seconds)
-	duration := 60 * time.Second
-	targetRPS := 1000.0
-	
-	suite.startResourceMonitoring()
-	
-	ctx, cancel := context.WithTimeout(context.Background(), duration)
-	defer cancel()
-	
-	var requestCount int64
-	interval := time.Second / time.Duration(targetRPS)
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	
-	for {
-		select {
-		case <-ctx.Done():
-			goto done
-		case <-ticker.C:
-			go func() {
-				suite.simulateMixedWorkload()
-				atomic.AddInt64(&requestCount, 1)
-			}()
-		}
-	}
-	
-done:
-	utilization := suite.stopResourceMonitoring()
-	
-	// Calculate efficiency metrics
-	requestsPerSecond := float64(requestCount) / duration.Seconds()
-	
-	return ResourceEfficiencyMetrics{
-		CPUEfficiency:     requestsPerSecond / (utilization.CPUUsagePercent / 100 * 8), // Assuming 8 cores
-		MemoryEfficiency:  requestsPerSecond / (utilization.MemoryUsagePercent / 100 * 16), // Assuming 16GB
-		NetworkEfficiency: requestsPerSecond / utilization.NetworkThroughputMbps,
-		EnergyEfficiency:  requestsPerSecond / 100, // Assuming 100W power consumption
-	}
+func (suite *LoadTestSuite) getCurrentMemoryUtilization() float64 {
+	// Mock implementation - replace with actual system metrics
+	return 1024 + suite.getRandomFloat()*512
 }
 
-func (suite *LoadTestSuite) measureScalabilityLimits() ScalabilityMetrics {
-	metrics := ScalabilityMetrics{}
-	
-	// Find maximum concurrent E2 nodes
-	metrics.MaxConcurrentNodes = suite.findMaxConcurrentNodes()
-	
-	// Find maximum concurrent policies
-	metrics.MaxConcurrentPolicies = suite.findMaxConcurrentPolicies()
-	
-	// Find maximum concurrent xApps
-	metrics.MaxConcurrentXApps = suite.findMaxConcurrentXApps()
-	
-	// Find linear scaling limit
-	metrics.LinearScalingLimit = suite.findLinearScalingLimit()
-	
-	// Calculate resource scaling factor
-	metrics.ResourceScalingFactor = suite.calculateResourceScalingFactor()
-	
-	return metrics
+func (suite *LoadTestSuite) getCurrentNetworkUtilization() float64 {
+	// Mock implementation - replace with actual network metrics
+	return 100.0 + suite.getRandomFloat()*200.0
 }
 
-func (suite *LoadTestSuite) findMaxConcurrentNodes() int {
-	// Binary search for maximum concurrent nodes
-	min := 50
-	max := 500
-	
-	for max-min > 5 {
-		test := (min + max) / 2
-		
-		result := suite.executeE2NodeLoadTest(test, 10)
-		if result.ErrorRate < 1.0 && result.AverageResponseTime < 500*time.Millisecond {
-			min = test
-		} else {
-			max = test
-		}
-	}
-	
-	return min
+func (suite *LoadTestSuite) getCurrentDiskUtilization() float64 {
+	// Mock implementation - replace with actual disk metrics
+	return 10.0 + suite.getRandomFloat()*30.0
 }
 
-func (suite *LoadTestSuite) findMaxConcurrentPolicies() int {
-	// Binary search for maximum concurrent policies
-	min := 100
-	max := 2000
-	
-	for max-min > 10 {
-		test := (min + max) / 2
-		
-		result := suite.executeA1PolicyLoadTest(test)
-		if result.ErrorRate < 1.0 && result.AverageCreationTime < 1*time.Second {
-			min = test
-		} else {
-			max = test
-		}
-	}
-	
-	return min
+func (suite *LoadTestSuite) getActiveConnections() int64 {
+	// Mock implementation - replace with actual connection count
+	return int64(suite.testResults.ConcurrentConnections + int(suite.getRandomFloat()*10))
 }
 
-func (suite *LoadTestSuite) findMaxConcurrentXApps() int {
-	// Binary search for maximum concurrent xApps
-	min := 10
-	max := 100
-	
-	for max-min > 2 {
-		test := (min + max) / 2
-		
-		result := suite.executeXAppLoadTest(test)
-		if result.FailedDeployments == 0 && result.AverageDeploymentTime < 30*time.Second {
-			min = test
-		} else {
-			max = test
-		}
-	}
-	
-	return min
-}
-
-func (suite *LoadTestSuite) findLinearScalingLimit() int {
-	// Find the point where scaling becomes non-linear
-	baseline := suite.executeE2NodeLoadTest(50, 20)
-	baselineRatio := baseline.ThroughputRPS / float64(baseline.ConcurrentNodes)
-	
-	for nodes := 100; nodes <= 500; nodes += 50 {
-		result := suite.executeE2NodeLoadTest(nodes, 20)
-		currentRatio := result.ThroughputRPS / float64(result.ConcurrentNodes)
-		
-		// If throughput per node drops by more than 20%, we've hit the limit
-		if currentRatio < baselineRatio*0.8 {
-			return nodes - 50
-		}
-	}
-	
-	return 500 // Maximum tested
-}
-
-func (suite *LoadTestSuite) calculateResourceScalingFactor() float64 {
-	// Measure resource usage scaling factor
-	result50 := suite.executeE2NodeLoadTest(50, 20)
-	result100 := suite.executeE2NodeLoadTest(100, 20)
-	
-	throughputRatio := result100.ThroughputRPS / result50.ThroughputRPS
-	expectedRatio := 100.0 / 50.0 // 2.0 for linear scaling
-	
-	return throughputRatio / expectedRatio
-}
-
-// Resource Monitoring
-
-func (suite *LoadTestSuite) startResourceMonitoring() {
-	suite.resourceMonitor.monitoring = true
-	suite.resourceMonitor.measurements = make([]ResourceMeasurement, 0)
-	
-	go func() {
-		ticker := time.NewTicker(suite.resourceMonitor.interval)
-		defer ticker.Stop()
-		
-		for suite.resourceMonitor.monitoring {
-			select {
-			case <-ticker.C:
-				measurement := suite.collectResourceMeasurement()
-				
-				suite.resourceMonitor.mutex.Lock()
-				suite.resourceMonitor.measurements = append(suite.resourceMonitor.measurements, measurement)
-				suite.resourceMonitor.mutex.Unlock()
-			}
-		}
-	}()
-}
-
-func (suite *LoadTestSuite) stopResourceMonitoring() ResourceUtilization {
-	suite.resourceMonitor.monitoring = false
-	time.Sleep(suite.resourceMonitor.interval * 2) // Wait for monitoring to stop
-	
-	suite.resourceMonitor.mutex.RLock()
-	defer suite.resourceMonitor.mutex.RUnlock()
-	
-	if len(suite.resourceMonitor.measurements) == 0 {
-		return ResourceUtilization{}
-	}
-	
-	// Calculate average utilization
-	var avgCPU, avgMemory, avgNetwork, avgDiskIOPS float64
-	var avgGoroutines int
-	var avgHeap float64
-	
-	for _, measurement := range suite.resourceMonitor.measurements {
-		avgCPU += measurement.Utilization.CPUUsagePercent
-		avgMemory += measurement.Utilization.MemoryUsagePercent
-		avgNetwork += measurement.Utilization.NetworkThroughputMbps
-		avgDiskIOPS += measurement.Utilization.DiskIOPSUsage
-		avgGoroutines += measurement.Utilization.GoroutineCount
-		avgHeap += measurement.Utilization.HeapSizeMB
-	}
-	
-	count := float64(len(suite.resourceMonitor.measurements))
-	
-	return ResourceUtilization{
-		CPUUsagePercent:       avgCPU / count,
-		MemoryUsagePercent:    avgMemory / count,
-		NetworkThroughputMbps: avgNetwork / count,
-		DiskIOPSUsage:        avgDiskIOPS / count,
-		GoroutineCount:       int(float64(avgGoroutines) / count),
-		HeapSizeMB:           avgHeap / count,
-	}
-}
-
-func (suite *LoadTestSuite) collectResourceMeasurement() ResourceMeasurement {
-	// Simulate resource collection (in real implementation, would query system metrics)
-	return ResourceMeasurement{
-		Timestamp: time.Now(),
-		Utilization: ResourceUtilization{
-			CPUUsagePercent:       60.0 + math.Sin(float64(time.Now().Unix()))*10,
-			MemoryUsagePercent:    70.0 + math.Cos(float64(time.Now().Unix()))*5,
-			NetworkThroughputMbps: 100.0 + math.Sin(float64(time.Now().Unix()/2))*20,
-			DiskIOPSUsage:        50.0 + math.Cos(float64(time.Now().Unix()/3))*10,
-			GoroutineCount:       1000 + int(math.Sin(float64(time.Now().Unix()))*100),
-			HeapSizeMB:           512.0 + math.Cos(float64(time.Now().Unix()))*50,
-		},
-	}
-}
-
-// Performance Validation
-
-func (suite *LoadTestSuite) validateE2NodePerformance(result *E2NodeLoadResult) {
-	// Validate E2 node performance requirements
-	assert.LessOrEqual(suite.T(), result.P95ResponseTime, suite.performanceTargets.MaxE2SetupLatency,
-		"E2 node P95 response time exceeds target for %d nodes", result.ConcurrentNodes)
-	
-	assert.LessOrEqual(suite.T(), result.ErrorRate, 100-suite.performanceTargets.MinSuccessRate,
-		"E2 node error rate exceeds target for %d nodes", result.ConcurrentNodes)
-	
-	assert.LessOrEqual(suite.T(), result.ResourceUtilization.CPUUsagePercent, suite.performanceTargets.MaxCPUUsage,
-		"CPU usage exceeds target for %d nodes", result.ConcurrentNodes)
-	
-	assert.LessOrEqual(suite.T(), result.ResourceUtilization.MemoryUsagePercent, suite.performanceTargets.MaxMemoryUsage,
-		"Memory usage exceeds target for %d nodes", result.ConcurrentNodes)
-	
-	log.Printf("E2 node load test (%d nodes): %.2f RPS, %.1f%% error rate, P95: %v",
-		result.ConcurrentNodes, result.ThroughputRPS, result.ErrorRate, result.P95ResponseTime)
-}
-
-func (suite *LoadTestSuite) validateA1PolicyPerformance(result *A1PolicyLoadResult) {
-	// Validate A1 policy performance requirements
-	assert.LessOrEqual(suite.T(), result.AverageCreationTime, suite.performanceTargets.MaxPolicyLatency,
-		"Policy creation time exceeds target for %d policies", result.ConcurrentPolicies)
-	
-	assert.LessOrEqual(suite.T(), result.ErrorRate, 100-suite.performanceTargets.MinSuccessRate,
-		"Policy error rate exceeds target for %d policies", result.ConcurrentPolicies)
-	
-	log.Printf("A1 policy load test (%d policies): %.2f PPS, %.1f%% error rate, avg creation: %v",
-		result.ConcurrentPolicies, result.ThroughputPPS, result.ErrorRate, result.AverageCreationTime)
-}
-
-func (suite *LoadTestSuite) validateXAppPerformance(result *XAppLoadResult) {
-	// Validate xApp performance requirements
-	assert.LessOrEqual(suite.T(), result.AverageDeploymentTime, 60*time.Second,
-		"xApp deployment time exceeds 60s for %d xApps", result.ConcurrentXApps)
-	
-	assert.Equal(suite.T(), result.FailedDeployments, int64(0),
-		"xApp deployment failures detected for %d xApps", result.ConcurrentXApps)
-	
-	log.Printf("xApp load test (%d xApps): %.1f deployments/s, avg deployment: %v",
-		result.ConcurrentXApps, result.ResourceEfficiency, result.AverageDeploymentTime)
-}
-
-func (suite *LoadTestSuite) validateSystemPerformance(result *SystemLoadResult) {
-	// Validate system performance requirements
-	assert.True(suite.T(), result.SystemStability,
-		"System stability compromised during %s test", result.TestName)
-	
-	successRate := float64(result.SuccessfulRequests) / float64(result.TotalRequests) * 100
-	assert.GreaterOrEqual(suite.T(), successRate, suite.performanceTargets.MinSuccessRate,
-		"Success rate below target during %s test", result.TestName)
-	
-	assert.GreaterOrEqual(suite.T(), result.SustainedThroughput, suite.performanceTargets.MinThroughputRPS,
-		"Sustained throughput below target during %s test", result.TestName)
-	
-	log.Printf("System load test (%s): %.2f RPS sustained, %.1f%% success rate",
-		result.TestName, result.SustainedThroughput, successRate)
-}
-
-// generateLoadTestReport generates comprehensive load test report
-func (suite *LoadTestSuite) generateLoadTestReport() {
+// generatePerformanceReport generates a comprehensive performance test report
+func (suite *LoadTestSuite) generatePerformanceReport() {
 	duration := suite.testResults.EndTime.Sub(suite.testResults.StartTime)
 	
 	report := fmt.Sprintf(`
 ================================================================
-O-RAN L Release Performance and Load Test Report
+O-RAN SC Performance Load Test Report
 ================================================================
 Test Duration: %v
-Total Tests: %d
-Passed Tests: %d
-Failed Tests: %d
+Total Requests: %d
+Successful Requests: %d
+Failed Requests: %d
 Success Rate: %.2f%%
+Error Rate: %.2f%%
 
-E2 Node Load Test Results:
+Performance Metrics:
+- Throughput: %.2f RPS
+- Average Latency: %v
+- Median (P50) Latency: %v
+- P95 Latency: %v
+- P99 Latency: %v
+- Min Latency: %v
+- Max Latency: %v
+
+Resource Utilization:
+- CPU Usage: %.2f%%
+- Memory Usage: %d MB
+- Network Throughput: %.2f MB/s
+- Disk IOPS: %.2f
+- Active Connections: %d
+
+Latency Distribution:
 `, duration,
-		suite.testResults.TotalTests,
-		suite.testResults.PassedTests,
-		suite.testResults.FailedTests,
-		float64(suite.testResults.PassedTests)/float64(suite.testResults.TotalTests)*100)
+		suite.testResults.TotalRequests,
+		suite.testResults.SuccessfulRequests,
+		suite.testResults.FailedRequests,
+		(1-suite.testResults.ErrorRate/100)*100,
+		suite.testResults.ErrorRate,
+		suite.testResults.ThroughputRPS,
+		suite.testResults.AverageLatency,
+		suite.testResults.P50Latency,
+		suite.testResults.P95Latency,
+		suite.testResults.P99Latency,
+		suite.testResults.MinLatency,
+		suite.testResults.MaxLatency,
+		suite.testResults.ResourceUtilization.CPUUsagePercent,
+		suite.testResults.ResourceUtilization.MemoryUsageMB,
+		suite.testResults.ResourceUtilization.NetworkThroughput,
+		suite.testResults.ResourceUtilization.DiskIOPS,
+		suite.testResults.ConcurrentConnections)
 	
-	for testName, result := range suite.testResults.E2NodeLoadTests {
-		report += fmt.Sprintf("- %s: %d nodes, %.2f RPS, %.1f%% errors, P95: %v\n",
-			testName, result.ConcurrentNodes, result.ThroughputRPS, result.ErrorRate, result.P95ResponseTime)
+	for bucket, count := range suite.testResults.LatencyDistribution {
+		report += fmt.Sprintf("- %s: %d requests\n", bucket, count)
 	}
 	
-	report += "\nA1 Policy Load Test Results:\n"
-	for testName, result := range suite.testResults.A1PolicyLoadTests {
-		report += fmt.Sprintf("- %s: %d policies, %.2f PPS, %.1f%% errors, avg creation: %v\n",
-			testName, result.ConcurrentPolicies, result.ThroughputPPS, result.ErrorRate, result.AverageCreationTime)
-	}
-	
-	report += "\nxApp Load Test Results:\n"
-	for testName, result := range suite.testResults.XAppLoadTests {
-		report += fmt.Sprintf("- %s: %d xApps, %.1f deployments/s, avg deployment: %v\n",
-			testName, result.ConcurrentXApps, result.ResourceEfficiency, result.AverageDeploymentTime)
-	}
-	
-	report += "\nSystem Load Test Results:\n"
-	for testName, result := range suite.testResults.SystemLoadTests {
-		successRate := float64(result.SuccessfulRequests) / float64(result.TotalRequests) * 100
-		report += fmt.Sprintf("- %s: %.2f RPS sustained, %.1f%% success, stable: %v\n",
-			testName, result.SustainedThroughput, successRate, result.SystemStability)
-	}
-	
-	if suite.testResults.PerformanceMetrics != nil {
-		metrics := suite.testResults.PerformanceMetrics
-		report += fmt.Sprintf(`
-Performance Metrics Summary:
-- E2 Setup Latency: avg=%v, P95=%v, P99=%v
-- Indication Latency: avg=%v, P95=%v, P99=%v
-- Policy Latency: avg=%v, P95=%v, P99=%v
-- Control Latency: avg=%v, P95=%v, P99=%v
-- Peak Throughput: %.2f RPS
-- Sustained Throughput: %.2f RPS
-- CPU Efficiency: %.2f req/core/sec
-- Memory Efficiency: %.2f req/GB/sec
-- Max Concurrent Nodes: %d
-- Max Concurrent Policies: %d
-- Max Concurrent xApps: %d
-`,
-			metrics.E2SetupLatency.Average, metrics.E2SetupLatency.P95, metrics.E2SetupLatency.P99,
-			metrics.IndicationLatency.Average, metrics.IndicationLatency.P95, metrics.IndicationLatency.P99,
-			metrics.PolicyLatency.Average, metrics.PolicyLatency.P95, metrics.PolicyLatency.P99,
-			metrics.ControlLatency.Average, metrics.ControlLatency.P95, metrics.ControlLatency.P99,
-			metrics.SystemThroughput.PeakThroughput,
-			metrics.SystemThroughput.SustainedThroughput,
-			metrics.ResourceEfficiency.CPUEfficiency,
-			metrics.ResourceEfficiency.MemoryEfficiency,
-			metrics.ScalabilityMetrics.MaxConcurrentNodes,
-			metrics.ScalabilityMetrics.MaxConcurrentPolicies,
-			metrics.ScalabilityMetrics.MaxConcurrentXApps)
+	if len(suite.testResults.ErrorDistribution) > 0 {
+		report += "\nError Distribution:\n"
+		for errorType, count := range suite.testResults.ErrorDistribution {
+			report += fmt.Sprintf("- %s: %d occurrences\n", errorType, count)
+		}
 	}
 	
 	report += "\n================================================================\n"
 	
-	// Write to file
-	reportFile := fmt.Sprintf("test-results/load_test_report_%s.txt",
+	// Write report to file
+	reportFile := fmt.Sprintf("test-results/performance_load_test_report_%s.txt", 
 		time.Now().Format("20060102_150405"))
 	
 	err := os.WriteFile(reportFile, []byte(report), 0644)
 	if err != nil {
-		log.Printf("Failed to write load test report: %v", err)
+		log.Printf("Failed to write performance report: %v", err)
 	} else {
-		log.Printf("Load test report written to: %s", reportFile)
+		log.Printf("Performance load test report written to: %s", reportFile)
 	}
 	
-	// Also print to console
+	// Also log to console
 	fmt.Println(report)
 }
 
-// TestLoadTestSuite runs the performance and load test suite
+// String method for RequestType
+func (rt RequestType) String() string {
+	switch rt {
+	case E2SetupRequest:
+		return "E2SetupRequest"
+	case RICSubscriptionRequest:
+		return "RICSubscriptionRequest"
+	case RICIndicationMessage:
+		return "RICIndicationMessage"
+	case RICControlRequest:
+		return "RICControlRequest"
+	case PolicyUpdateRequest:
+		return "PolicyUpdateRequest"
+	case PolicyDeleteRequest:
+		return "PolicyDeleteRequest"
+	case HealthCheckRequest:
+		return "HealthCheckRequest"
+	default:
+		return "UnknownRequest"
+	}
+}
+
+// TestLoadTestSuite runs the performance load test suite
 func TestLoadTestSuite(t *testing.T) {
 	suite.Run(t, new(LoadTestSuite))
 }

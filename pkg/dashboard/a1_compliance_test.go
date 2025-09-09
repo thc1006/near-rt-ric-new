@@ -63,40 +63,6 @@ func NewA1ComplianceTest(runner *ComplianceTestRunner) *A1ComplianceTest {
 	}
 }
 
-// runA1Test executes A1 compliance tests
-func (r *ComplianceTestRunner) runA1Test(ctx context.Context, test ComplianceTest) TestResult {
-	a1Test := NewA1ComplianceTest(r)
-
-	switch test.ID {
-	case "a1-001":
-		return a1Test.testHealthCheck(ctx, test)
-	case "a1-002":
-		return a1Test.testPolicyTypeManagement(ctx, test)
-	case "a1-003":
-		return a1Test.testPolicyInstanceManagement(ctx, test)
-	case "a1-004":
-		return a1Test.testAuthentication(ctx, test)
-	case "a1-005":
-		return a1Test.testAuthorization(ctx, test)
-	case "a1-006":
-		return a1Test.testJSONSchemaValidation(ctx, test)
-	case "a1-007":
-		return a1Test.testErrorResponses(ctx, test)
-	case "a1-008":
-		return a1Test.testAPIVersioning(ctx, test)
-	case "a1-009":
-		return a1Test.testContentNegotiation(ctx, test)
-	case "a1-010":
-		return a1Test.testRateLimiting(ctx, test)
-	default:
-		return TestResult{
-			TestID:  test.ID,
-			Status:  StatusError,
-			Message: fmt.Sprintf("Unknown A1 test: %s", test.ID),
-		}
-	}
-}
-
 // testHealthCheck validates A1 health check endpoint
 func (t *A1ComplianceTest) testHealthCheck(ctx context.Context, test ComplianceTest) TestResult {
 	result := TestResult{

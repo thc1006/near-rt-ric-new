@@ -10,21 +10,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// RICComponentHealth tracks health of RIC components
-type RICComponentHealth struct {
-	ComponentName string `json:"componentName"`
-	Status        string `json:"status"`
-	LastChecked   time.Time `json:"lastChecked"`
-	Endpoint      string `json:"endpoint"`
-	Error         string `json:"error,omitempty"`
-}
-
-// ProductionHealthChecker manages RIC dashboard health checks
-type ProductionHealthChecker struct {
-	components map[string]RICComponentHealth
-	running    int32
-}
-
 // NewProductionHealthChecker initializes health checker
 func NewProductionHealthChecker() *ProductionHealthChecker {
 	return &ProductionHealthChecker{

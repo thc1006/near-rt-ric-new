@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"fmt"
 	"net/http"
 	"sync/atomic"
 	"time"
@@ -48,40 +49,6 @@ func (api *ProductionDashboardAPI) healthHandler(w http.ResponseWriter, r *http.
 
 	// Write JSON response
 	api.writeJSONResponse(w, http.StatusOK, healthStatus)
-}
-
-func (api *ProductionDashboardAPI) readinessHandler(w http.ResponseWriter, r *http.Request) {
-	// Check if the API is running and can accept requests
-	running := atomic.LoadInt32(&api.running)
-	if running == 0 {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		api.writeErrorResponse(w, http.StatusServiceUnavailable, "Dashboard API not ready")
-		return
-	}
-
-	// Check WebSocket readiness
-	wsReady := api.wsConnectionManager.IsReady()
-	
-	// Check performance optimizer readiness
-	perfReady := api.performanceOptimizer.IsReady()
-
-	// Detailed readiness status
-	readinessStatus := map[string]interface{}{
-		"status": "ready",
-		"details": map[string]bool{
-			"api_running":           running == 1,
-			"websocket_ready":       wsReady,
-			"performance_optimizer": perfReady,
-		},
-	}
-
-	// If any component is not ready, mark as not ready
-	if !wsReady || !perfReady {
-		readinessStatus["status"] = "not_ready"
-		w.WriteHeader(http.StatusServiceUnavailable)
-	}
-
-	api.writeJSONResponse(w, http.StatusOK, readinessStatus)
 }
 
 // Component health check methods

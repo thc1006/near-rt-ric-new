@@ -123,11 +123,13 @@ type ErrorMetrics struct {
 	RecoverableErrors int64            `json:"recoverableErrors"`
 }
 
-// Latency Bucket for histogram
+// LatencyBucket represents a latency distribution bucket - needed for performance_testing.go line 127
 type LatencyBucket struct {
-	UpperBoundMs float64 `json:"upperBoundMs"`
-	Count        int64   `json:"count"`
-	Percentage   float64 `json:"percentage"`
+	Min       time.Duration `json:"min"`
+	Max       time.Duration `json:"max"`
+	Count     int64         `json:"count"`
+	Frequency float64       `json:"frequency"`
+	Label     string        `json:"label"`
 }
 
 // NOTE: ResourceExhaustionPoint type moved to types.go to avoid redeclaration
@@ -254,17 +256,12 @@ func maxInt(values []int) int {
 	return max
 }
 
-func minInt(values []int) int {
-	if len(values) == 0 {
-		return 0
+// minInt function for calculating minimum of two integers - needed by performance_testing.go line 257
+func minInt(a, b int) int {
+	if a < b {
+		return a
 	}
-	min := values[0]
-	for _, v := range values[1:] {
-		if v < min {
-			min = v
-		}
-	}
-	return min
+	return b
 }
 
 func avgInt(values []int) float64 {
