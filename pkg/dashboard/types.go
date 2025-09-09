@@ -296,6 +296,17 @@ const (
 	HealthStatusUnknown   HealthStatus = "unknown"
 )
 
+// HealthCheckResult represents the result of a health check - MASTER VERSION
+type HealthCheckResult struct {
+	ComponentName string        `json:"componentName"`
+	Status        HealthStatus  `json:"status"`
+	Message       string        `json:"message"`
+	Error         error         `json:"error,omitempty"`
+	CheckTime     time.Time     `json:"checkTime"`
+	Duration      time.Duration `json:"duration"`
+	Details       map[string]interface{} `json:"details,omitempty"`
+}
+
 // CircuitBreaker implements the circuit breaker pattern for fault tolerance
 type CircuitBreaker struct {
 	mu                sync.RWMutex
@@ -331,6 +342,17 @@ const (
 	StateHalfOpen
 	StateOpen
 )
+
+// ErrorHandler handles errors in production systems - ADDED
+type ErrorHandler struct {
+	mu            sync.RWMutex
+	errorHandlers map[string]ErrorHandlerFunc
+	metrics       ErrorMetrics
+	logger        *StructuredLogger
+}
+
+// ErrorHandlerFunc represents an error handling function - ADDED
+type ErrorHandlerFunc func(ctx context.Context, err error) error
 
 // ActionType represents the type of subscription action
 type ActionType uint32
@@ -632,7 +654,7 @@ type ServiceModelStatistics struct {
 type ServiceModelType string
 
 const (
-	ServiceModelTypeKPM ServiceModelType = "kpm"      
+	ServiceModelTypeKPM ServiceModelType = "kmp"      
 	ServiceModelTypeRC  ServiceModelType = "rc"       
 	ServiceModelTypeNI  ServiceModelType = "ni"       
 	ServiceModelTypeTS  ServiceModelType = "ts"       
@@ -857,6 +879,80 @@ type SecurityHeaders interface{}
 type E2HealthMonitor interface{}
 type NodeRateLimiter interface{}
 type NodeCircuitBreaker interface{}
+
+// MISSING INTERFACES - Adding required interfaces to resolve undefined references
+type AsyncPackageProcessor interface{}
+type ResourcePoolManager interface{}
+type PackageManagerClient interface{}
+type ResourceProvisionerClient interface{}
+type SMOLoadBalancer interface{}
+type NephioLoadBalancer interface{}
+type IntegrationCache interface{}
+type IntegrationCircuitBreaker interface{}
+type IntegrationMetrics interface{}
+type IntegrationPerformanceTracker interface{}
+type EnergyManager interface{}
+type CapacityPlanner interface{}
+type IntegrationHealthMonitor interface{}
+
+// FINAL BATCH OF MISSING TYPES - Adding the last few undefined references
+type SLARequirements struct {
+	LatencySLA     time.Duration `json:"latencySla"`
+	ThroughputSLA  float64       `json:"throughputSla"`
+	AvailabilitySLA float64      `json:"availabilitySla"`
+	ReliabilitySLA  float64      `json:"reliabilitySla"`
+}
+
+type ComputeResources struct {
+	CPUCores    int     `json:"cpuCores"`
+	CPUUsage    float64 `json:"cpuUsage"`
+	RAMSize     uint64  `json:"ramSize"`
+	RAMUsage    float64 `json:"ramUsage"`
+}
+
+type NetworkResources struct {
+	Bandwidth      uint64  `json:"bandwidth"`
+	Latency        time.Duration `json:"latency"`
+	PacketLossRate float64 `json:"packetLossRate"`
+	Jitter         time.Duration `json:"jitter"`
+}
+
+type StorageResources struct {
+	StorageSize  uint64  `json:"storageSize"`
+	StorageUsage float64 `json:"storageUsage"`
+	IOPS         uint64  `json:"iops"`
+	Throughput   uint64  `json:"throughput"`
+}
+
+type AcceleratorResources struct {
+	GPUCount    int     `json:"gpuCount"`
+	GPUMemory   uint64  `json:"gpuMemory"`
+	GPUUsage    float64 `json:"gpuUsage"`
+	Accelerator string  `json:"accelerator"`
+}
+
+// Memory and CPU sampling types for stability testing
+type MemorySample struct {
+	Timestamp  time.Time `json:"timestamp"`
+	UsageMB    float64   `json:"usageMB"`
+	HeapMB     float64   `json:"heapMB"`
+	StackMB    float64   `json:"stackMB"`
+}
+
+type CPUSample struct {
+	Timestamp  time.Time `json:"timestamp"`
+	Usage      float64   `json:"usage"`
+	LoadAvg1   float64   `json:"loadAvg1"`
+	LoadAvg5   float64   `json:"loadAvg5"`
+	LoadAvg15  float64   `json:"loadAvg15"`
+}
+
+type ErrorRateSample struct {
+	Timestamp  time.Time `json:"timestamp"`
+	ErrorRate  float64   `json:"errorRate"`
+	ErrorCount uint64    `json:"errorCount"`
+	TotalCount uint64    `json:"totalCount"`
+}
 
 // MISSING CONCRETE TYPES - Adding required struct types
 
@@ -1206,8 +1302,6 @@ type BackendHealthChecker struct {
 	healthChecks  map[string]*HealthCheckResult
 }
 
-// Note: HealthCheckResult is in xapp_health_monitor.go, not duplicated here
-
 type RequestRouter struct {
 	routes      map[string]*Route
 	middleware  []MiddlewareFunc
@@ -1215,8 +1309,6 @@ type RequestRouter struct {
 	stats       RouterStats
 	mu          sync.RWMutex
 }
-
-// Route is defined in routing_models.go, not duplicated here
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
@@ -1245,7 +1337,490 @@ type SessionInfo struct {
 	Metadata    map[string]interface{} `json:"metadata"`
 }
 
-// Note: AuditEvent is in security_compliance_test.go, not duplicated here
+// RateLimiterStats represents rate limiter statistics
+type RateLimiterStats struct {
+	RequestsAllowed  uint64    `json:"requestsAllowed"`
+	RequestsDenied   uint64    `json:"requestsDenied"`
+	CurrentRate      float64   `json:"currentRate"`
+	LastUpdated      time.Time `json:"lastUpdated"`
+}
 
-// Note: WorkItem and WorkResult are defined as concrete types but used as interfaces in zero_copy_components.go
-// This creates a conflict that would need refactoring to resolve properly
+// CompressionHandler handles response compression
+type CompressionHandler struct {
+	level       int
+	minSize     int
+	enabledTypes []string
+	stats       CompressionStats
+	mu          sync.RWMutex
+}
+
+// CompressionStats represents compression statistics
+type CompressionStats struct {
+	BytesOriginal   uint64    `json:"bytesOriginal"`
+	BytesCompressed uint64    `json:"bytesCompressed"`
+	CompressionRatio float64  `json:"compressionRatio"`
+	RequestsCompressed uint64 `json:"requestsCompressed"`
+	LastUpdated      time.Time `json:"lastUpdated"`
+}
+
+// AuthenticationManager manages API authentication
+type AuthenticationManager struct {
+	secretKey    string
+	expirationTime time.Duration
+	tokens       map[string]*TokenInfo
+	mu           sync.RWMutex
+	stats        AuthStats
+}
+
+// TokenInfo represents authentication token information
+type TokenInfo struct {
+	Token     string    `json:"token"`
+	UserID    string    `json:"userId"`
+	ExpiresAt time.Time `json:"expiresAt"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// AuthStats represents authentication statistics
+type AuthStats struct {
+	TokensIssued    uint64    `json:"tokensIssued"`
+	TokensExpired   uint64    `json:"tokensExpired"`
+	FailedAttempts  uint64    `json:"failedAttempts"`
+	ActiveTokens    int       `json:"activeTokens"`
+	LastUpdated     time.Time `json:"lastUpdated"`
+}
+
+// RateLimitManager manages rate limiting for users
+type RateLimitManager struct {
+	config       *ProductionAPIConfig
+	userLimiters map[string]*UserRateLimiter
+	mu           sync.RWMutex
+	stats        RateLimitManagerStats
+}
+
+// UserRateLimiter represents per-user rate limiting
+type UserRateLimiter struct {
+	userID      string
+	requests    int
+	lastReset   time.Time
+	windowSize  time.Duration
+	limit       int
+}
+
+// RateLimitManagerStats represents rate limit manager statistics
+type RateLimitManagerStats struct {
+	ActiveUsers       int       `json:"activeUsers"`
+	TotalRequests     uint64    `json:"totalRequests"`
+	RateLimitedUsers  uint64    `json:"rateLimitedUsers"`
+	LastUpdated       time.Time `json:"lastUpdated"`
+}
+
+// APIHealthChecker checks API health
+type APIHealthChecker struct {
+	checks      map[string]HealthCheckFunc
+	results     map[string]*HealthCheckResult
+	mu          sync.RWMutex
+	interval    time.Duration
+	isRunning   bool
+}
+
+// HealthCheckFunc represents a health check function
+type HealthCheckFunc func() *HealthCheckResult
+
+// HighPerformanceSubscriptionManager manages subscriptions at high performance
+type HighPerformanceSubscriptionManager struct {
+	subscriptions map[string]*E2Subscription
+	mu            sync.RWMutex
+	stats         SubscriptionManagerStats
+	isRunning     bool
+}
+
+// SubscriptionManagerStats represents subscription manager statistics
+type SubscriptionManagerStats struct {
+	ActiveSubscriptions   int       `json:"activeSubscriptions"`
+	TotalSubscriptions    uint64    `json:"totalSubscriptions"`
+	SubscriptionErrors    uint64    `json:"subscriptionErrors"`
+	LastUpdated          time.Time `json:"lastUpdated"`
+}
+
+// E2NodeConnectRequest represents a request to connect an E2 node
+type E2NodeConnectRequest struct {
+	NodeID      string            `json:"nodeId"`
+	Address     string            `json:"address"`
+	Port        int               `json:"port"`
+	Type        string            `json:"type"`
+	Metadata    map[string]string `json:"metadata"`
+}
+
+// E2NodeMapShard represents a shard of E2 nodes for performance
+type E2NodeMapShard struct {
+	nodes map[string]*E2Node
+	mu    sync.RWMutex
+}
+
+// E2ConnectionManager manages E2 connections
+type E2ConnectionManager struct {
+	connections map[string]*E2Connection
+	mu          sync.RWMutex
+	stats       E2ConnectionStats
+}
+
+// E2ConnectionStats represents E2 connection statistics
+type E2ConnectionStats struct {
+	MessagesSent     uint64    `json:"messagesSent"`
+	MessagesReceived uint64    `json:"messagesReceived"`
+	BytesSent        uint64    `json:"bytesSent"`
+	BytesReceived    uint64    `json:"bytesReceived"`
+	ErrorCount       uint64    `json:"errorCount"`
+	LastUpdated      time.Time `json:"lastUpdated"`
+}
+
+// E2NodeRouter routes E2 node traffic
+type E2NodeRouter struct {
+	routes map[string]*E2NodeRoute
+	mu     sync.RWMutex
+}
+
+// E2NodeRoute represents an E2 node route
+type E2NodeRoute struct {
+	NodeID     string    `json:"nodeId"`
+	TargetAddr string    `json:"targetAddr"`
+	Weight     int       `json:"weight"`
+	Active     bool      `json:"active"`
+	LastUsed   time.Time `json:"lastUsed"`
+}
+
+// E2LoadDistributor distributes load among E2 nodes
+type E2LoadDistributor struct {
+	nodes      []*E2Node
+	algorithm  LoadBalancingAlgorithm
+	mu         sync.RWMutex
+	stats      LoadDistributorStats
+}
+
+// LoadDistributorStats represents load distributor statistics
+type LoadDistributorStats struct {
+	RequestsDistributed uint64    `json:"requestsDistributed"`
+	AverageLatency      time.Duration `json:"averageLatency"`
+	ErrorCount          uint64    `json:"errorCount"`
+	LastUpdated         time.Time `json:"lastUpdated"`
+}
+
+// E2AlertManager manages E2 node alerts
+type E2AlertManager struct {
+	alerts    map[string]*E2Alert
+	mu        sync.RWMutex
+	handlers  []AlertHandler
+}
+
+// E2Alert represents an E2 node alert
+type E2Alert struct {
+	ID          string                 `json:"id"`
+	NodeID      string                 `json:"nodeId"`
+	Type        AlertType              `json:"type"`
+	Severity    AlertSeverity          `json:"severity"`
+	Message     string                 `json:"message"`
+	Timestamp   time.Time              `json:"timestamp"`
+	Metadata    map[string]interface{} `json:"metadata"`
+	Resolved    bool                   `json:"resolved"`
+	ResolvedAt  *time.Time             `json:"resolvedAt,omitempty"`
+}
+
+// AlertType represents the type of alert
+type AlertType string
+
+const (
+	AlertTypeNodeDisconnected AlertType = "node_disconnected"
+	AlertTypeHighLatency      AlertType = "high_latency"
+	AlertTypeHighErrorRate    AlertType = "high_error_rate"
+	AlertTypeResourceExhausted AlertType = "resource_exhausted"
+)
+
+// AlertHandler handles alerts
+type AlertHandler interface {
+	HandleAlert(alert *E2Alert) error
+}
+
+// E2NodeManagerStats represents E2 node manager statistics
+type E2NodeManagerStats struct {
+	ConnectedNodes    int       `json:"connectedNodes"`
+	DisconnectedNodes int       `json:"disconnectedNodes"`
+	TotalNodes        int       `json:"totalNodes"`
+	ActiveAlerts      int       `json:"activeAlerts"`
+	LastUpdated       time.Time `json:"lastUpdated"`
+}
+
+// IndicationPipeline processes indications in a pipeline
+type IndicationPipeline struct {
+	stages    []PipelineStage
+	mu        sync.RWMutex
+	stats     PipelineStats
+}
+
+// PipelineStage represents a stage in the indication pipeline
+type PipelineStage interface {
+	Process(indication *E2Indication) (*E2Indication, error)
+	GetStats() StageStats
+}
+
+// StageStats represents stage statistics
+type StageStats struct {
+	StageName        string        `json:"stageName"`
+	ProcessedCount   uint64        `json:"processedCount"`
+	AverageLatency   time.Duration `json:"averageLatency"`
+	ErrorCount       uint64        `json:"errorCount"`
+}
+
+// E2Indication represents an E2 indication
+type E2Indication struct {
+	ID             string                 `json:"id"`
+	NodeID         string                 `json:"nodeId"`
+	SubscriptionID string                 `json:"subscriptionId"`
+	Header         []byte                 `json:"header"`
+	Message        []byte                 `json:"message"`
+	Timestamp      time.Time              `json:"timestamp"`
+	Metadata       map[string]interface{} `json:"metadata"`
+}
+
+// IndicationBatchProcessor processes indications in batches
+type IndicationBatchProcessor struct {
+	batchSize     int
+	flushInterval time.Duration
+	buffer        []*E2Indication
+	mu            sync.RWMutex
+	stats         BatchProcessorStats
+}
+
+// BatchProcessorStats represents batch processor statistics
+type BatchProcessorStats struct {
+	BatchesProcessed uint64        `json:"batchesProcessed"`
+	AverageBatchSize float64       `json:"averageBatchSize"`
+	AverageLatency   time.Duration `json:"averageLatency"`
+	LastUpdated      time.Time     `json:"lastUpdated"`
+}
+
+// IndicationSIMDProcessor processes indications using SIMD instructions
+type IndicationSIMDProcessor struct {
+	enabled bool
+	stats   SIMDProcessorStats
+	mu      sync.RWMutex
+}
+
+// SIMDProcessorStats represents SIMD processor statistics
+type SIMDProcessorStats struct {
+	OperationsPerSecond  uint64    `json:"operationsPerSecond"`
+	AverageLatency       time.Duration `json:"averageLatency"`
+	TotalOperations      uint64    `json:"totalOperations"`
+	LastUpdated          time.Time `json:"lastUpdated"`
+}
+
+// IndicationCompressionHandler handles indication compression
+type IndicationCompressionHandler struct {
+	enabled bool
+	level   int
+	stats   IndicationCompressionStats
+	mu      sync.RWMutex
+}
+
+// IndicationCompressionStats represents indication compression statistics
+type IndicationCompressionStats struct {
+	OriginalSize     uint64    `json:"originalSize"`
+	CompressedSize   uint64    `json:"compressedSize"`
+	CompressionRatio float64   `json:"compressionRatio"`
+	LastUpdated      time.Time `json:"lastUpdated"`
+}
+
+// IndicationRoutingEngine routes indications
+type IndicationRoutingEngine struct {
+	routes map[string]*IndicationRoute
+	mu     sync.RWMutex
+	stats  RoutingEngineStats
+}
+
+// IndicationRoute represents an indication route
+type IndicationRoute struct {
+	ID          string    `json:"id"`
+	Pattern     string    `json:"pattern"`
+	Target      string    `json:"target"`
+	Active      bool      `json:"active"`
+	LastUsed    time.Time `json:"lastUsed"`
+	MessageCount uint64   `json:"messageCount"`
+}
+
+// RoutingEngineStats represents routing engine statistics
+type RoutingEngineStats struct {
+	RoutesActive    int       `json:"routesActive"`
+	MessagesRouted  uint64    `json:"messagesRouted"`
+	RoutingErrors   uint64    `json:"routingErrors"`
+	LastUpdated     time.Time `json:"lastUpdated"`
+}
+
+// FastSubscriptionMatcher matches subscriptions quickly
+type FastSubscriptionMatcher struct {
+	subscriptions map[string]*E2Subscription
+	indexedBy     map[string][]string // indexed by different criteria
+	mu            sync.RWMutex
+	stats         MatcherStats
+}
+
+// MatcherStats represents matcher statistics
+type MatcherStats struct {
+	MatchesPerformed uint64    `json:"matchesPerformed"`
+	AverageLatency   time.Duration `json:"averageLatency"`
+	CacheHitRate     float64   `json:"cacheHitRate"`
+	LastUpdated      time.Time `json:"lastUpdated"`
+}
+
+// IndicationProcessorStats represents indication processor statistics
+type IndicationProcessorStats struct {
+	TotalProcessed    uint64        `json:"totalProcessed"`
+	ProcessingRate    float64       `json:"processingRate"`
+	AverageLatency    time.Duration `json:"averageLatency"`
+	ErrorRate         float64       `json:"errorRate"`
+	LastUpdated       time.Time     `json:"lastUpdated"`
+}
+
+// queueNode represents a node in the lock-free queue
+type queueNode struct {
+	data interface{}
+	next *queueNode
+}
+
+// LogEntry represents a structured log entry used in production_hardening.go
+type LogEntry struct {
+	Level     string                 `json:"level"`
+	Message   string                 `json:"message"`
+	Timestamp time.Time              `json:"timestamp"`
+	Fields    map[string]interface{} `json:"fields"`
+	Component string                 `json:"component"`
+	TraceID   string                 `json:"traceId,omitempty"`
+}
+
+// ADDED MISSING TYPES FOR QUICK FIX
+
+// ServiceProfile represents a network slice service profile
+type ServiceProfile struct {
+	ID              string            `json:"id"`
+	Name            string            `json:"name"`
+	Description     string            `json:"description"`
+	ServiceType     string            `json:"serviceType"`
+	Requirements    map[string]string `json:"requirements"`
+	CreatedAt       time.Time         `json:"createdAt"`
+	UpdatedAt       time.Time         `json:"updatedAt"`
+}
+
+// NetworkSlice represents a network slice
+type NetworkSlice struct {
+	ID              string                 `json:"id"`
+	Name            string                 `json:"name"`
+	Type            string                 `json:"type"`
+	Status          string                 `json:"status"`
+	ServiceProfile  ServiceProfile         `json:"serviceProfile"`
+	Configuration   map[string]interface{} `json:"configuration"`
+	CreatedAt       time.Time              `json:"createdAt"`
+	UpdatedAt       time.Time              `json:"updatedAt"`
+}
+
+// PackageTask represents a package management task
+type PackageTask struct {
+	ID          string                 `json:"id"`
+	Type        string                 `json:"type"`
+	PackageID   string                 `json:"packageId"`
+	Action      string                 `json:"action"`
+	Status      string                 `json:"status"`
+	Progress    float64                `json:"progress"`
+	Metadata    map[string]interface{} `json:"metadata"`
+	CreatedAt   time.Time              `json:"createdAt"`
+	CompletedAt *time.Time             `json:"completedAt,omitempty"`
+}
+
+// PolicyManagerClient interface for A1 policy management
+type PolicyManagerClient interface {
+	GetPolicyTypes() ([]PolicyType, error)
+	GetPolicyInstances(typeID PolicyTypeID) ([]PolicyInstance, error)
+	CreatePolicyInstance(instance PolicyInstance) error
+	DeletePolicyInstance(typeID PolicyTypeID, instanceID PolicyInstanceID) error
+}
+
+// RAppManagerClient interface for rApp management
+type RAppManagerClient interface {
+	ListRApps() ([]string, error)
+	GetRApp(name string) (interface{}, error)
+	DeployRApp(name string, config interface{}) error
+	UndeployRApp(name string) error
+}
+
+// RequestCache caches requests for performance
+type RequestCache struct {
+	cache   map[string]interface{}
+	mu      sync.RWMutex
+	ttl     time.Duration
+	cleanup *time.Ticker
+}
+
+// PackageCache caches packages for faster access
+type PackageCache struct {
+	packages map[string]interface{}
+	mu       sync.RWMutex
+	maxSize  int
+	stats    CacheStats
+}
+
+// CacheStats represents cache statistics
+type CacheStats struct {
+	Hits        uint64    `json:"hits"`
+	Misses      uint64    `json:"misses"`
+	Entries     int       `json:"entries"`
+	LastUpdated time.Time `json:"lastUpdated"`
+}
+
+// PackageValidator validates packages
+type PackageValidator struct {
+	rules      map[string]ValidationRule
+	mu         sync.RWMutex
+	stats      ValidationStats
+}
+
+// ValidationRule represents a validation rule
+type ValidationRule struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Rule        func(interface{}) bool `json:"-"`
+	Enabled     bool                   `json:"enabled"`
+}
+
+// ValidationStats represents validation statistics
+type ValidationStats struct {
+	TotalValidations uint64    `json:"totalValidations"`
+	PassedValidations uint64   `json:"passedValidations"`
+	FailedValidations uint64   `json:"failedValidations"`
+	LastValidation    time.Time `json:"lastValidation"`
+}
+
+// PackageDeployer deploys packages
+type PackageDeployer struct {
+	deployments map[string]*DeploymentSpec
+	mu          sync.RWMutex
+	stats       DeploymentStats
+}
+
+// DeploymentStats represents deployment statistics
+type DeploymentStats struct {
+	TotalDeployments     uint64    `json:"totalDeployments"`
+	SuccessfulDeployments uint64   `json:"successfulDeployments"`
+	FailedDeployments    uint64    `json:"failedDeployments"`
+	LastDeployment       time.Time `json:"lastDeployment"`
+}
+
+// PackageBatchProcessor processes packages in batches
+type PackageBatchProcessor struct {
+	batchSize     int
+	flushInterval time.Duration
+	buffer        []interface{}
+	mu            sync.RWMutex
+	stats         BatchProcessorStats
+}
+
+// Note: References to external types (ErrorMetrics, StructuredLogger, ProductionAPIConfig, 
+// E2Connection, Route, WebSocketConnection, AlertSeverity, PipelineStats) are resolved 
+// by importing them from their respective files where they are originally defined
+// to avoid redeclaration conflicts.

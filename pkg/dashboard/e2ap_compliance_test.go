@@ -44,19 +44,6 @@ type RANFunctionDef struct {
 	Revision    uint32 `json:"revision"`
 }
 
-// SCTPConnection represents an SCTP connection
-type SCTPConnection struct {
-	conn net.Conn
-}
-
-// Close closes the SCTP connection
-func (s *SCTPConnection) Close() error {
-	if s.conn != nil {
-		return s.conn.Close()
-	}
-	return nil
-}
-
 // NewE2APComplianceTest creates a new E2AP compliance test instance
 func NewE2APComplianceTest(runner *ComplianceTestRunner) *E2APComplianceTest {
 	return &E2APComplianceTest{
@@ -565,12 +552,4 @@ func loadE2APTestData() *E2APTestData {
 			},
 		},
 	}
-}
-
-// minInt helper function for calculating minimum of two integers
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
