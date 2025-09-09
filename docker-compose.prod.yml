@@ -1,0 +1,241 @@
+version: '3.8'
+
+# Production Environment Configuration
+# Based on O-RAN SC L Release standards
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.infrastructure.yml -f docker-compose.prod.yml up
+
+services:
+  # =============================================================================
+  # Production Overrides for Core Services
+  # =============================================================================
+  
+  dashboard-api:
+    build:
+      args:
+        - GO_VERSION=1.24.6
+        - BUILD_VERSION=${VERSION:-v1.0.0}
+        - ENABLE_FIPS=true
+    environment:
+      - GO_ENV=production
+      - LOG_LEVEL=info
+      - LOG_FORMAT=json
+      - DB_NAME=${DB_NAME:-oran_prod}
+      - DB_USER=${DB_USER:-oran_prod}
+      - DB_PASSWORD=${DB_PASSWORD:-secure_password_123}
+      - DB_SSL_MODE=require
+      - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_key_here}
+      - ENABLE_CORS=true
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:8080}
+      - ENABLE_TLS=${ENABLE_TLS:-true}
+      - CERT_FILE=/certs/server.crt
+      - KEY_FILE=/certs/server.key
+    volumes:
+      - ./configs:/configs:ro
+      - ./certs:/certs:ro
+      - api-logs:/logs
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  ric:
+    build:
+      args:
+        - GO_VERSION=1.24.6
+        - BUILD_VERSION=${VERSION:-v1.0.0}
+    environment:
+      - GO_ENV=production
+      - LOG_LEVEL=info
+      - ENABLE_TLS=${ENABLE_TLS:-true}
+      - CERT_FILE=/certs/ric.crt
+      - KEY_FILE=/certs/ric.key
+      - CA_FILE=/certs/ca.crt
+    volumes:
+      - ./configs/ric:/configs:ro
+      - ./certs:/certs:ro
+      - ric-data:/data
+      - ric-logs:/logs
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+
+  xapp-hello-world:
+    environment:
+      - GO_ENV=production
+      - LOG_LEVEL=info
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # =============================================================================
+  # Production Infrastructure Overrides
+  # =============================================================================
+
+  postgres:
+    environment:
+      - POSTGRES_DB=${DB_NAME:-oran_prod}
+      - POSTGRES_USER=${DB_USER:-oran_prod}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-secure_password_123}
+    volumes:
+      - postgres-prod-data:/var/lib/postgresql/data
+      - ./scripts/db/init-production.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - postgres-backups:/backups
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  redis:
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:-secure_redis_123}
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-prod-data:/data
+      - ./configs/redis/redis-prod.conf:/usr/local/etc/redis/redis.conf:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  prometheus:
+    volumes:
+      - ./configs/prometheus/prometheus-prod.yml:/etc/prometheus/prometheus.yml:ro
+      - ./configs/prometheus/rules:/etc/prometheus/rules:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=10GB'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.external-url=http://localhost:9092'
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  grafana:
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-secure_grafana_123}
+      - GF_SECURITY_SECRET_KEY=${GRAFANA_SECRET:-grafana_secret_key}
+      - GF_INSTALL_PLUGINS=redis-datasource,grafana-worldmap-panel,grafana-clock-panel
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+    volumes:
+      - ./configs/grafana/dashboards-prod:/etc/grafana/provisioning/dashboards:ro
+      - ./configs/grafana/datasources-prod:/etc/grafana/provisioning/datasources:ro
+      - grafana-prod-data:/var/lib/grafana
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # =============================================================================
+  # Production-specific Services
+  # =============================================================================
+
+  # Web Dashboard (Production Build)
+  web-dashboard:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile.prod
+      args:
+        - NODE_ENV=production
+        - REACT_APP_API_URL=${API_URL:-http://localhost:8080}
+        - REACT_APP_WS_URL=${WS_URL:-ws://localhost:8080/ws}
+        - REACT_APP_VERSION=${VERSION:-v1.0.0}
+    image: oran/web-dashboard:${VERSION:-latest}
+    container_name: web-dashboard
+    restart: unless-stopped
+    ports:
+      - "3001:80"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - dashboard-api
+    networks:
+      - oran-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./configs/nginx/nginx-prod.conf:/etc/nginx/nginx.conf:ro
+      - ./configs/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certs:/etc/nginx/certs:ro
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      - dashboard-api
+      - web-dashboard
+    networks:
+      - oran-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# =============================================================================
+# Production Volumes
+# =============================================================================
+
+volumes:
+  postgres-prod-data:
+    driver: local
+  postgres-backups:
+    driver: local
+  redis-prod-data:
+    driver: local
+  grafana-prod-data:
+    driver: local
+  api-logs:
+    driver: local
+  ric-logs:
+    driver: local
+  nginx-logs:
+    driver: local

@@ -182,8 +182,8 @@ services:
       - "8081:8081"
     command: jobmanager
     environment:
-      JOB_MANAGER_RPC_ADDRESS: flink-jobmanager
-      FLINK_PROPERTIES: "jobmanager.rpc.address: flink-jobmanager"
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+      - FLINK_PROPERTIES="jobmanager.rpc.address: flink-jobmanager"
     networks:
       - oran-network
     volumes:
@@ -197,8 +197,8 @@ services:
       - flink-jobmanager
     command: taskmanager
     environment:
-      JOB_MANAGER_RPC_ADDRESS: flink-jobmanager
-      FLINK_PROPERTIES: "jobmanager.rpc.address: flink-jobmanager"
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+      - FLINK_PROPERTIES="jobmanager.rpc.address: flink-jobmanager"
     networks:
       - oran-network
     volumes:
@@ -231,11 +231,6 @@ services:
     volumes:
       - ./configs/analytics:/configs:ro
     restart: unless-stopped
-
-# =============================================================================
-# Analytics & Telemetry Extension
-# Use with: docker-compose -f docker-compose.yml -f docker-compose.infrastructure.yml -f docker-compose.analytics.yml up
-# =============================================================================
 
 networks:
   oran-network:

@@ -1,5 +1,9 @@
 version: '3.8'
 
+# Base O-RAN Near-RT RIC Configuration
+# This file contains only the core O-RAN services
+# Use with infrastructure and environment-specific overlays
+
 services:
   # =============================================================================
   # Core O-RAN Components
@@ -18,12 +22,12 @@ services:
       - "8080:8080"
       - "9090:9090"  # Metrics
     environment:
-      - LOG_LEVEL=debug
+      - LOG_LEVEL=${LOG_LEVEL:-info}
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=oran
-      - DB_USER=oran
-      - DB_PASSWORD=oran123
+      - DB_NAME=${DB_NAME:-oran}
+      - DB_USER=${DB_USER:-oran}
+      - DB_PASSWORD=${DB_PASSWORD:-oran123}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - JAEGER_AGENT_HOST=jaeger
@@ -56,9 +60,9 @@ services:
       - "8081:8081"     # HTTP API
       - "9091:9091"     # Metrics
     environment:
-      - LOG_LEVEL=debug
+      - LOG_LEVEL=${LOG_LEVEL:-info}
       - E2_BIND_ADDR=0.0.0.0:36421
-      - ENABLE_TLS=false
+      - ENABLE_TLS=${ENABLE_TLS:-false}
     networks:
       - oran-network
     volumes:
@@ -68,6 +72,12 @@ services:
     cap_add:
       - NET_ADMIN
       - SYS_ADMIN
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   xapp-hello-world:
     build:
@@ -78,7 +88,7 @@ services:
     ports:
       - "8082:8082"
     environment:
-      - LOG_LEVEL=debug
+      - LOG_LEVEL=${LOG_LEVEL:-info}
       - RMR_SEED_RT=/configs/routes.txt
       - RIC_HOST=ric
       - RIC_PORT=8081
@@ -89,165 +99,12 @@ services:
     volumes:
       - ./configs/xapp:/configs:ro
     restart: unless-stopped
-
-  # =============================================================================
-  # Supporting Services
-  # =============================================================================
-
-  postgres:
-    image: postgres:15-alpine
-    container_name: postgres
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_DB=oran
-      - POSTGRES_USER=oran
-      - POSTGRES_PASSWORD=oran123
-      - PGDATA=/var/lib/postgresql/data/pgdata
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - ./scripts/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    networks:
-      - oran-network
-    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U oran"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    container_name: redis
-    ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes
-    volumes:
-      - redis-data:/data
-    networks:
-      - oran-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # =============================================================================
-  # Monitoring & Observability
-  # =============================================================================
-
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    ports:
-      - "9092:9090"
-    volumes:
-      - ./configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus-data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-      - '--web.console.templates=/usr/share/prometheus/consoles'
-      - '--web.enable-lifecycle'
-    networks:
-      - oran-network
-    restart: unless-stopped
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin123
-      - GF_INSTALL_PLUGINS=redis-datasource
-    volumes:
-      - ./configs/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./configs/grafana/datasources:/etc/grafana/provisioning/datasources:ro
-      - grafana-data:/var/lib/grafana
-    depends_on:
-      - prometheus
-    networks:
-      - oran-network
-    restart: unless-stopped
-
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    container_name: jaeger
-    ports:
-      - "5775:5775/udp"   # Agent accept zipkin.thrift
-      - "6831:6831/udp"   # Agent accept jaeger.thrift
-      - "6832:6832/udp"   # Agent accept jaeger.thrift binary
-      - "5778:5778"       # Agent serve configs
-      - "16686:16686"     # Query serve frontend
-      - "14268:14268"     # Collector accept jaeger.thrift
-      - "14250:14250"     # Collector accept gRPC
-      - "9411:9411"       # Collector accept zipkin
-    environment:
-      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
-      - COLLECTOR_OTLP_ENABLED=true
-    networks:
-      - oran-network
-    restart: unless-stopped
-
-  # =============================================================================
-  # Development Tools
-  # =============================================================================
-
-  adminer:
-    image: adminer:latest
-    container_name: adminer
-    ports:
-      - "8083:8080"
-    environment:
-      - ADMINER_DEFAULT_SERVER=postgres
-      - ADMINER_DESIGN=pepa-linha
-    depends_on:
-      - postgres
-    networks:
-      - oran-network
-    profiles:
-      - dev
-
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    container_name: redis-commander
-    ports:
-      - "8084:8081"
-    environment:
-      - REDIS_HOSTS=local:redis:6379
-    depends_on:
-      - redis
-    networks:
-      - oran-network
-    profiles:
-      - dev
-
-  # =============================================================================
-  # UI Development Server
-  # =============================================================================
-
-  ui-dev:
-    image: node:18-alpine
-    container_name: ui-dev
-    working_dir: /app
-    ports:
-      - "3001:3000"
-    environment:
-      - NODE_ENV=development
-      - REACT_APP_API_URL=http://localhost:8080
-      - REACT_APP_WS_URL=ws://localhost:8080/ws
-    volumes:
-      - ./ui:/app
-      - /app/node_modules  # Anonymous volume for node_modules
-    command: sh -c "npm install && npm start"
-    networks:
-      - oran-network
-    profiles:
-      - dev
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
 
 # =============================================================================
 # Networks
@@ -265,13 +122,5 @@ networks:
 # =============================================================================
 
 volumes:
-  postgres-data:
-    driver: local
-  redis-data:
-    driver: local
-  prometheus-data:
-    driver: local
-  grafana-data:
-    driver: local
   ric-data:
     driver: local

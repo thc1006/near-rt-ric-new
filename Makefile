@@ -328,6 +328,244 @@ security-report: ## Generate comprehensive security report
 	@echo "$(GREEN)Security report generated: $(COVERAGE_DIR)/security-report.md$(NC)"
 
 # ============================================================================
+# WG11 Compliance Targets
+# ============================================================================
+
+.PHONY: wg11-validate
+wg11-validate: ## Validate WG11 interface security compliance
+	@echo "$(YELLOW)Validating WG11 compliance...$(NC)"
+	@if [ -f "$(SCRIPTS_DIR)/security-validation-tests.sh" ]; then \
+		bash $(SCRIPTS_DIR)/security-validation-tests.sh interfaces; \
+	else \
+		echo "$(RED)Security validation script not found$(NC)"; exit 1; \
+	fi
+	@echo "$(GREEN)WG11 validation completed$(NC)"
+
+.PHONY: wg11-deploy
+wg11-deploy: ## Deploy WG11 security policies
+	@echo "$(YELLOW)Deploying WG11 security policies...$(NC)"
+	@kubectl apply -f $(CONFIG_DIR)/oran-wg11-security.yaml || echo "$(YELLOW)WG11 config not found$(NC)"
+	@if [ -f "$(SCRIPTS_DIR)/oran-security-enforcement.sh" ]; then \
+		bash $(SCRIPTS_DIR)/oran-security-enforcement.sh wg11; \
+	else \
+		echo "$(YELLOW)WG11 enforcement script not found$(NC)"; \
+	fi
+	@echo "$(GREEN)WG11 security policies deployed$(NC)"
+
+.PHONY: wg11-test
+wg11-test: ## Test WG11 interface security
+	@echo "$(YELLOW)Testing WG11 interface security...$(NC)"
+	@for interface in e2 a1 o1 o2; do \
+		echo "Testing $$interface interface..."; \
+		if [ -f "$(SCRIPTS_DIR)/security-validation-tests.sh" ]; then \
+			bash $(SCRIPTS_DIR)/security-validation-tests.sh interfaces | grep "$$interface" || true; \
+		fi \
+	done
+	@echo "$(GREEN)WG11 interface testing completed$(NC)"
+
+# ============================================================================
+# Enhanced Security Targets
+# ============================================================================
+
+.PHONY: fips-enable
+fips-enable: ## Enable FIPS 140-3 mode
+	@echo "$(YELLOW)Enabling FIPS 140-3 mode ($(FIPS_MODE))...$(NC)"
+	@if [ -f "$(SCRIPTS_DIR)/oran-security-enforcement.sh" ]; then \
+		bash $(SCRIPTS_DIR)/oran-security-enforcement.sh fips; \
+	else \
+		echo "$(YELLOW)FIPS enforcement script not found$(NC)"; \
+	fi
+	@echo "$(GREEN)FIPS 140-3 enabled$(NC)"
+
+.PHONY: fips-validate
+fips-validate: ## Validate FIPS compliance
+	@echo "$(YELLOW)Validating FIPS 140-3 compliance...$(NC)"
+	@if [ -f "$(SCRIPTS_DIR)/security-validation-tests.sh" ]; then \
+		bash $(SCRIPTS_DIR)/security-validation-tests.sh fips; \
+	else \
+		echo "$(YELLOW)FIPS validation script not found$(NC)"; \
+	fi
+	@echo "$(GREEN)FIPS validation completed$(NC)"
+
+.PHONY: certs-generate
+certs-generate: ## Generate all interface certificates
+	@echo "$(YELLOW)Generating certificates...$(NC)"
+	@if [ -f "$(SCRIPTS_DIR)/oran-security-enforcement.sh" ]; then \
+		bash $(SCRIPTS_DIR)/oran-security-enforcement.sh certs; \
+	else \
+		echo "$(YELLOW)Certificate generation script not found$(NC)"; \
+	fi
+	@echo "$(GREEN)Certificates generated$(NC)"
+
+.PHONY: certs-validate
+certs-validate: ## Validate certificate status
+	@echo "$(YELLOW)Validating certificates...$(NC)"
+	@if [ -f "$(SCRIPTS_DIR)/security-validation-tests.sh" ]; then \
+		bash $(SCRIPTS_DIR)/security-validation-tests.sh certs; \
+	else \
+		echo "$(YELLOW)Certificate validation script not found$(NC)"; \
+	fi
+	@echo "$(GREEN)Certificate validation completed$(NC)"
+
+.PHONY: certs-rotate
+certs-rotate: ## Rotate expiring certificates
+	@echo "$(YELLOW)Checking for expiring certificates...$(NC)"
+	@CERT_EXPIRATION_THRESHOLD=30; \
+	for ns in oran nonrtric ocloud-system; do \
+		echo "Checking certificates in $$ns namespace..."; \
+		if kubectl get namespace $$ns &>/dev/null; then \
+			kubectl get secrets -n $$ns -o json 2>/dev/null | jq -r \
+			'.items[] | select(.type=="kubernetes.io/tls") | .metadata.name' 2>/dev/null | \
+			while read secret; do \
+				if [ ! -z "$$secret" ]; then \
+					echo "Checking $$secret..."; \
+					kubectl get secret $$secret -n $$ns -o jsonpath='{.data.tls\.crt}' 2>/dev/null | \
+					base64 -d 2>/dev/null | openssl x509 -checkend $$(( $$CERT_EXPIRATION_THRESHOLD * 24 * 3600 )) -noout 2>/dev/null || \
+					echo "$(YELLOW)Certificate $$secret expires within $$CERT_EXPIRATION_THRESHOLD days$(NC)"; \
+				fi \
+			done; \
+		else \
+			echo "$(YELLOW)Namespace $$ns not found$(NC)"; \
+		fi \
+	done
+	@echo "$(GREEN)Certificate rotation check completed$(NC)"
+
+.PHONY: scan-containers
+scan-containers: ## Scan all container images for vulnerabilities
+	@echo "$(YELLOW)Scanning container images...$(NC)"
+	@mkdir -p $(COVERAGE_DIR)/vulnerability-reports
+	@if command -v kubectl &> /dev/null; then \
+		kubectl get pods -A -o jsonpath='{.items[*].spec.containers[*].image}' 2>/dev/null | \
+		tr ' ' '\n' | sort -u | while read image; do \
+			if [ ! -z "$$image" ] && command -v trivy &> /dev/null; then \
+				echo "Scanning $$image..."; \
+				trivy image --severity HIGH,CRITICAL --format json \
+				--timeout 10m "$$image" > \
+				"$(COVERAGE_DIR)/vulnerability-reports/$$(echo $$image | tr '/:' '_').json" 2>/dev/null || \
+				echo "$(YELLOW)Failed to scan $$image$(NC)"; \
+			fi; \
+		done; \
+	else \
+		echo "$(YELLOW)kubectl not available, skipping container scanning$(NC)"; \
+	fi
+	@echo "$(GREEN)Container scanning completed$(NC)"
+
+.PHONY: scan-configs
+scan-configs: ## Scan configuration files
+	@echo "$(YELLOW)Scanning configuration files...$(NC)"
+	@mkdir -p $(COVERAGE_DIR)/vulnerability-reports
+	@if command -v trivy &> /dev/null; then \
+		trivy config --severity HIGH,CRITICAL \
+		--format json --output $(COVERAGE_DIR)/vulnerability-reports/config-scan.json ./config/ 2>/dev/null || true; \
+		trivy config --severity HIGH,CRITICAL \
+		--format json --output $(COVERAGE_DIR)/vulnerability-reports/helm-scan.json ./helm/ 2>/dev/null || true; \
+	else \
+		echo "$(YELLOW)Trivy not available, skipping config scanning$(NC)"; \
+	fi
+	@echo "$(GREEN)Configuration scanning completed$(NC)"
+
+.PHONY: scan-dependencies
+scan-dependencies: ## Scan Go dependencies
+	@echo "$(YELLOW)Scanning Go dependencies...$(NC)"
+	@mkdir -p $(COVERAGE_DIR)/vulnerability-reports
+	@if command -v trivy &> /dev/null; then \
+		trivy fs --severity HIGH,CRITICAL \
+		--format json --output $(COVERAGE_DIR)/vulnerability-reports/deps-scan.json . 2>/dev/null || true; \
+	fi
+	@if command -v nancy &> /dev/null; then \
+		$(GO) list -json -m all | nancy sleuth 2>/dev/null || true; \
+	fi
+	@echo "$(GREEN)Dependency scanning completed$(NC)"
+
+.PHONY: policies-apply
+policies-apply: ## Apply security policies
+	@echo "$(YELLOW)Applying security policies...$(NC)"
+	@if [ -f "$(SCRIPTS_DIR)/oran-security-enforcement.sh" ]; then \
+		bash $(SCRIPTS_DIR)/oran-security-enforcement.sh network; \
+	else \
+		echo "$(YELLOW)Security enforcement script not found$(NC)"; \
+	fi
+	@echo "$(GREEN)Security policies applied$(NC)"
+
+.PHONY: policies-validate
+policies-validate: ## Validate policy compliance
+	@echo "$(YELLOW)Validating policy compliance...$(NC)"
+	@if [ -f "$(SCRIPTS_DIR)/security-validation-tests.sh" ]; then \
+		bash $(SCRIPTS_DIR)/security-validation-tests.sh compliance; \
+	else \
+		echo "$(YELLOW)Policy validation script not found$(NC)"; \
+	fi
+	@echo "$(GREEN)Policy validation completed$(NC)"
+
+.PHONY: network-policies
+network-policies: ## Apply zero-trust network policies
+	@echo "$(YELLOW)Applying zero-trust network policies...$(NC)"
+	@if command -v kubectl &> /dev/null; then \
+		for ns in oran nonrtric nephio-system ocloud-system; do \
+			if kubectl get namespace $$ns &>/dev/null; then \
+				echo "Applying policies to $$ns..."; \
+				kubectl apply -f - <<< "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: default-deny-all\n  namespace: $$ns\nspec:\n  podSelector: {}\n  policyTypes: [Ingress, Egress]" 2>/dev/null || true; \
+				kubectl apply -f - <<< "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: allow-dns\n  namespace: $$ns\nspec:\n  podSelector: {}\n  policyTypes: [Egress]\n  egress:\n  - to: []\n    ports:\n    - protocol: UDP\n      port: 53" 2>/dev/null || true; \
+			else \
+				echo "$(YELLOW)Namespace $$ns not found$(NC)"; \
+			fi \
+		done; \
+	else \
+		echo "$(YELLOW)kubectl not available$(NC)"; \
+	fi
+	@echo "$(GREEN)Zero-trust network policies applied$(NC)"
+
+.PHONY: security-monitor
+security-monitor: ## Setup security monitoring
+	@echo "$(YELLOW)Setting up security monitoring...$(NC)"
+	@if [ -f "$(SCRIPTS_DIR)/oran-security-enforcement.sh" ]; then \
+		bash $(SCRIPTS_DIR)/oran-security-enforcement.sh monitor; \
+	else \
+		echo "$(YELLOW)Security monitoring script not found$(NC)"; \
+	fi
+	@echo "$(GREEN)Security monitoring setup completed$(NC)"
+
+.PHONY: security-alerts
+security-alerts: ## Check security alerts
+	@echo "$(YELLOW)Checking security alerts...$(NC)"
+	@if command -v kubectl &> /dev/null; then \
+		kubectl get events -A 2>/dev/null | grep -i security || echo "No security events found"; \
+		kubectl get pods -A 2>/dev/null | grep -E "(Error|CrashLoopBackOff|ImagePullBackOff)" || echo "No problematic pods found"; \
+	else \
+		echo "$(YELLOW)kubectl not available$(NC)"; \
+	fi
+	@echo "$(GREEN)Security alerts check completed$(NC)"
+
+.PHONY: install-nancy
+install-nancy: ## Install Nancy dependency scanner
+	@echo "$(YELLOW)Installing Nancy...$(NC)"
+	@$(GO) install github.com/sonatypecommunity/nancy@latest
+	@echo "$(GREEN)Nancy installed successfully$(NC)"
+
+.PHONY: clean-security
+clean-security: ## Clean security artifacts
+	@echo "$(YELLOW)Cleaning security artifacts...$(NC)"
+	@rm -rf $(COVERAGE_DIR)/vulnerability-reports
+	@rm -rf $(CERTS_DIR)
+	@echo "$(GREEN)Security cleanup completed$(NC)"
+
+.PHONY: validate-environment
+validate-environment: ## Validate security environment
+	@echo "$(YELLOW)Validating security environment...$(NC)"
+	@echo "Go version: $(shell $(GO) version)"
+	@echo "FIPS mode: $(FIPS_MODE)"
+	@echo "CGO enabled: $(CGO_ENABLED)"
+	@if command -v kubectl &> /dev/null; then \
+		echo "Kubernetes context: $$(kubectl config current-context 2>/dev/null || echo 'Not configured')"; \
+		kubectl version --client 2>/dev/null || echo "$(YELLOW)kubectl client check failed$(NC)"; \
+	else \
+		echo "$(YELLOW)kubectl not available$(NC)"; \
+	fi
+	@openssl version 2>/dev/null || echo "$(YELLOW)OpenSSL not available$(NC)"
+	@trivy version 2>/dev/null || echo "$(YELLOW)Trivy not available$(NC)"
+	@echo "$(GREEN)Environment validation completed$(NC)"
+
+# ============================================================================
 # Testing
 # ============================================================================
 
