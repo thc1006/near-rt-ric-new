@@ -3,7 +3,7 @@
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/your-repo/near-rt-ric-new)
 [![O-RAN SC L Release](https://img.shields.io/badge/O--RAN%20SC-L%20Release-blue.svg)](https://docs.o-ran-sc.org)
-[![Deployment Status](https://img.shields.io/badge/deployment-verified-success.svg)](./實際部署指南_zh-TW.md)
+[![Deployment Status](https://img.shields.io/badge/deployment-verified-success.svg)](./docs/deployment-guide-zh-tw.md)
 
 🎉 **Successfully Deployed with Official O-RAN SC Components** - This project provides a verified, production-ready O-RAN Near-RT RIC implementation using official O-RAN Software Community containers. Features real deployment verification, official Angular + Spring Boot dashboard, and complete O-RAN L Release compliance.
 
@@ -192,9 +192,9 @@ The platform follows a microservices architecture with the following key compone
 - ✅ **O-RAN L Release Compliance**: Using latest September 2025 specifications
 
 ### 📚 **Deployment Guides**
-- [🇺🇸 Complete Deployment Guide](部署指南_zh-TW.md) - Comprehensive deployment with theory
-- [🚀 Real Deployment Guide](實際部署指南_zh-TW.md) - Based on actual deployment experience
-- [🔧 Troubleshooting](實際部署指南_zh-TW.md#常見問題解決) - Real issues and solutions
+- [🇺🇸 Complete Deployment Guide](docs/deployment-guide-zh-tw.md) - Comprehensive deployment with theory
+- [🚀 Real Deployment Guide](docs/deployment-guide-zh-tw.md) - Based on actual deployment experience
+- [🔧 Troubleshooting](docs/deployment-guide-zh-tw.md#常見問題解決) - Real issues and solutions
 
 ## Documentation
 
