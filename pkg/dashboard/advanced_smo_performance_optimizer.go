@@ -1775,7 +1775,7 @@ func (aspo *AdvancedSMOPerformanceOptimizer) updateE2NodeMetrics() {
 func (aspo *AdvancedSMOPerformanceOptimizer) updateSMOMetrics() {
 	if aspo.smoIntegration != nil {
 		metrics := aspo.smoIntegration.GetMetrics()
-		aspo.stats.SMORequestsPerSecond = metrics.RequestsPerSecond
+		aspo.stats.SMORequestsPerSecond = uint64(metrics.RequestsPerSecond)
 		aspo.stats.SMOAverageLatencyMs = metrics.AverageLatencyMs
 		aspo.stats.SMOPolicyUpdates = metrics.PolicyUpdates
 		aspo.stats.SMORAppDeployments = metrics.RAppDeployments
@@ -1829,7 +1829,7 @@ func (aspo *AdvancedSMOPerformanceOptimizer) benchmarkE2NodeScaling() ScalingBen
 }
 
 // Stop gracefully stops the advanced optimizer
-func (aspo *AdvancedSMOPerformanceOptimizer) Stop() error {
+func (aspo *AdvancedSMOPerformanceOptimizer) Stop(ctx context.Context) error {
 	if !atomic.CompareAndSwapInt32(&aspo.running, 1, 0) {
 		return fmt.Errorf("optimizer not running")
 	}

@@ -1923,6 +1923,7 @@ type NETCONFClient struct {
 	client   interface{}
 }
 
+
 type RMRMessage struct {
 	payload []byte
 	msgType int

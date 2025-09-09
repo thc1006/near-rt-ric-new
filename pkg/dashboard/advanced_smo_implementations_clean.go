@@ -198,6 +198,9 @@ type ComplianceTestSuite struct {
 	Standard    ComplianceStandard `json:"standard"`
 	Tests       []ComplianceTest  `json:"tests"`
 	Config      map[string]interface{} `json:"config"`
+	Results     []TestResult      `json:"results"`
+	Summary     TestSummary       `json:"summary"`
+	Metadata    map[string]string `json:"metadata"`
 }
 
 // Throughput-related types
@@ -477,11 +480,15 @@ type SMOIntegrationImpl struct {
 }
 
 type SMOMetrics struct {
-	RequestCount    uint64    `json:"requestCount"`
-	SuccessCount    uint64    `json:"successCount"`
-	FailureCount    uint64    `json:"failureCount"`
-	AverageLatency  float64   `json:"averageLatency"`
-	LastRequestTime time.Time `json:"lastRequestTime"`
+	RequestCount       uint64    `json:"requestCount"`
+	SuccessCount       uint64    `json:"successCount"`
+	FailureCount       uint64    `json:"failureCount"`
+	AverageLatency     float64   `json:"averageLatency"`
+	LastRequestTime    time.Time `json:"lastRequestTime"`
+	RequestsPerSecond  float64   `json:"requestsPerSecond"`
+	AverageLatencyMs   float64   `json:"averageLatencyMs"`
+	PolicyUpdates      uint64    `json:"policyUpdates"`
+	RAppDeployments    uint64    `json:"rAppDeployments"`
 }
 
 type NephioR5IntegrationImpl struct {
@@ -805,7 +812,7 @@ func (smo *SMOIntegrationImpl) ApplyPolicy(ctx context.Context, policy interface
 	return nil
 }
 
-func (smo *SMOIntegrationImpl) GetMetrics() interface{} {
+func (smo *SMOIntegrationImpl) GetMetrics() SMOMetrics {
 	// Implementation for getting SMO metrics
 	return smo.metrics
 }
