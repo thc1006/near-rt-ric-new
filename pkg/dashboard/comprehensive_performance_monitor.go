@@ -20,33 +20,33 @@ import (
 // ComprehensivePerformanceMonitor provides real-time performance monitoring
 // and benchmarking for O-RAN L Release with Nephio R5 integration
 type ComprehensivePerformanceMonitor struct {
-	// Core monitoring components - use existing interface types
+	// Core monitoring components - use concrete implementation types
 	realTimeProfiler        *RealTimeProfilerImpl
-	latencyAnalyzer         LatencyAnalyzer
-	throughputMonitor       ThroughputMonitor
+	latencyAnalyzer         *LatencyAnalyzerImpl
+	throughputMonitor       *ThroughputMonitorImpl
 	resourceMonitor         *ResourceMonitor
 	
 	// SMO and Nephio R5 monitoring
-	smoPerformanceMonitor   SMOPerformanceMonitor
-	nephioPerformanceMonitor NephioPerformanceMonitor
+	smoPerformanceMonitor   *SMOPerformanceMonitorImpl
+	nephioPerformanceMonitor *NephioPerformanceMonitorImpl
 	
 	// E2 interface monitoring
-	e2InterfaceMonitor      E2InterfaceMonitor
-	indicationMonitor       IndicationMonitor
-	subscriptionMonitor     SubscriptionMonitor
+	e2InterfaceMonitor      *E2InterfaceMonitorImpl
+	indicationMonitor       *IndicationMonitorImpl
+	subscriptionMonitor     *SubscriptionMonitorImpl
 	
 	// Dashboard API monitoring
-	apiPerformanceMonitor   APIPerformanceMonitor
-	connectionMonitor       ConnectionMonitor
+	apiPerformanceMonitor   *APIPerformanceMonitorImpl
+	connectionMonitor       *ConnectionMonitorImpl
 	
 	// Performance analysis - use existing concrete types
 	performanceAnalyzer     *PerformanceAnalyzerImpl
 	bottleneckDetector      *BottleneckDetector
-	performancePredictor    PerformancePredictor
+	performancePredictor    *PerformancePredictorImpl
 	
-	// Benchmarking system - remove undefined types for now
-	loadTester              LoadTester
-	stressTester            StressTester
+	// Benchmarking system - use concrete implementation types
+	loadTester              *LoadTesterImpl
+	stressTester            *StressTesterImpl
 	
 	// Configuration and state
 	config                  *PerformanceMonitorConfig
@@ -244,7 +244,7 @@ type StressTesterImpl struct {
 // Create implementation constructors that return interface types
 
 // NewLatencyAnalyzer creates a new latency analyzer
-func NewLatencyAnalyzer(percentiles []float64) LatencyAnalyzer {
+func NewLatencyAnalyzer(percentiles []float64) *LatencyAnalyzerImpl {
 	return &LatencyAnalyzerImpl{
 		percentiles: percentiles,
 		samples:     make([]float64, 0),
@@ -252,7 +252,7 @@ func NewLatencyAnalyzer(percentiles []float64) LatencyAnalyzer {
 }
 
 // NewThroughputMonitor creates a new throughput monitor
-func NewThroughputMonitor(windowSize time.Duration) ThroughputMonitor {
+func NewThroughputMonitor(windowSize time.Duration) *ThroughputMonitorImpl {
 	return &ThroughputMonitorImpl{
 		windowSize: windowSize,
 		requests:   make([]time.Time, 0),
@@ -260,57 +260,67 @@ func NewThroughputMonitor(windowSize time.Duration) ThroughputMonitor {
 }
 
 // Additional constructor functions for monitoring components
-func NewSMOPerformanceMonitor() SMOPerformanceMonitor {
+func NewSMOPerformanceMonitor() *SMOPerformanceMonitorImpl {
 	return &SMOPerformanceMonitorImpl{
 		config: make(map[string]interface{}),
 	}
 }
 
-func NewNephioPerformanceMonitor() NephioPerformanceMonitor {
+func NewNephioPerformanceMonitor() *NephioPerformanceMonitorImpl {
 	return &NephioPerformanceMonitorImpl{
 		config: make(map[string]interface{}),
 	}
 }
 
-func NewE2InterfaceMonitor() E2InterfaceMonitor {
+func NewE2InterfaceMonitor() *E2InterfaceMonitorImpl {
 	return &E2InterfaceMonitorImpl{
 		nodeCount: 0,
 	}
 }
 
-func NewIndicationMonitor() IndicationMonitor {
+func NewIndicationMonitor() *IndicationMonitorImpl {
 	return &IndicationMonitorImpl{
 		rate: 0.0,
 	}
 }
 
-func NewSubscriptionMonitor() SubscriptionMonitor {
+func NewSubscriptionMonitor() *SubscriptionMonitorImpl {
 	return &SubscriptionMonitorImpl{
 		activeCount: 0,
 	}
 }
 
-func NewAPIPerformanceMonitor() APIPerformanceMonitor {
+func NewAPIPerformanceMonitor() *APIPerformanceMonitorImpl {
 	return &APIPerformanceMonitorImpl{
 		responseTime: 0.0,
 	}
 }
 
-func NewConnectionMonitor() ConnectionMonitor {
+func NewConnectionMonitor() *ConnectionMonitorImpl {
 	return &ConnectionMonitorImpl{
 		connections: 0,
 	}
 }
 
-func NewPerformancePredictor() PerformancePredictor {
+func NewPerformancePredictor() *PerformancePredictorImpl {
 	return &PerformancePredictorImpl{}
 }
 
-func NewLoadTester() LoadTester {
+// Missing constructors - simple implementations
+func NewRealTimeProfiler(interval time.Duration) *RealTimeProfilerImpl {
+	return &RealTimeProfilerImpl{}
+}
+
+func NewPerformanceAnalyzer() *PerformanceAnalyzerImpl {
+	return &PerformanceAnalyzerImpl{}
+}
+
+
+func NewLoadTester() *LoadTesterImpl {
 	return &LoadTesterImpl{}
 }
 
-func NewStressTester() StressTester {
+func NewStressTester() *StressTesterImpl {
 	return &StressTesterImpl{}
 }
 
@@ -318,20 +328,15 @@ func NewStressTester() StressTester {
 func (la *LatencyAnalyzerImpl) Stop() error    { return nil }
 func (tm *ThroughputMonitorImpl) Stop() error  { return nil }
 func (eim *E2InterfaceMonitorImpl) Stop() error { return nil }
+func (rtp *RealTimeProfilerImpl) Stop() error { return nil }
 
 // Helper methods to get concrete types for accessing fields
 func (cpm *ComprehensivePerformanceMonitor) getE2InterfaceMonitorImpl() *E2InterfaceMonitorImpl {
-	if impl, ok := cpm.e2InterfaceMonitor.(*E2InterfaceMonitorImpl); ok {
-		return impl
-	}
-	return &E2InterfaceMonitorImpl{nodeCount: 0}
+	return cpm.e2InterfaceMonitor
 }
 
 func (cpm *ComprehensivePerformanceMonitor) getSubscriptionMonitorImpl() *SubscriptionMonitorImpl {
-	if impl, ok := cpm.subscriptionMonitor.(*SubscriptionMonitorImpl); ok {
-		return impl
-	}
-	return &SubscriptionMonitorImpl{activeCount: 0}
+	return cpm.subscriptionMonitor
 }
 
 // NewComprehensivePerformanceMonitor creates a new performance monitor instance
@@ -852,15 +857,15 @@ func (cpm *ComprehensivePerformanceMonitor) Stop() error {
 		}
 	}
 
-	// Stop implementation components
-	if la, ok := cpm.latencyAnalyzer.(*LatencyAnalyzerImpl); ok {
-		la.Stop()
+	// Stop implementation components - direct method calls since fields are concrete types
+	if cpm.latencyAnalyzer != nil {
+		cpm.latencyAnalyzer.Stop()
 	}
-	if tm, ok := cpm.throughputMonitor.(*ThroughputMonitorImpl); ok {
-		tm.Stop()
+	if cpm.throughputMonitor != nil {
+		cpm.throughputMonitor.Stop()
 	}
-	if eim, ok := cpm.e2InterfaceMonitor.(*E2InterfaceMonitorImpl); ok {
-		eim.Stop()
+	if cpm.e2InterfaceMonitor != nil {
+		cpm.e2InterfaceMonitor.Stop()
 	}
 
 	logrus.Info("Comprehensive Performance Monitor stopped successfully")

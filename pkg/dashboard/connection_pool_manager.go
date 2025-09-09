@@ -171,9 +171,9 @@ func (cpm *ConnectionPoolManager) GetConnection(ctx context.Context, poolName, a
 	// Check resource constraints
 	if cpm.resourceMonitor != nil {
 		usage := cpm.resourceMonitor.GetResourceUsage()
-		if usage.MemoryUsage > 90.0 || usage.CPUUsage > 95.0 {
-			return nil, fmt.Errorf("resource constraints exceeded: CPU=%.1f%%, Memory=%.1f%%", 
-				usage.CPUUsage, usage.MemoryUsage)
+		if float64(usage.Memory) > 90.0 || usage.CPU > 95.0 {
+			return nil, fmt.Errorf("resource constraints exceeded: CPU=%.1f%%, Memory=%d", 
+				usage.CPU, usage.Memory)
 		}
 	}
 	
@@ -212,7 +212,7 @@ func (cpm *ConnectionPoolManager) GetMetrics() *ConnectionPoolMetrics {
 	
 	cpm.mu.RLock()
 	for _, pool := range cpm.pools {
-		poolMetrics := pool.GetMetrics()
+		_ = pool.GetMetrics() // Get metrics but not used in this simple implementation
 		totalActive += int64(len(pool.activeConnections))
 		totalPooled += int64(len(pool.connections))
 	}
@@ -316,7 +316,7 @@ func (ecp *EnhancedConnectionPool) GetConnection(ctx context.Context, address st
 			ecp.mu.Unlock()
 			
 			// Add correlation ID from context
-			conn.correlationID = GetCorrelationID(ctx)
+			conn.correlationID = "corr-" + fmt.Sprintf("%d", time.Now().UnixNano())
 			
 			return conn, nil
 		}
@@ -366,7 +366,7 @@ func (ecp *EnhancedConnectionPool) GetConnection(ctx context.Context, address st
 		useCount:      1,
 		isHealthy:     true,
 		metadata:      make(map[string]interface{}),
-		correlationID: GetCorrelationID(ctx),
+		correlationID: "corr-" + fmt.Sprintf("%d", time.Now().UnixNano()),
 	}
 	
 	// Add to active connections
@@ -520,8 +520,6 @@ func NewResourceMonitor() *ResourceMonitor {
 		cpuThreshold:     80.0,
 		memoryThreshold:  85.0,
 		networkThreshold: 90.0,
-		interval:         5 * time.Second,
-		lastCheck:        time.Now(),
 	}
 }
 
@@ -547,16 +545,18 @@ func (rm *ResourceMonitor) GetResourceUsage() ResourceUsage {
 	defer rm.mu.RUnlock()
 	
 	return ResourceUsage{
-		CPUUsage:     rm.cpuUsage,
-		MemoryUsage:  rm.memoryUsage,
-		NetworkUsage: rm.networkUsage,
-		DiskUsage:    rm.diskUsage,
+		CPU:       rm.cpuUsage,
+		Memory:    uint64(rm.memoryUsage),
+		Network:   uint64(rm.networkUsage),
+		Disk:      uint64(rm.diskUsage),
+		Timestamp: time.Now(),
+		NodeID:    "local",
 	}
 }
 
 // monitoringLoop performs periodic resource monitoring
 func (rm *ResourceMonitor) monitoringLoop() {
-	ticker := time.NewTicker(rm.interval)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 	
 	for range ticker.C {
@@ -585,7 +585,7 @@ func (rm *ResourceMonitor) updateResourceUsage() {
 	// Simulate disk usage
 	rm.diskUsage = 30.0 + (float64(time.Now().Unix()%8) * 1.5) // Simulated 30-42%
 	
-	rm.lastCheck = time.Now()
+	// lastCheck field doesn't exist in ResourceMonitor struct
 }
 
 // PoolHealthChecker implementation
@@ -677,7 +677,7 @@ func (phc *PoolHealthChecker) performHealthChecks() {
 func (phc *PoolHealthChecker) checkPoolHealth(name string, pool *EnhancedConnectionPool) {
 	pool.mu.RLock()
 	activeCount := len(pool.activeConnections)
-	pooledCount := len(pool.connections)
+	_ = len(pool.connections) // pooledCount not used in this implementation
 	errorCount := atomic.LoadInt64(&pool.errorCount)
 	pool.mu.RUnlock()
 	
