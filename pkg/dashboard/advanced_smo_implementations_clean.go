@@ -13,6 +13,81 @@ import (
 
 // SMO Integration Implementation for O-RAN L Release 2025 September
 
+// Missing type definitions for compilation
+type OCloudManager = OCloudManagerImpl
+type SIMDOperation struct {
+	Name   string
+	Vector []float64
+}
+type WeightedLoadBalancer struct {
+	weights map[string]float64
+	mu      sync.RWMutex
+}
+type RoutingCache struct {
+	cache map[string]interface{}
+	mu    sync.RWMutex
+}
+type RoutingMetrics struct {
+	RequestCount uint64
+	LatencyMs    float64
+}
+type ZeroCopyBufferPool struct {
+	buffers [][]byte
+	mu      sync.RWMutex
+}
+type MessageArena struct {
+	memory []byte
+	mu     sync.RWMutex
+}
+type DirectMemoryAccess struct {
+	baseAddr uintptr
+}
+type ZeroCopyStats struct {
+	BytesProcessed uint64
+	Operations     uint64
+}
+type SIMDAcceleratorStats struct {
+	VectorOpsPerSec uint64
+	Utilization     float64
+}
+type LockFreeRoutingTable struct {
+	entries map[string]interface{}
+}
+type ConcurrentNodeMap struct {
+	nodes map[string]interface{}
+	mu    sync.RWMutex
+}
+type E2ConnectionPool struct {
+	connections []interface{}
+	mu          sync.RWMutex
+}
+type SubscriptionManager struct {
+	subs map[string]interface{}
+	mu   sync.RWMutex
+}
+type E2LoadBalancer struct {
+	nodes map[string]interface{}
+	mu    sync.RWMutex
+}
+type E2NodeMetrics struct {
+	ConnectionCount uint64
+	Throughput      float64
+}
+type AdvancedPerformanceConfig struct {
+	MemoryPoolSizeMB     int
+	E2ConnectionPoolSize int
+	WebSocketPoolSize    int
+}
+type ProcessingResult struct {
+	NodeID           string
+	MessageType      E2MessageType
+	ProcessedData    []byte
+	Success          bool
+	ProcessingTimeNs int64
+}
+type E2MessageType int
+type SubscriptionID string
+
 // SMOIntegrationImpl implements SMOIntegration interface
 type SMOIntegrationImpl struct {
 	endpoint            string
@@ -44,7 +119,7 @@ type NephioR5IntegrationImpl struct {
 	packageRepoEndpoint string
 	healthCheckInterval time.Duration
 	packageManager      *NephioPackageManagerImpl
-	oCloudManager       *OCloudManager
+	oCloudManager       *OCloudManagerImpl
 	workflowManager     *NephioWorkflowManagerImpl
 	metrics             *NephioMetricsImpl
 	mu                  sync.RWMutex

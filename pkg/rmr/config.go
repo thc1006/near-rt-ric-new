@@ -2,7 +2,7 @@ package rmr
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sync"
 
@@ -49,7 +49,7 @@ func LoadConfig(configPath string) (*RMRConfig, error) {
 	}
 
 	// Read file contents
-	data, err := ioutil.ReadFile(absPath)
+	data, err := os.ReadFile(absPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %v", err)
 	}

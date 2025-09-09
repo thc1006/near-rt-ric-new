@@ -85,19 +85,6 @@ const (
 	XAppStatusUpdating  XAppStatus = "UPDATING"
 )
 
-// XAppInstance represents a running instance of an xApp
-type XAppInstance struct {
-	ID           string                 `json:"id"`
-	Descriptor   *XAppDescriptor        `json:"descriptor"`
-	Status       XAppStatus             `json:"status"`
-	StartedAt    time.Time              `json:"startedAt"`
-	LastHealthy  time.Time              `json:"lastHealthy"`
-	Subscriptions map[string]*Subscription `json:"subscriptions"`
-	Metrics      XAppMetrics            `json:"metrics"`
-	Environment  map[string]string      `json:"environment"`
-	PodName      string                 `json:"podName,omitempty"`
-	ServiceName  string                 `json:"serviceName,omitempty"`
-}
 
 // XAppMetrics contains runtime metrics for an xApp
 type XAppMetrics struct {

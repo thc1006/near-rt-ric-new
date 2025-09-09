@@ -906,9 +906,9 @@ func TestDashboardHandlerTestSuite(t *testing.T) {
 func (suite *DashboardHandlerTestSuite) TearDownSuite() {
 	duration := time.Since(suite.testResults.StartTime)
 	
-	fmt.Printf("\n" + strings.Repeat("=", 80) + "\n")
+	fmt.Printf("\n%s\n", strings.Repeat("=", 80))
 	fmt.Printf("Dashboard Handler Unit Test Results\n")
-	fmt.Printf(strings.Repeat("=", 80) + "\n")
+	fmt.Printf("%s\n", strings.Repeat("=", 80))
 	fmt.Printf("Test Duration: %v\n", duration)
 	fmt.Printf("Total Tests: %d\n", suite.testResults.TotalTests)
 	fmt.Printf("Passed Tests: %d\n", suite.testResults.PassedTests)
@@ -931,5 +931,5 @@ func (suite *DashboardHandlerTestSuite) TearDownSuite() {
 			perf.RequestsPerSec)
 	}
 	
-	fmt.Printf(strings.Repeat("=", 80) + "\n")
+	fmt.Printf("%s\n", strings.Repeat("=", 80))
 }

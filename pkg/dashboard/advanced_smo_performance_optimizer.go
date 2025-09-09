@@ -71,73 +71,7 @@ type AdvancedSMOPerformanceOptimizer struct {
 	latencyMutex     sync.RWMutex
 }
 
-// AdvancedPerformanceConfig defines comprehensive performance parameters
-type AdvancedPerformanceConfig struct {
-	// Phase 8 Performance Targets
-	MaxProcessingLatencyMs   int `json:"maxProcessingLatencyMs"`   // <10ms
-	TargetThroughputIPS      int `json:"targetThroughputIPS"`      // 10,000+
-	MaxConcurrentE2Nodes     int `json:"maxConcurrentE2Nodes"`     // 100+
-	DashboardConcurrentUsers int `json:"dashboardConcurrentUsers"` // 100+
-
-	// SMO Integration Settings
-	SMOEndpoint            string        `json:"smoEndpoint"`
-	NonRTRICEndpoint       string        `json:"nonRTRICEndpoint"`
-	PolicyManagerEndpoint  string        `json:"policyManagerEndpoint"`
-	RAppManagerEndpoint    string        `json:"rAppManagerEndpoint"`
-	SMOHealthCheckInterval time.Duration `json:"smoHealthCheckInterval"`
-	SMORequestTimeout      time.Duration `json:"smoRequestTimeout"`
-
-	// Nephio R5 Settings
-	PorchAPIEndpoint          string        `json:"porchAPIEndpoint"`
-	OCloudManagerEndpoint     string        `json:"oCloudManagerEndpoint"`
-	PackageRepoEndpoint       string        `json:"packageRepoEndpoint"`
-	NephioHealthCheckInterval time.Duration `json:"nephioHealthCheckInterval"`
-
-	// Zero-copy and SIMD optimization
-	EnableZeroCopy         bool   `json:"enableZeroCopy"`
-	EnableSIMDAcceleration bool   `json:"enableSIMDAcceleration"`
-	SIMDInstructionSet     string `json:"simdInstructionSet"`
-	ZeroCopyBufferSize     int    `json:"zeroCopyBufferSize"`
-
-	// CPU affinity and threading
-	EnableCPUAffinity bool  `json:"enableCPUAffinity"`
-	CriticalPathCores []int `json:"criticalPathCores"`
-	E2ProcessingCores []int `json:"e2ProcessingCores"`
-	DashboardAPICores []int `json:"dashboardAPICores"`
-	WorkerThreadCount int   `json:"workerThreadCount"`
-
-	// Memory optimization
-	EnableHugePages     bool  `json:"enableHugePages"`
-	HugePageSize        int   `json:"hugePageSize"`
-	MemoryPoolSizeMB    int   `json:"memoryPoolSizeMB"`
-	EnableNUMAAwareness bool  `json:"enableNUMAAwareness"`
-	PreferredNUMANodes  []int `json:"preferredNUMANodes"`
-
-	// Connection pooling
-	E2ConnectionPoolSize   int           `json:"e2ConnectionPoolSize"`
-	HTTPConnectionPoolSize int           `json:"httpConnectionPoolSize"`
-	WebSocketPoolSize      int           `json:"webSocketPoolSize"`
-	ConnectionIdleTimeout  time.Duration `json:"connectionIdleTimeout"`
-	ConnectionMaxLifetime  time.Duration `json:"connectionMaxLifetime"`
-
-	// Batch processing
-	E2IndicationBatchSize   int           `json:"e2IndicationBatchSize"`
-	PolicyUpdateBatchSize   int           `json:"policyUpdateBatchSize"`
-	BatchProcessingInterval time.Duration `json:"batchProcessingInterval"`
-	MaxBatchWaitTime        time.Duration `json:"maxBatchWaitTime"`
-
-	// Circuit breaker and resilience
-	CircuitBreakerThreshold int           `json:"circuitBreakerThreshold"`
-	CircuitBreakerTimeout   time.Duration `json:"circuitBreakerTimeout"`
-	RetryMaxAttempts        int           `json:"retryMaxAttempts"`
-	RetryBaseDelay          time.Duration `json:"retryBaseDelay"`
-
-	// Performance monitoring
-	EnableRealTimeProfiling bool          `json:"enableRealTimeProfiling"`
-	ProfilingInterval       time.Duration `json:"profilingInterval"`
-	EnableAutoTuning        bool          `json:"enableAutoTuning"`
-	AutoTuningInterval      time.Duration `json:"autoTuningInterval"`
-}
+// AdvancedPerformanceConfig - type definition moved to advanced_smo_implementations_clean.go
 
 // AdvancedPerformanceStats tracks comprehensive performance metrics
 type AdvancedPerformanceStats struct {
@@ -207,13 +141,7 @@ type ZeroCopyMessageProcessor struct {
 	mu                 sync.RWMutex
 }
 
-// ZeroCopyStats tracks zero-copy performance
-type ZeroCopyStats struct {
-	ZeroCopyOperations  uint64
-	MemoryCopiesAvoided uint64
-	BytesCopySaved      uint64
-	PerformanceGain     time.Duration
-}
+// ZeroCopyStats - type definition moved to advanced_smo_implementations_clean.go
 
 // MessageArena manages pre-allocated message buffers
 type MessageArena struct {

@@ -42,16 +42,6 @@ type ManagedSubscription struct {
 	Configuration    map[string]interface{} `json:"configuration,omitempty"`
 }
 
-// SubscriptionStatus represents the status of a subscription
-type SubscriptionStatus string
-
-const (
-	SubscriptionStatusActive    SubscriptionStatus = "ACTIVE"
-	SubscriptionStatusInactive  SubscriptionStatus = "INACTIVE"
-	SubscriptionStatusPending   SubscriptionStatus = "PENDING"
-	SubscriptionStatusFailed    SubscriptionStatus = "FAILED"
-	SubscriptionStatusCancelled SubscriptionStatus = "CANCELLED"
-)
 
 // NOTE: EventTriggerType type moved to types.go to avoid redeclaration
 
