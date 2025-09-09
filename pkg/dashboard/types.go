@@ -1917,6 +1917,12 @@ type ComplianceIssue struct {
 	severity string
 }
 
+// NETCONFClient for O1 interface compliance testing
+type NETCONFClient struct {
+	endpoint string
+	client   interface{}
+}
+
 type RMRMessage struct {
 	payload []byte
 	msgType int

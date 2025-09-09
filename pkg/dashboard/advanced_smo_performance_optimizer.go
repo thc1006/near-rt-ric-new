@@ -1467,7 +1467,7 @@ func (aspo *AdvancedSMOPerformanceOptimizer) optimizeLatency() {
 
 func (aspo *AdvancedSMOPerformanceOptimizer) scaleForThroughput() {
 	// Implement throughput scaling strategies
-	aspo.connectionPoolCluster.ScaleUp()
+	aspo.connectionPoolCluster.ScaleUp(2) // Scale up by factor of 2
 
 	if aspo.autoTuner != nil {
 		aspo.autoTuner.OptimizeForThroughput()
@@ -1838,12 +1838,12 @@ func (aspo *AdvancedSMOPerformanceOptimizer) Stop() error {
 
 	// Stop SMO integration
 	if aspo.smoIntegration != nil {
-		aspo.smoIntegration.Stop()
+		aspo.smoIntegration.Stop(ctx)
 	}
 
 	// Stop Nephio R5 integration
 	if aspo.nephioR5Integration != nil {
-		aspo.nephioR5Integration.Stop()
+		aspo.nephioR5Integration.Stop(ctx)
 	}
 
 	// Stop other components in reverse order
