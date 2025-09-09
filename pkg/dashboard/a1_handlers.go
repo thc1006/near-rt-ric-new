@@ -298,12 +298,8 @@ func (s *Server) handleCreateOrUpdatePolicyInstance(w http.ResponseWriter, r *ht
 
 	if isUpdate {
 		// Update existing policy instance
-		update := &PolicyInstanceUpdate{
-			PolicyInstanceID: policyInstanceID,
-			Policy:           request.Policy,
-		}
-
-		if err := a1Client.UpdatePolicyInstance(ctx, policyTypeID, update); err != nil {
+		// Fix: UpdatePolicyInstance interface expects (ctx, policyTypeId, policyInstanceId, body)
+		if err := a1Client.UpdatePolicyInstance(ctx, policyTypeID, policyInstanceID, request.Policy); err != nil {
 			log.Printf("Failed to update policy instance %s: %v", policyInstanceID, err)
 			http.Error(w, "Failed to update policy instance", http.StatusInternalServerError)
 			return

@@ -49,8 +49,8 @@ func (c *A1MediatorClientImpl) IsConnected() bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-// GetHealth retrieves health information from A1 Mediator
-func (c *A1MediatorClientImpl) GetHealth(ctx context.Context) (*A1Health, error) {
+// GetHealth retrieves health information from A1 Mediator - Updated to match interface
+func (c *A1MediatorClientImpl) GetHealth(ctx context.Context) (interface{}, error) {
 	if c.HTTPClient == nil || c.BaseURL == "" {
 		return nil, fmt.Errorf("A1 Mediator client not configured")
 	}
@@ -96,8 +96,8 @@ func (c *A1MediatorClientImpl) GetHealth(ctx context.Context) (*A1Health, error)
 	return health, nil
 }
 
-// GetPolicyTypes retrieves all policy types from A1 Mediator
-func (c *A1MediatorClientImpl) GetPolicyTypes(ctx context.Context) (*PolicyTypeListResponse, error) {
+// GetPolicyTypes retrieves all policy types from A1 Mediator - Updated to match interface
+func (c *A1MediatorClientImpl) GetPolicyTypes(ctx context.Context) (interface{}, error) {
 	if c.HTTPClient == nil || c.BaseURL == "" {
 		return &PolicyTypeListResponse{PolicyTypes: []PolicyType{}, Total: 0}, nil
 	}
@@ -136,7 +136,10 @@ func (c *A1MediatorClientImpl) GetPolicyTypes(ctx context.Context) (*PolicyTypeL
 			log.Printf("Failed to get policy type %s: %v", typeID, err)
 			continue
 		}
-		policyTypes = append(policyTypes, *policyType)
+		// Cast result back to PolicyType
+		if pt, ok := policyType.(*PolicyType); ok {
+			policyTypes = append(policyTypes, *pt)
+		}
 	}
 
 	return &PolicyTypeListResponse{
@@ -145,10 +148,21 @@ func (c *A1MediatorClientImpl) GetPolicyTypes(ctx context.Context) (*PolicyTypeL
 	}, nil
 }
 
-// GetPolicyType retrieves a specific policy type from A1 Mediator
-func (c *A1MediatorClientImpl) GetPolicyType(ctx context.Context, policyTypeID PolicyTypeID) (*PolicyType, error) {
+// GetPolicyType retrieves a specific policy type from A1 Mediator - Updated to match interface
+func (c *A1MediatorClientImpl) GetPolicyType(ctx context.Context, policyTypeId interface{}) (interface{}, error) {
 	if c.HTTPClient == nil || c.BaseURL == "" {
 		return nil, fmt.Errorf("A1 Mediator client not configured")
+	}
+
+	// Convert policyTypeId to string
+	var policyTypeID string
+	switch v := policyTypeId.(type) {
+	case string:
+		policyTypeID = v
+	case PolicyTypeID:
+		policyTypeID = string(v)
+	default:
+		policyTypeID = fmt.Sprintf("%v", v)
 	}
 
 	url := fmt.Sprintf("%s/a1-p/policytypes/%s", c.BaseURL, policyTypeID)
@@ -178,18 +192,45 @@ func (c *A1MediatorClientImpl) GetPolicyType(ctx context.Context, policyTypeID P
 		return nil, fmt.Errorf("failed to decode policy type response: %w", err)
 	}
 
-	return c.parsePolicyType(string(policyTypeID), rawPolicyType)
+	return c.parsePolicyType(policyTypeID, rawPolicyType)
 }
 
-// CreatePolicyType creates a new policy type in A1 Mediator
-func (c *A1MediatorClientImpl) CreatePolicyType(ctx context.Context, policyTypeID PolicyTypeID, request *PolicyTypeRequest) error {
+// CreatePolicyType creates a new policy type in A1 Mediator - Updated to match interface
+func (c *A1MediatorClientImpl) CreatePolicyType(ctx context.Context, policyTypeId interface{}, body interface{}) error {
 	if c.HTTPClient == nil || c.BaseURL == "" {
 		return fmt.Errorf("A1 Mediator client not configured")
 	}
 
+	// Convert policyTypeId to string
+	var policyTypeID string
+	switch v := policyTypeId.(type) {
+	case string:
+		policyTypeID = v
+	case PolicyTypeID:
+		policyTypeID = string(v)
+	default:
+		policyTypeID = fmt.Sprintf("%v", v)
+	}
+
 	url := fmt.Sprintf("%s/a1-p/policytypes/%s", c.BaseURL, policyTypeID)
 
-	jsonData, err := json.Marshal(request.Schema)
+	var jsonData []byte
+	var err error
+
+	// Handle different body types
+	switch v := body.(type) {
+	case *PolicyTypeRequest:
+		jsonData, err = json.Marshal(v.Schema)
+	case map[string]interface{}:
+		jsonData, err = json.Marshal(v)
+	case []byte:
+		jsonData = v
+	case string:
+		jsonData = []byte(v)
+	default:
+		jsonData, err = json.Marshal(v)
+	}
+
 	if err != nil {
 		return fmt.Errorf("failed to marshal policy type schema: %w", err)
 	}
@@ -217,10 +258,21 @@ func (c *A1MediatorClientImpl) CreatePolicyType(ctx context.Context, policyTypeI
 	return nil
 }
 
-// DeletePolicyType deletes a policy type from A1 Mediator
-func (c *A1MediatorClientImpl) DeletePolicyType(ctx context.Context, policyTypeID PolicyTypeID) error {
+// DeletePolicyType deletes a policy type from A1 Mediator - Updated to match interface
+func (c *A1MediatorClientImpl) DeletePolicyType(ctx context.Context, policyTypeId interface{}) error {
 	if c.HTTPClient == nil || c.BaseURL == "" {
 		return fmt.Errorf("A1 Mediator client not configured")
+	}
+
+	// Convert policyTypeId to string
+	var policyTypeID string
+	switch v := policyTypeId.(type) {
+	case string:
+		policyTypeID = v
+	case PolicyTypeID:
+		policyTypeID = string(v)
+	default:
+		policyTypeID = fmt.Sprintf("%v", v)
 	}
 
 	url := fmt.Sprintf("%s/a1-p/policytypes/%s", c.BaseURL, policyTypeID)
@@ -250,10 +302,21 @@ func (c *A1MediatorClientImpl) DeletePolicyType(ctx context.Context, policyTypeI
 	return nil
 }
 
-// GetPolicyInstances retrieves all policy instances for a policy type from A1 Mediator
-func (c *A1MediatorClientImpl) GetPolicyInstances(ctx context.Context, policyTypeID PolicyTypeID) (*PolicyInstanceListResponse, error) {
+// GetPolicyInstances retrieves all policy instances for a policy type from A1 Mediator - Updated to match interface
+func (c *A1MediatorClientImpl) GetPolicyInstances(ctx context.Context, policyTypeId interface{}) (interface{}, error) {
 	if c.HTTPClient == nil || c.BaseURL == "" {
 		return &PolicyInstanceListResponse{PolicyInstances: []PolicyInstance{}, Total: 0}, nil
+	}
+
+	// Convert policyTypeId to string
+	var policyTypeID string
+	switch v := policyTypeId.(type) {
+	case string:
+		policyTypeID = v
+	case PolicyTypeID:
+		policyTypeID = string(v)
+	default:
+		policyTypeID = fmt.Sprintf("%v", v)
 	}
 
 	url := fmt.Sprintf("%s/a1-p/policytypes/%s/policies", c.BaseURL, policyTypeID)
@@ -290,7 +353,10 @@ func (c *A1MediatorClientImpl) GetPolicyInstances(ctx context.Context, policyTyp
 			log.Printf("Failed to get policy instance %s: %v", instanceID, err)
 			continue
 		}
-		policyInstances = append(policyInstances, *policyInstance)
+		// Cast result back to PolicyInstance
+		if pi, ok := policyInstance.(*PolicyInstance); ok {
+			policyInstances = append(policyInstances, *pi)
+		}
 	}
 
 	return &PolicyInstanceListResponse{
@@ -299,10 +365,30 @@ func (c *A1MediatorClientImpl) GetPolicyInstances(ctx context.Context, policyTyp
 	}, nil
 }
 
-// GetPolicyInstance retrieves a specific policy instance from A1 Mediator
-func (c *A1MediatorClientImpl) GetPolicyInstance(ctx context.Context, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID) (*PolicyInstance, error) {
+// GetPolicyInstance retrieves a specific policy instance from A1 Mediator - Updated to match interface
+func (c *A1MediatorClientImpl) GetPolicyInstance(ctx context.Context, policyTypeId interface{}, policyInstanceId interface{}) (interface{}, error) {
 	if c.HTTPClient == nil || c.BaseURL == "" {
 		return nil, fmt.Errorf("A1 Mediator client not configured")
+	}
+
+	// Convert IDs to strings
+	var policyTypeID, policyInstanceID string
+	switch v := policyTypeId.(type) {
+	case string:
+		policyTypeID = v
+	case PolicyTypeID:
+		policyTypeID = string(v)
+	default:
+		policyTypeID = fmt.Sprintf("%v", v)
+	}
+
+	switch v := policyInstanceId.(type) {
+	case string:
+		policyInstanceID = v
+	case PolicyInstanceID:
+		policyInstanceID = string(v)
+	default:
+		policyInstanceID = fmt.Sprintf("%v", v)
 	}
 
 	url := fmt.Sprintf("%s/a1-p/policytypes/%s/policies/%s", c.BaseURL, policyTypeID, policyInstanceID)
@@ -333,24 +419,64 @@ func (c *A1MediatorClientImpl) GetPolicyInstance(ctx context.Context, policyType
 	}
 
 	return &PolicyInstance{
-		PolicyInstanceID: policyInstanceID,
-		PolicyTypeID:     policyTypeID,
-		PolicyData:       map[string]interface{}{"data": policyData},
-		Status:           "ACTIVE",
+		ID:               PolicyInstanceID(policyInstanceID),
+		TypeID:           PolicyTypeID(policyTypeID),
+		Policy:           policyData,
+		Status:           PolicyStatusActive,
 		CreatedAt:        time.Now(),
+		UpdatedAt:        time.Now(),
+		PolicyInstanceID: PolicyInstanceID(policyInstanceID),
+		PolicyTypeID:     PolicyTypeID(policyTypeID),
+		PolicyData:       map[string]interface{}{"data": policyData},
 		LastModified:     time.Now(),
 	}, nil
 }
 
-// CreatePolicyInstance creates a new policy instance in A1 Mediator
-func (c *A1MediatorClientImpl) CreatePolicyInstance(ctx context.Context, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID, request *PolicyInstanceRequest) error {
+// CreatePolicyInstance creates a new policy instance in A1 Mediator - Updated to match interface
+func (c *A1MediatorClientImpl) CreatePolicyInstance(ctx context.Context, policyTypeId interface{}, policyInstanceId interface{}, body interface{}) error {
 	if c.HTTPClient == nil || c.BaseURL == "" {
 		return fmt.Errorf("A1 Mediator client not configured")
 	}
 
+	// Convert IDs to strings
+	var policyTypeID, policyInstanceID string
+	switch v := policyTypeId.(type) {
+	case string:
+		policyTypeID = v
+	case PolicyTypeID:
+		policyTypeID = string(v)
+	default:
+		policyTypeID = fmt.Sprintf("%v", v)
+	}
+
+	switch v := policyInstanceId.(type) {
+	case string:
+		policyInstanceID = v
+	case PolicyInstanceID:
+		policyInstanceID = string(v)
+	default:
+		policyInstanceID = fmt.Sprintf("%v", v)
+	}
+
 	url := fmt.Sprintf("%s/a1-p/policytypes/%s/policies/%s", c.BaseURL, policyTypeID, policyInstanceID)
 
-	jsonData, err := json.Marshal(request.Policy)
+	var jsonData []byte
+	var err error
+
+	// Handle different body types
+	switch v := body.(type) {
+	case *PolicyInstanceRequest:
+		jsonData, err = json.Marshal(v.Policy)
+	case map[string]interface{}:
+		jsonData, err = json.Marshal(v)
+	case []byte:
+		jsonData = v
+	case string:
+		jsonData = []byte(v)
+	default:
+		jsonData, err = json.Marshal(v)
+	}
+
 	if err != nil {
 		return fmt.Errorf("failed to marshal policy instance: %w", err)
 	}
@@ -378,15 +504,51 @@ func (c *A1MediatorClientImpl) CreatePolicyInstance(ctx context.Context, policyT
 	return nil
 }
 
-// UpdatePolicyInstance updates an existing policy instance in A1 Mediator
-func (c *A1MediatorClientImpl) UpdatePolicyInstance(ctx context.Context, policyTypeID PolicyTypeID, update *PolicyInstanceUpdate) error {
+// UpdatePolicyInstance updates an existing policy instance in A1 Mediator - Updated to match interface
+func (c *A1MediatorClientImpl) UpdatePolicyInstance(ctx context.Context, policyTypeId interface{}, policyInstanceId interface{}, body interface{}) error {
 	if c.HTTPClient == nil || c.BaseURL == "" {
 		return fmt.Errorf("A1 Mediator client not configured")
 	}
 
-	url := fmt.Sprintf("%s/a1-p/policytypes/%s/policies/%s", c.BaseURL, policyTypeID, update.PolicyInstanceID)
+	// Convert IDs to strings
+	var policyTypeID, policyInstanceID string
+	switch v := policyTypeId.(type) {
+	case string:
+		policyTypeID = v
+	case PolicyTypeID:
+		policyTypeID = string(v)
+	default:
+		policyTypeID = fmt.Sprintf("%v", v)
+	}
 
-	jsonData, err := json.Marshal(update.Policy)
+	switch v := policyInstanceId.(type) {
+	case string:
+		policyInstanceID = v
+	case PolicyInstanceID:
+		policyInstanceID = string(v)
+	default:
+		policyInstanceID = fmt.Sprintf("%v", v)
+	}
+
+	url := fmt.Sprintf("%s/a1-p/policytypes/%s/policies/%s", c.BaseURL, policyTypeID, policyInstanceID)
+
+	var jsonData []byte
+	var err error
+
+	// Handle different body types
+	switch v := body.(type) {
+	case *PolicyInstanceUpdate:
+		jsonData, err = json.Marshal(v.Policy)
+	case map[string]interface{}:
+		jsonData, err = json.Marshal(v)
+	case []byte:
+		jsonData = v
+	case string:
+		jsonData = []byte(v)
+	default:
+		jsonData, err = json.Marshal(v)
+	}
+
 	if err != nil {
 		return fmt.Errorf("failed to marshal policy instance update: %w", err)
 	}
@@ -410,14 +572,34 @@ func (c *A1MediatorClientImpl) UpdatePolicyInstance(ctx context.Context, policyT
 		return fmt.Errorf("A1 Mediator returned status %d for policy instance update: %s", resp.StatusCode, string(body))
 	}
 
-	log.Printf("Successfully updated policy instance %s for type %s", update.PolicyInstanceID, policyTypeID)
+	log.Printf("Successfully updated policy instance %s for type %s", policyInstanceID, policyTypeID)
 	return nil
 }
 
-// DeletePolicyInstance deletes a policy instance from A1 Mediator
-func (c *A1MediatorClientImpl) DeletePolicyInstance(ctx context.Context, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID) error {
+// DeletePolicyInstance deletes a policy instance from A1 Mediator - Updated to match interface
+func (c *A1MediatorClientImpl) DeletePolicyInstance(ctx context.Context, policyTypeId interface{}, policyInstanceId interface{}) error {
 	if c.HTTPClient == nil || c.BaseURL == "" {
 		return fmt.Errorf("A1 Mediator client not configured")
+	}
+
+	// Convert IDs to strings
+	var policyTypeID, policyInstanceID string
+	switch v := policyTypeId.(type) {
+	case string:
+		policyTypeID = v
+	case PolicyTypeID:
+		policyTypeID = string(v)
+	default:
+		policyTypeID = fmt.Sprintf("%v", v)
+	}
+
+	switch v := policyInstanceId.(type) {
+	case string:
+		policyInstanceID = v
+	case PolicyInstanceID:
+		policyInstanceID = string(v)
+	default:
+		policyInstanceID = fmt.Sprintf("%v", v)
 	}
 
 	url := fmt.Sprintf("%s/a1-p/policytypes/%s/policies/%s", c.BaseURL, policyTypeID, policyInstanceID)
@@ -447,10 +629,30 @@ func (c *A1MediatorClientImpl) DeletePolicyInstance(ctx context.Context, policyT
 	return nil
 }
 
-// GetPolicyInstanceStatus retrieves the status of a policy instance from A1 Mediator
-func (c *A1MediatorClientImpl) GetPolicyInstanceStatus(ctx context.Context, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID) (*PolicyStatus, error) {
+// GetPolicyInstanceStatus retrieves the status of a policy instance from A1 Mediator - Updated to match interface
+func (c *A1MediatorClientImpl) GetPolicyInstanceStatus(ctx context.Context, policyTypeId interface{}, policyInstanceId interface{}) (interface{}, error) {
 	if c.HTTPClient == nil || c.BaseURL == "" {
 		return nil, fmt.Errorf("A1 Mediator client not configured")
+	}
+
+	// Convert IDs to strings
+	var policyTypeID, policyInstanceID string
+	switch v := policyTypeId.(type) {
+	case string:
+		policyTypeID = v
+	case PolicyTypeID:
+		policyTypeID = string(v)
+	default:
+		policyTypeID = fmt.Sprintf("%v", v)
+	}
+
+	switch v := policyInstanceId.(type) {
+	case string:
+		policyInstanceID = v
+	case PolicyInstanceID:
+		policyInstanceID = string(v)
+	default:
+		policyInstanceID = fmt.Sprintf("%v", v)
 	}
 
 	url := fmt.Sprintf("%s/a1-p/policytypes/%s/policies/%s/status", c.BaseURL, policyTypeID, policyInstanceID)
@@ -479,16 +681,16 @@ func (c *A1MediatorClientImpl) GetPolicyInstanceStatus(ctx context.Context, poli
 	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
 		// If status endpoint doesn't return structured data, create default status
 		status = PolicyStatus{
-			Status:     "ACTIVE",
-			LastUpdated: time.Now(),
+			Status:     PolicyStatusActive,
+			LastUpdate: time.Now(),
 		}
 	}
 
 	return &status, nil
 }
 
-// GetStats retrieves statistics from A1 Mediator
-func (c *A1MediatorClientImpl) GetStats(ctx context.Context) (*A1Stats, error) {
+// GetStats retrieves statistics from A1 Mediator - Updated to match interface
+func (c *A1MediatorClientImpl) GetStats(ctx context.Context) (interface{}, error) {
 	if c.HTTPClient == nil || c.BaseURL == "" {
 		return &A1Stats{
 			PolicyTypesByStatus:     make(map[string]uint32),
@@ -499,9 +701,20 @@ func (c *A1MediatorClientImpl) GetStats(ctx context.Context) (*A1Stats, error) {
 	}
 
 	// A1 Mediator doesn't have a dedicated stats endpoint, so we'll aggregate from available data
-	policyTypes, err := c.GetPolicyTypes(ctx)
+	policyTypesResp, err := c.GetPolicyTypes(ctx)
 	if err != nil {
 		log.Printf("Failed to get policy types for stats: %v", err)
+		return &A1Stats{
+			PolicyTypesByStatus:     make(map[string]uint32),
+			PolicyInstancesByType:   make(map[string]uint32),
+			PolicyInstancesByStatus: make(map[string]uint32),
+			LastUpdated:             time.Now(),
+		}, nil
+	}
+
+	// Cast response back to PolicyTypeListResponse
+	policyTypes, ok := policyTypesResp.(*PolicyTypeListResponse)
+	if !ok {
 		return &A1Stats{
 			PolicyTypesByStatus:     make(map[string]uint32),
 			PolicyInstancesByType:   make(map[string]uint32),
@@ -519,43 +732,72 @@ func (c *A1MediatorClientImpl) GetStats(ctx context.Context) (*A1Stats, error) {
 	}
 
 	// Count policy types by status
-	stats.PolicyTypesByStatus["ACTIVE"] = policyTypes.Total
+	stats.PolicyTypesByStatus[PolicyStatusActive] = policyTypes.Total
 
 	// Count policy instances by type and status
 	var totalInstances uint32
 	for _, policyType := range policyTypes.PolicyTypes {
-		instances, err := c.GetPolicyInstances(ctx, policyType.PolicyTypeID)
+		instancesResp, err := c.GetPolicyInstances(ctx, policyType.ID)
 		if err != nil {
-			log.Printf("Failed to get policy instances for type %s: %v", policyType.PolicyTypeID, err)
+			log.Printf("Failed to get policy instances for type %s: %v", policyType.ID, err)
 			continue
 		}
 
-		stats.PolicyInstancesByType[string(policyType.PolicyTypeID)] = instances.Total
-		totalInstances += instances.Total
+		if instances, ok := instancesResp.(*PolicyInstanceListResponse); ok {
+			stats.PolicyInstancesByType[string(policyType.ID)] = instances.Total
+			totalInstances += instances.Total
 
-		// Count by status (assuming all are active for now)
-		stats.PolicyInstancesByStatus["ACTIVE"] += instances.Total
+			// Count by status (assuming all are active for now)
+			stats.PolicyInstancesByStatus[PolicyStatusActive] += instances.Total
+		}
 	}
 
 	stats.TotalPolicyInstances = totalInstances
 	return stats, nil
 }
 
-// ValidatePolicy validates a policy against its type schema
-func (c *A1MediatorClientImpl) ValidatePolicy(ctx context.Context, policyTypeID PolicyTypeID, policy json.RawMessage) (*PolicyValidationResult, error) {
+// ValidatePolicy validates a policy against its type schema - Updated to match interface
+func (c *A1MediatorClientImpl) ValidatePolicy(ctx context.Context, policyTypeId interface{}, body interface{}) (interface{}, error) {
 	// This is a client-side validation - in a real implementation, this might call
 	// a validation endpoint or perform JSON schema validation
 
-	// For now, we'll do basic JSON validation
-	var policyData interface{}
-	if err := json.Unmarshal(policy, &policyData); err != nil {
+	var policyData []byte
+	var err error
+
+	// Handle different body types
+	switch v := body.(type) {
+	case []byte:
+		policyData = v
+	case string:
+		policyData = []byte(v)
+	case json.RawMessage:
+		policyData = []byte(v)
+	default:
+		policyData, err = json.Marshal(v)
+		if err != nil {
+			return &PolicyValidationResult{
+				IsValid: false,
+				Errors: []PolicyValidationError{
+					{
+						Field:   "policy",
+						Message: "Failed to marshal policy data",
+						Value:   fmt.Sprintf("%v", v),
+					},
+				},
+			}, nil
+		}
+	}
+
+	// Basic JSON validation
+	var parsedData interface{}
+	if err := json.Unmarshal(policyData, &parsedData); err != nil {
 		return &PolicyValidationResult{
 			IsValid: false,
 			Errors: []PolicyValidationError{
 				{
 					Field:   "policy",
 					Message: "Invalid JSON format",
-					Value:   string(policy),
+					Value:   string(policyData),
 				},
 			},
 		}, nil
@@ -571,10 +813,13 @@ func (c *A1MediatorClientImpl) ValidatePolicy(ctx context.Context, policyTypeID 
 // parsePolicyType parses raw policy type data into PolicyType struct
 func (c *A1MediatorClientImpl) parsePolicyType(typeID string, rawPolicyType map[string]interface{}) (*PolicyType, error) {
 	policyType := &PolicyType{
-		PolicyTypeID: PolicyTypeID(typeID),
-		Name:         "",
-		Description:  "",
-		Schema:       make(map[string]interface{}),
+		ID:          PolicyTypeID(typeID),
+		Name:        "",
+		Description: "",
+		Schema:      make([]byte, 0),
+		CreatedAt:   time.Now(),
+		PolicyTypeID: typeID,
+		Schema2:     make(map[string]interface{}),
 	}
 
 	// Extract name if available
@@ -589,8 +834,13 @@ func (c *A1MediatorClientImpl) parsePolicyType(typeID string, rawPolicyType map[
 		policyType.Description = description
 	}
 
-	// The entire response is the schema
-	policyType.Schema = rawPolicyType
+	// Convert the entire response to schema
+	schemaBytes, err := json.Marshal(rawPolicyType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal schema: %w", err)
+	}
+	policyType.Schema = json.RawMessage(schemaBytes)
+	policyType.Schema2 = rawPolicyType
 
 	return policyType, nil
 }

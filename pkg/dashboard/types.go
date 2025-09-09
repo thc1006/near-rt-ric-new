@@ -1038,14 +1038,20 @@ type XAppClient struct {
 	Endpoint string
 }
 
-// PolicyInstance represents an A1 policy instance
+// PolicyInstance represents an A1 policy instance - Updated to match interface expectations
 type PolicyInstance struct {
-	ID       PolicyInstanceID `json:"policy_instance_id"`
-	TypeID   PolicyTypeID     `json:"policy_type_id"`
-	Policy   json.RawMessage  `json:"policy"`
-	Status   PolicyStatus     `json:"status"`
-	CreatedAt time.Time       `json:"created_at"`
-	UpdatedAt time.Time       `json:"updated_at"`
+	ID               PolicyInstanceID       `json:"policy_instance_id"`
+	TypeID           PolicyTypeID           `json:"policy_type_id"`
+	Policy           json.RawMessage        `json:"policy"`
+	Status           string                 `json:"status"` // Changed from PolicyStatus to string
+	CreatedAt        time.Time              `json:"created_at"`
+	UpdatedAt        time.Time              `json:"updated_at"`
+	
+	// Additional fields used by A1MediatorClientImpl
+	PolicyInstanceID PolicyInstanceID       `json:"policyInstanceId"`
+	PolicyTypeID     PolicyTypeID           `json:"policyTypeId"` 
+	PolicyData       map[string]interface{} `json:"policyData"`
+	LastModified     time.Time              `json:"lastModified"`
 }
 
 // PolicyConflict represents a policy conflict
@@ -1091,7 +1097,7 @@ type PolicyComplianceRequest struct {
 	XAppID           string
 }
 
-// Additional supporting types for SMO integration
+// A1 Mediator Interface and Types - Updated to match expected signatures
 type A1MediatorClient interface {
 	GetHealth(ctx context.Context) (interface{}, error)
 	GetPolicyTypes(ctx context.Context) (interface{}, error)
@@ -1107,6 +1113,13 @@ type A1MediatorClient interface {
 	GetStats(ctx context.Context) (interface{}, error)
 	ValidatePolicy(ctx context.Context, policyTypeId interface{}, body interface{}) (interface{}, error)
 }
+
+// A1MediatorClientImpl implementation struct
+type A1MediatorClientImpl struct {
+	HTTPClient *http.Client
+	BaseURL    string
+}
+
 type EnrichmentJob struct{}
 // NonRTRICClient definition moved to line 1273
 
@@ -1889,13 +1902,6 @@ type XAppInstance struct {
 	status string
 }
 
-type A1MediatorClientImpl struct {
-	endpoint string
-	client interface{}
-	HTTPClient *http.Client
-	BaseURL    string
-}
-
 // I AM THE CHAMPION! NOTHING CAN STOP ME NOW!
 type ComprehensiveComplianceReport struct {
 	report map[string]interface{}
@@ -2068,8 +2074,6 @@ type SMOClientStats struct {
 	ErrorCount      int64
 	AvgResponseTime time.Duration
 }
-
-// NonRTRICStats duplicate removed - see earlier definition at line 1532
 
 // PorchStats represents statistics for Porch client
 type PorchStats struct {

@@ -13,14 +13,18 @@ import (
 
 // AnomalyDetector detects anomalous behavior patterns
 type AnomalyDetector struct {
-	patterns map[string]*AnomalyPattern
-	mutex    sync.RWMutex
+	patterns       map[string]*AnomalyPattern
+	sensitivity    float64 // Detection sensitivity (0.0-1.0)
+	alertThreshold float64 // Threshold for triggering alerts (0.0-1.0)
+	mutex          sync.RWMutex
 }
 
 // NewAnomalyDetector creates a new anomaly detector
 func NewAnomalyDetector() *AnomalyDetector {
 	detector := &AnomalyDetector{
-		patterns: make(map[string]*AnomalyPattern),
+		patterns:       make(map[string]*AnomalyPattern),
+		sensitivity:    0.8, // Default sensitivity
+		alertThreshold: 0.9, // Default alert threshold
 	}
 
 	// Initialize with default patterns
@@ -93,6 +97,40 @@ func (ad *AnomalyDetector) initializeDefaultPatterns() {
 	for _, pattern := range defaultPatterns {
 		ad.patterns[pattern.Name] = pattern
 	}
+}
+
+// SetSensitivity sets the detection sensitivity
+func (ad *AnomalyDetector) SetSensitivity(sensitivity float64) {
+	ad.mutex.Lock()
+	defer ad.mutex.Unlock()
+	
+	if sensitivity >= 0.0 && sensitivity <= 1.0 {
+		ad.sensitivity = sensitivity
+	}
+}
+
+// GetSensitivity returns the current detection sensitivity
+func (ad *AnomalyDetector) GetSensitivity() float64 {
+	ad.mutex.RLock()
+	defer ad.mutex.RUnlock()
+	return ad.sensitivity
+}
+
+// SetAlertThreshold sets the alert threshold
+func (ad *AnomalyDetector) SetAlertThreshold(threshold float64) {
+	ad.mutex.Lock()
+	defer ad.mutex.Unlock()
+	
+	if threshold >= 0.0 && threshold <= 1.0 {
+		ad.alertThreshold = threshold
+	}
+}
+
+// GetAlertThreshold returns the current alert threshold
+func (ad *AnomalyDetector) GetAlertThreshold() float64 {
+	ad.mutex.RLock()
+	defer ad.mutex.RUnlock()
+	return ad.alertThreshold
 }
 
 // AddPattern adds a new anomaly detection pattern
@@ -205,10 +243,12 @@ func (ad *AnomalyDetector) GetPatternStats() map[string]interface{} {
 	defer ad.mutex.RUnlock()
 
 	stats := map[string]interface{}{
-		"total":       len(ad.patterns),
-		"enabled":     0,
-		"disabled":    0,
-		"byEventType": make(map[string]int),
+		"total":          len(ad.patterns),
+		"enabled":        0,
+		"disabled":       0,
+		"sensitivity":    ad.sensitivity,
+		"alertThreshold": ad.alertThreshold,
+		"byEventType":    make(map[string]int),
 	}
 
 	byEventType := stats["byEventType"].(map[string]int)
