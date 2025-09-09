@@ -87,4 +87,4 @@ security_test_report.yaml
 *.mov
 *.mp3
 *.wav
-*.flac
+*.flac.claude/
