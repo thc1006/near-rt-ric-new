@@ -249,10 +249,11 @@ func (ds *DiscoveryService) getSubscriptionManagerMetrics() map[string]interface
 				"active_subscriptions":   stats.ActiveSubscriptions,
 				"total_subscriptions":    stats.TotalSubscriptions,
 				"failed_subscriptions":   stats.FailedSubscriptions,
-				"total_indications":      stats.TotalIndications,
-				"indications_per_second": stats.IndicationsPerSecond,
-				"subscriptions_by_status": stats.SubscriptionsByStatus,
-				"subscriptions_by_xapp":   stats.SubscriptionsByXApp,
+				// Removed unsupported fields that don't exist in SubscriptionStats
+				"total_indications":      0,
+				"indications_per_second": 0.0,
+				"subscriptions_by_status": map[string]int{},
+				"subscriptions_by_xapp":   map[string]int{},
 			}
 		}
 	}

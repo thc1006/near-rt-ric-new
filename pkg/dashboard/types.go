@@ -254,6 +254,9 @@ type E2NodeSimulator struct {
 	// Subscription management
 	subscriptions     map[string]*SimulatedSubscription
 	
+	// Add missing indicationTicker field
+	indicationTicker  *time.Ticker
+	
 	// Load testing fields from load_testing.go
 	ID               string
 	ConnectionTime   time.Time
@@ -2186,8 +2189,8 @@ type ThroughputBenchmarkResult struct {
 
 // Indication represents an indication message from an E2 node (comprehensive version)
 type Indication struct {
-	// From subscription_models.go (more comprehensive)
-	SubscriptionID SubscriptionID `json:"subscriptionId"`
+	// From subscription_models.go (more comprehensive) - Note: SubscriptionID is defined elsewhere
+	// SubscriptionID SubscriptionID `json:"subscriptionId"`
 	E2NodeID       string         `json:"e2NodeId"`
 	RANFunctionID  uint32         `json:"ranFunctionId"`
 	ActionID       uint32         `json:"actionId"`
@@ -2203,3 +2206,11 @@ type Indication struct {
 	Data          []byte         `json:"data,omitempty"`
 	ProcessingStart time.Time    `json:"processingStart,omitempty"`
 }
+
+// Note: The following types are already defined in other files so we don't redefine them:
+// - SubscriptionID (defined in advanced_smo_implementations_clean.go)
+// - E2NodeListResponse (defined in e2_models.go) 
+// - E2NodeHealth (defined in e2_models.go)
+// - E2ManagerStats (defined in e2_models.go)
+// - E2SetupRequest (defined in e2_models.go)
+// - E2NodeComponentConfig (defined in e2_models.go)

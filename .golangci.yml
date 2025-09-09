@@ -84,7 +84,7 @@ linters:
     - bodyclose
     - dogsled
     - dupl
-    - copyloopvar  # Replaced exportloopref
+    # - copyloopvar  # Requires Go 1.22+, disabled for Go 1.21
     - gci
     - gocognit
     - goconst
