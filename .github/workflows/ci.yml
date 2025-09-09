@@ -1,11 +1,13 @@
 name: CI/CD Pipeline
 
+# 暫時禁用自動觸發，避免與簡化CI衝突
 on:
-  push:
-    branches: [main, develop]
-    tags: ['v*']
-  pull_request:
-    branches: [main, develop]
+  workflow_dispatch:  # 僅手動觸發
+  # push:
+  #   branches: [main, develop]
+  #   tags: ['v*']
+  # pull_request:
+  #   branches: [main, develop]
 
 env:
   GO_VERSION: '1.21'
