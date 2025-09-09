@@ -205,9 +205,9 @@ func (ad *AnomalyDetector) GetPatternStats() map[string]interface{} {
 	defer ad.mutex.RUnlock()
 
 	stats := map[string]interface{}{
-		"total":   len(ad.patterns),
-		"enabled": 0,
-		"disabled": 0,
+		"total":       len(ad.patterns),
+		"enabled":     0,
+		"disabled":    0,
 		"byEventType": make(map[string]int),
 	}
 

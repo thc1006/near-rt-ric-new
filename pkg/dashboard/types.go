@@ -1084,7 +1084,28 @@ type PolicyComplianceRequest struct {
 }
 
 // Additional supporting types for SMO integration
-type A1MediatorClient interface{}
+type A1MediatorClient interface {
+	IsConnected() bool
+	GetHealth(ctx context.Context) (*A1Health, error)
+	GetPolicyTypes(ctx context.Context) (*PolicyTypeListResponse, error)
+	GetPolicyType(ctx context.Context, policyTypeID PolicyTypeID) (*PolicyType, error)
+	CreatePolicyType(ctx context.Context, policyTypeID PolicyTypeID, request *PolicyTypeRequest) error
+	DeletePolicyType(ctx context.Context, policyTypeID PolicyTypeID) error
+	GetPolicyInstances(ctx context.Context, policyTypeID PolicyTypeID) (*PolicyInstanceListResponse, error)
+	GetPolicyInstance(ctx context.Context, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID) (*PolicyInstance, error)
+	CreatePolicyInstance(ctx context.Context, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID, request *PolicyInstanceRequest) error
+	UpdatePolicyInstance(ctx context.Context, policyTypeID PolicyTypeID, update *PolicyInstanceUpdate) error
+	DeletePolicyInstance(ctx context.Context, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID) error
+	GetPolicyInstanceStatus(ctx context.Context, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID) (*PolicyStatus, error)
+	GetStats(ctx context.Context) (*A1Stats, error)
+	ValidatePolicy(ctx context.Context, policyTypeID PolicyTypeID, policy json.RawMessage) (*PolicyValidationResult, error)
+}
+
+// A1MediatorClientImpl provides concrete implementation of A1MediatorClient interface
+type A1MediatorClientImpl struct {
+	httpClient *http.Client
+	endpoint   string
+}
 
 // Scaling Types - centralized to avoid redeclarations
 
@@ -1582,7 +1603,11 @@ type RealTimeProfiler interface{}
 // Performance monitoring types
 type PerformanceAnalyzer interface{}
 type AutoPerformanceTuner interface{}
-type CircuitBreakerCluster interface{}
+type CircuitBreakerCluster interface {
+	IsOpen(nodeID string) bool
+	RecordFailure(nodeID string)
+	RecordSuccess(nodeID string)
+}
 type ComprehensiveHealthMonitor interface{}
 type LatencyAnalyzer interface{}
 type ThroughputMonitor interface{}
@@ -1779,8 +1804,20 @@ type LoadTestReport interface{}
 type NephioTestReport interface{}
 type QueueMetrics interface{}
 type Subscription interface{}
-type E2MessageType interface{}
-type ProcessingResult interface{}
+type E2MessageType int
+
+const (
+	E2MessageTypeIndication E2MessageType = iota
+	E2MessageTypeSubscription
+	E2MessageTypePolicy
+)
+type ProcessingResult struct {
+	NodeID           string
+	MessageType      E2MessageType
+	ProcessedData    []byte
+	Success          bool
+	ProcessingTimeNs int64
+}
 type ScalabilityBenchmarkResult interface{}
 type StressBenchmarkResult interface{}
 type LatencyMeasurement interface{}

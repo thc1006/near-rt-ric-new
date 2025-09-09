@@ -5,36 +5,34 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math"
 	"net/http"
 	"os"
 	"os/signal"
 	"sort"
-	"strings"
-	"syscall"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/influxdata/influxdb-client-go/v2/api"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // TimeSeriesOptimizer provides advanced time-series data storage and retrieval optimization
 type TimeSeriesOptimizer struct {
-	influxClient     influxdb2.Client
-	queryAPI         api.QueryAPI
-	writeAPI         api.WriteAPIBlocking
-	compressionMgr   *CompressionManager
-	retentionMgr     *RetentionManager
-	queryOptimizer   *QueryOptimizer
-	cacheMgr         *CacheManager
-	aggregationMgr   *AggregationManager
-	downsampleMgr    *DownsampleManager
-	metrics          *OptimizerMetrics
-	mu               sync.RWMutex
+	influxClient   influxdb2.Client
+	queryAPI       api.QueryAPI
+	writeAPI       api.WriteAPIBlocking
+	compressionMgr *CompressionManager
+	retentionMgr   *RetentionManager
+	queryOptimizer *QueryOptimizer
+	cacheMgr       *CacheManager
+	aggregationMgr *AggregationManager
+	downsampleMgr  *DownsampleManager
+	metrics        *OptimizerMetrics
+	mu             sync.RWMutex
 }
 
 // CompressionManager handles data compression and decompression
@@ -42,7 +40,7 @@ type CompressionManager struct {
 	compressionAlgorithms map[string]CompressionAlgorithm
 	compressionPolicy     *CompressionPolicy
 	compressionStats      map[string]*CompressionStats
-	mu                   sync.RWMutex
+	mu                    sync.RWMutex
 }
 
 type CompressionAlgorithm interface {
@@ -53,71 +51,71 @@ type CompressionAlgorithm interface {
 }
 
 type CompressionPolicy struct {
-	DefaultAlgorithm    string                          `json:"default_algorithm"`
-	MeasurementPolicies map[string]MeasurementPolicy   `json:"measurement_policies"`
-	AgePolicies         []AgeBasedPolicy               `json:"age_policies"`
-	SizePolicies        []SizeBasedPolicy              `json:"size_policies"`
-	LastUpdated         time.Time                      `json:"last_updated"`
+	DefaultAlgorithm    string                       `json:"default_algorithm"`
+	MeasurementPolicies map[string]MeasurementPolicy `json:"measurement_policies"`
+	AgePolicies         []AgeBasedPolicy             `json:"age_policies"`
+	SizePolicies        []SizeBasedPolicy            `json:"size_policies"`
+	LastUpdated         time.Time                    `json:"last_updated"`
 }
 
 type MeasurementPolicy struct {
-	MeasurementName     string    `json:"measurement_name"`
-	CompressionLevel    int       `json:"compression_level"` // 0-9
-	PreferredAlgorithm  string    `json:"preferred_algorithm"`
+	MeasurementName     string        `json:"measurement_name"`
+	CompressionLevel    int           `json:"compression_level"` // 0-9
+	PreferredAlgorithm  string        `json:"preferred_algorithm"`
 	CompressionDelay    time.Duration `json:"compression_delay"`
-	MinCompressionRatio float64   `json:"min_compression_ratio"`
+	MinCompressionRatio float64       `json:"min_compression_ratio"`
 }
 
 type AgeBasedPolicy struct {
-	MinAge              time.Duration `json:"min_age"`
-	CompressionLevel    int          `json:"compression_level"`
-	PreferredAlgorithm  string       `json:"preferred_algorithm"`
+	MinAge             time.Duration `json:"min_age"`
+	CompressionLevel   int           `json:"compression_level"`
+	PreferredAlgorithm string        `json:"preferred_algorithm"`
 }
 
 type SizeBasedPolicy struct {
-	MinSize             int64    `json:"min_size_bytes"`
-	CompressionLevel    int      `json:"compression_level"`
-	PreferredAlgorithm  string   `json:"preferred_algorithm"`
+	MinSize            int64  `json:"min_size_bytes"`
+	CompressionLevel   int    `json:"compression_level"`
+	PreferredAlgorithm string `json:"preferred_algorithm"`
 }
 
 type CompressionStats struct {
-	Algorithm           string    `json:"algorithm"`
-	OriginalSize        int64     `json:"original_size_bytes"`
-	CompressedSize      int64     `json:"compressed_size_bytes"`
-	CompressionRatio    float64   `json:"compression_ratio"`
-	CompressionTime     time.Duration `json:"compression_time"`
-	DecompressionTime   time.Duration `json:"decompression_time"`
-	LastCompressed      time.Time `json:"last_compressed"`
+	Algorithm         string        `json:"algorithm"`
+	OriginalSize      int64         `json:"original_size_bytes"`
+	CompressedSize    int64         `json:"compressed_size_bytes"`
+	CompressionRatio  float64       `json:"compression_ratio"`
+	CompressionTime   time.Duration `json:"compression_time"`
+	DecompressionTime time.Duration `json:"decompression_time"`
+	LastCompressed    time.Time     `json:"last_compressed"`
 }
 
 // RetentionManager handles data retention policies and cleanup
 type RetentionManager struct {
-	retentionPolicies   map[string]*RetentionPolicy
-	cleanupScheduler    *CleanupScheduler
-	archiveManager      *ArchiveManager
-	retentionStats      map[string]*RetentionStats
-	mu                  sync.RWMutex
+	retentionPolicies map[string]*RetentionPolicy
+	cleanupScheduler  *CleanupScheduler
+	archiveManager    *ArchiveManager
+	retentionStats    map[string]*RetentionStats
+	mu                sync.RWMutex
 }
 
 type RetentionPolicy struct {
-	PolicyName          string           `json:"policy_name"`
-	MeasurementPattern  string           `json:"measurement_pattern"`
-	RetentionPeriod     time.Duration    `json:"retention_period"`
-	DownsampleRules     []DownsampleRule `json:"downsample_rules"`
-	ArchiveAfter        time.Duration    `json:"archive_after"`
-	DeleteAfter         time.Duration    `json:"delete_after"`
-	TagSelectors        []TagSelector    `json:"tag_selectors"`
-	Priority            int              `json:"priority"`
-	Enabled             bool             `json:"enabled"`
-	CreatedAt           time.Time        `json:"created_at"`
-	LastUpdated         time.Time        `json:"last_updated"`
+	PolicyName         string           `json:"policy_name"`
+	MeasurementPattern string           `json:"measurement_pattern"`
+	RetentionPeriod    time.Duration    `json:"retention_period"`
+	DownsampleRules    []DownsampleRule `json:"downsample_rules"`
+	ArchiveAfter       time.Duration    `json:"archive_after"`
+	DeleteAfter        time.Duration    `json:"delete_after"`
+	TagSelectors       []TagSelector    `json:"tag_selectors"`
+	Priority           int              `json:"priority"`
+	Enabled            bool             `json:"enabled"`
+	CreatedAt          time.Time        `json:"created_at"`
+	LastUpdated        time.Time        `json:"last_updated"`
 }
 
 type DownsampleRule struct {
-	Age                 time.Duration    `json:"age"`
-	Resolution          time.Duration    `json:"resolution"`
-	AggregationFunction string          `json:"aggregation_function"`
-	KeepOriginal        bool            `json:"keep_original"`
+	Age                 time.Duration `json:"age"`
+	Resolution          time.Duration `json:"resolution"`
+	AggregationFunction string        `json:"aggregation_function"`
+	KeepOriginal        bool          `json:"keep_original"`
 }
 
 type TagSelector struct {
@@ -127,38 +125,38 @@ type TagSelector struct {
 }
 
 type CleanupScheduler struct {
-	schedule            map[string]*CleanupJob
-	cleanupQueue        chan *CleanupTask
-	activeCleanups      map[string]*CleanupTask
-	mu                  sync.RWMutex
+	schedule       map[string]*CleanupJob
+	cleanupQueue   chan *CleanupTask
+	activeCleanups map[string]*CleanupTask
+	mu             sync.RWMutex
 }
 
 type CleanupJob struct {
-	JobID               string           `json:"job_id"`
-	RetentionPolicy     string           `json:"retention_policy"`
-	Schedule            string           `json:"schedule"` // Cron format
-	LastRun             time.Time        `json:"last_run"`
-	NextRun             time.Time        `json:"next_run"`
-	Enabled             bool             `json:"enabled"`
+	JobID           string    `json:"job_id"`
+	RetentionPolicy string    `json:"retention_policy"`
+	Schedule        string    `json:"schedule"` // Cron format
+	LastRun         time.Time `json:"last_run"`
+	NextRun         time.Time `json:"next_run"`
+	Enabled         bool      `json:"enabled"`
 }
 
 type CleanupTask struct {
-	TaskID              string           `json:"task_id"`
-	JobID               string           `json:"job_id"`
-	StartTime           time.Time        `json:"start_time"`
-	EndTime             time.Time        `json:"end_time"`
-	Status              string           `json:"status"` // "running", "completed", "failed"
-	ProcessedSeries     int64            `json:"processed_series"`
-	DeletedPoints       int64            `json:"deleted_points"`
-	ArchivedPoints      int64            `json:"archived_points"`
-	ErrorMessage        string           `json:"error_message,omitempty"`
+	TaskID          string    `json:"task_id"`
+	JobID           string    `json:"job_id"`
+	StartTime       time.Time `json:"start_time"`
+	EndTime         time.Time `json:"end_time"`
+	Status          string    `json:"status"` // "running", "completed", "failed"
+	ProcessedSeries int64     `json:"processed_series"`
+	DeletedPoints   int64     `json:"deleted_points"`
+	ArchivedPoints  int64     `json:"archived_points"`
+	ErrorMessage    string    `json:"error_message,omitempty"`
 }
 
 type ArchiveManager struct {
-	archiveBackends     map[string]ArchiveBackend
-	archivePolicy       *ArchivePolicy
-	archiveQueue        chan *ArchiveRequest
-	mu                  sync.RWMutex
+	archiveBackends map[string]ArchiveBackend
+	archivePolicy   *ArchivePolicy
+	archiveQueue    chan *ArchiveRequest
+	mu              sync.RWMutex
 }
 
 type ArchiveBackend interface {
@@ -169,187 +167,187 @@ type ArchiveBackend interface {
 }
 
 type ArchivePolicy struct {
-	DefaultBackend      string                     `json:"default_backend"`
-	BackendConfigs      map[string]BackendConfig   `json:"backend_configs"`
-	CompressionEnabled  bool                       `json:"compression_enabled"`
-	EncryptionEnabled   bool                       `json:"encryption_enabled"`
+	DefaultBackend     string                   `json:"default_backend"`
+	BackendConfigs     map[string]BackendConfig `json:"backend_configs"`
+	CompressionEnabled bool                     `json:"compression_enabled"`
+	EncryptionEnabled  bool                     `json:"encryption_enabled"`
 }
 
 type BackendConfig struct {
-	BackendType         string                     `json:"backend_type"` // "s3", "gcs", "azure", "filesystem"
-	ConnectionString    string                     `json:"connection_string"`
-	BucketName          string                     `json:"bucket_name"`
-	CompressionLevel    int                        `json:"compression_level"`
-	ChunkSize           int64                      `json:"chunk_size_bytes"`
-	MaxRetries          int                        `json:"max_retries"`
-	Timeout             time.Duration              `json:"timeout"`
+	BackendType      string        `json:"backend_type"` // "s3", "gcs", "azure", "filesystem"
+	ConnectionString string        `json:"connection_string"`
+	BucketName       string        `json:"bucket_name"`
+	CompressionLevel int           `json:"compression_level"`
+	ChunkSize        int64         `json:"chunk_size_bytes"`
+	MaxRetries       int           `json:"max_retries"`
+	Timeout          time.Duration `json:"timeout"`
 }
 
 type ArchiveData struct {
-	Measurement         string                     `json:"measurement"`
-	Tags                map[string]string          `json:"tags"`
-	TimeRange           *TimeRange                 `json:"time_range"`
-	DataPoints          []ArchiveDataPoint         `json:"data_points"`
-	Metadata            map[string]interface{}     `json:"metadata"`
-	CompressionRatio    float64                    `json:"compression_ratio"`
-	ArchiveTime         time.Time                  `json:"archive_time"`
+	Measurement      string                 `json:"measurement"`
+	Tags             map[string]string      `json:"tags"`
+	TimeRange        *TimeRange             `json:"time_range"`
+	DataPoints       []ArchiveDataPoint     `json:"data_points"`
+	Metadata         map[string]interface{} `json:"metadata"`
+	CompressionRatio float64                `json:"compression_ratio"`
+	ArchiveTime      time.Time              `json:"archive_time"`
 }
 
 type ArchiveDataPoint struct {
-	Timestamp           time.Time                  `json:"timestamp"`
-	Fields              map[string]interface{}     `json:"fields"`
+	Timestamp time.Time              `json:"timestamp"`
+	Fields    map[string]interface{} `json:"fields"`
 }
 
 type ArchiveQuery struct {
-	Measurement         string                     `json:"measurement"`
-	Tags                map[string]string          `json:"tags"`
-	TimeRange           *TimeRange                 `json:"time_range"`
-	Fields              []string                   `json:"fields,omitempty"`
+	Measurement string            `json:"measurement"`
+	Tags        map[string]string `json:"tags"`
+	TimeRange   *TimeRange        `json:"time_range"`
+	Fields      []string          `json:"fields,omitempty"`
 }
 
 type ArchiveRequest struct {
-	RequestID           string                     `json:"request_id"`
-	Data                *ArchiveData               `json:"data"`
-	Backend             string                     `json:"backend"`
-	Priority            int                        `json:"priority"`
-	CreatedAt           time.Time                  `json:"created_at"`
+	RequestID string       `json:"request_id"`
+	Data      *ArchiveData `json:"data"`
+	Backend   string       `json:"backend"`
+	Priority  int          `json:"priority"`
+	CreatedAt time.Time    `json:"created_at"`
 }
 
 type ArchiveStats struct {
-	TotalArchived       int64                      `json:"total_archived"`
-	TotalSize           int64                      `json:"total_size_bytes"`
-	CompressionRatio    float64                    `json:"compression_ratio"`
-	LastArchived        time.Time                  `json:"last_archived"`
+	TotalArchived    int64     `json:"total_archived"`
+	TotalSize        int64     `json:"total_size_bytes"`
+	CompressionRatio float64   `json:"compression_ratio"`
+	LastArchived     time.Time `json:"last_archived"`
 }
 
 type RetentionStats struct {
-	PolicyName          string                     `json:"policy_name"`
-	TotalSeries         int64                      `json:"total_series"`
-	TotalPoints         int64                      `json:"total_points"`
-	OldestPoint         time.Time                  `json:"oldest_point"`
-	NewestPoint         time.Time                  `json:"newest_point"`
-	StorageSize         int64                      `json:"storage_size_bytes"`
-	LastCleanup         time.Time                  `json:"last_cleanup"`
+	PolicyName  string    `json:"policy_name"`
+	TotalSeries int64     `json:"total_series"`
+	TotalPoints int64     `json:"total_points"`
+	OldestPoint time.Time `json:"oldest_point"`
+	NewestPoint time.Time `json:"newest_point"`
+	StorageSize int64     `json:"storage_size_bytes"`
+	LastCleanup time.Time `json:"last_cleanup"`
 }
 
 // QueryOptimizer optimizes query performance
 type QueryOptimizer struct {
-	queryCache          *QueryCache
-	indexManager        *IndexManager
-	queryPlanner        *QueryPlanner
-	queryStats          *QueryStatistics
-	optimizationRules   []OptimizationRule
-	mu                  sync.RWMutex
+	queryCache        *QueryCache
+	indexManager      *IndexManager
+	queryPlanner      *QueryPlanner
+	queryStats        *QueryStatistics
+	optimizationRules []OptimizationRule
+	mu                sync.RWMutex
 }
 
 type QueryCache struct {
-	cache               map[string]*CacheEntry
-	cachePolicy         *CachePolicy
-	evictionPolicy      string  // "LRU", "LFU", "TTL"
-	maxCacheSize        int64
-	currentCacheSize    int64
-	hitCount            int64
-	missCount           int64
-	mu                  sync.RWMutex
+	cache            map[string]*CacheEntry
+	cachePolicy      *CachePolicy
+	evictionPolicy   string // "LRU", "LFU", "TTL"
+	maxCacheSize     int64
+	currentCacheSize int64
+	hitCount         int64
+	missCount        int64
+	mu               sync.RWMutex
 }
 
 type CacheEntry struct {
-	QueryHash           string                     `json:"query_hash"`
-	Query               string                     `json:"query"`
-	Result              []byte                     `json:"result"`
-	CreatedAt           time.Time                  `json:"created_at"`
-	LastAccessed        time.Time                  `json:"last_accessed"`
-	AccessCount         int64                      `json:"access_count"`
-	TTL                 time.Duration              `json:"ttl"`
-	Size                int64                      `json:"size_bytes"`
-	Tags                map[string]string          `json:"tags"`
+	QueryHash    string            `json:"query_hash"`
+	Query        string            `json:"query"`
+	Result       []byte            `json:"result"`
+	CreatedAt    time.Time         `json:"created_at"`
+	LastAccessed time.Time         `json:"last_accessed"`
+	AccessCount  int64             `json:"access_count"`
+	TTL          time.Duration     `json:"ttl"`
+	Size         int64             `json:"size_bytes"`
+	Tags         map[string]string `json:"tags"`
 }
 
 type CachePolicy struct {
-	DefaultTTL          time.Duration              `json:"default_ttl"`
-	MaxEntrySize        int64                      `json:"max_entry_size_bytes"`
-	CachePatterns       []CachePattern             `json:"cache_patterns"`
-	InvalidationRules   []InvalidationRule         `json:"invalidation_rules"`
+	DefaultTTL        time.Duration      `json:"default_ttl"`
+	MaxEntrySize      int64              `json:"max_entry_size_bytes"`
+	CachePatterns     []CachePattern     `json:"cache_patterns"`
+	InvalidationRules []InvalidationRule `json:"invalidation_rules"`
 }
 
 type CachePattern struct {
-	Pattern             string                     `json:"pattern"`
-	TTL                 time.Duration              `json:"ttl"`
-	Enabled             bool                       `json:"enabled"`
+	Pattern string        `json:"pattern"`
+	TTL     time.Duration `json:"ttl"`
+	Enabled bool          `json:"enabled"`
 }
 
 type InvalidationRule struct {
-	Trigger             string                     `json:"trigger"` // "time", "write", "tag_change"
-	Pattern             string                     `json:"pattern"`
-	Enabled             bool                       `json:"enabled"`
+	Trigger string `json:"trigger"` // "time", "write", "tag_change"
+	Pattern string `json:"pattern"`
+	Enabled bool   `json:"enabled"`
 }
 
 type IndexManager struct {
-	indexes             map[string]*TimeSeriesIndex
-	indexStats          map[string]*IndexStats
-	indexPolicy         *IndexPolicy
-	mu                  sync.RWMutex
+	indexes     map[string]*TimeSeriesIndex
+	indexStats  map[string]*IndexStats
+	indexPolicy *IndexPolicy
+	mu          sync.RWMutex
 }
 
 type TimeSeriesIndex struct {
-	IndexName           string                     `json:"index_name"`
-	Measurement         string                     `json:"measurement"`
-	Fields              []string                   `json:"fields"`
-	Tags                []string                   `json:"tags"`
-	IndexType           string                     `json:"index_type"` // "btree", "hash", "inverted"
-	CreatedAt           time.Time                  `json:"created_at"`
-	LastUpdated         time.Time                  `json:"last_updated"`
-	Size                int64                      `json:"size_bytes"`
-	Enabled             bool                       `json:"enabled"`
+	IndexName   string    `json:"index_name"`
+	Measurement string    `json:"measurement"`
+	Fields      []string  `json:"fields"`
+	Tags        []string  `json:"tags"`
+	IndexType   string    `json:"index_type"` // "btree", "hash", "inverted"
+	CreatedAt   time.Time `json:"created_at"`
+	LastUpdated time.Time `json:"last_updated"`
+	Size        int64     `json:"size_bytes"`
+	Enabled     bool      `json:"enabled"`
 }
 
 type IndexStats struct {
-	IndexName           string                     `json:"index_name"`
-	TotalEntries        int64                      `json:"total_entries"`
-	IndexSize           int64                      `json:"index_size_bytes"`
-	HitRate             float64                    `json:"hit_rate"`
-	LastUsed            time.Time                  `json:"last_used"`
-	MaintenanceNeeded   bool                       `json:"maintenance_needed"`
+	IndexName         string    `json:"index_name"`
+	TotalEntries      int64     `json:"total_entries"`
+	IndexSize         int64     `json:"index_size_bytes"`
+	HitRate           float64   `json:"hit_rate"`
+	LastUsed          time.Time `json:"last_used"`
+	MaintenanceNeeded bool      `json:"maintenance_needed"`
 }
 
 type IndexPolicy struct {
-	AutoCreateIndexes   bool                       `json:"auto_create_indexes"`
-	IndexThreshold      int64                      `json:"index_threshold"`
-	MaxIndexes          int                        `json:"max_indexes"`
-	MaintenanceSchedule string                     `json:"maintenance_schedule"`
+	AutoCreateIndexes   bool   `json:"auto_create_indexes"`
+	IndexThreshold      int64  `json:"index_threshold"`
+	MaxIndexes          int    `json:"max_indexes"`
+	MaintenanceSchedule string `json:"maintenance_schedule"`
 }
 
 type QueryPlanner struct {
-	executionPlans      map[string]*ExecutionPlan
-	planCache           map[string]*ExecutionPlan
-	optimizationHints   map[string][]OptimizationHint
-	mu                  sync.RWMutex
+	executionPlans    map[string]*ExecutionPlan
+	planCache         map[string]*ExecutionPlan
+	optimizationHints map[string][]OptimizationHint
+	mu                sync.RWMutex
 }
 
 type ExecutionPlan struct {
-	PlanID              string                     `json:"plan_id"`
-	QueryHash           string                     `json:"query_hash"`
-	EstimatedCost       float64                    `json:"estimated_cost"`
-	EstimatedTime       time.Duration              `json:"estimated_time"`
-	Steps               []ExecutionStep            `json:"steps"`
-	UseIndexes          []string                   `json:"use_indexes"`
-	Parallelization     int                        `json:"parallelization"`
-	CreatedAt           time.Time                  `json:"created_at"`
+	PlanID          string          `json:"plan_id"`
+	QueryHash       string          `json:"query_hash"`
+	EstimatedCost   float64         `json:"estimated_cost"`
+	EstimatedTime   time.Duration   `json:"estimated_time"`
+	Steps           []ExecutionStep `json:"steps"`
+	UseIndexes      []string        `json:"use_indexes"`
+	Parallelization int             `json:"parallelization"`
+	CreatedAt       time.Time       `json:"created_at"`
 }
 
 type ExecutionStep struct {
-	StepID              string                     `json:"step_id"`
-	Operation           string                     `json:"operation"`
-	EstimatedCost       float64                    `json:"estimated_cost"`
-	EstimatedRows       int64                      `json:"estimated_rows"`
-	Dependencies        []string                   `json:"dependencies"`
+	StepID        string   `json:"step_id"`
+	Operation     string   `json:"operation"`
+	EstimatedCost float64  `json:"estimated_cost"`
+	EstimatedRows int64    `json:"estimated_rows"`
+	Dependencies  []string `json:"dependencies"`
 }
 
 type OptimizationHint struct {
-	HintType            string                     `json:"hint_type"`
-	Description         string                     `json:"description"`
-	Impact              string                     `json:"impact"` // "high", "medium", "low"
-	Suggestion          string                     `json:"suggestion"`
+	HintType    string `json:"hint_type"`
+	Description string `json:"description"`
+	Impact      string `json:"impact"` // "high", "medium", "low"
+	Suggestion  string `json:"suggestion"`
 }
 
 type OptimizationRule interface {
@@ -359,188 +357,188 @@ type OptimizationRule interface {
 }
 
 type QueryInfo struct {
-	Query               string                     `json:"query"`
-	Measurement         string                     `json:"measurement"`
-	TimeRange           *TimeRange                 `json:"time_range"`
-	Fields              []string                   `json:"fields"`
-	Tags                map[string]string          `json:"tags"`
-	Aggregations        []string                   `json:"aggregations"`
-	GroupBy             []string                   `json:"group_by"`
-	OrderBy             []string                   `json:"order_by"`
-	Limit               int                        `json:"limit"`
+	Query        string            `json:"query"`
+	Measurement  string            `json:"measurement"`
+	TimeRange    *TimeRange        `json:"time_range"`
+	Fields       []string          `json:"fields"`
+	Tags         map[string]string `json:"tags"`
+	Aggregations []string          `json:"aggregations"`
+	GroupBy      []string          `json:"group_by"`
+	OrderBy      []string          `json:"order_by"`
+	Limit        int               `json:"limit"`
 }
 
 type QueryStatistics struct {
-	totalQueries        int64
-	averageLatency      time.Duration
-	slowQueries         []*SlowQuery
-	queryPatterns       map[string]*QueryPattern
-	mu                  sync.RWMutex
+	totalQueries   int64
+	averageLatency time.Duration
+	slowQueries    []*SlowQuery
+	queryPatterns  map[string]*QueryPattern
+	mu             sync.RWMutex
 }
 
 type SlowQuery struct {
-	Query               string                     `json:"query"`
-	ExecutionTime       time.Duration              `json:"execution_time"`
-	Timestamp           time.Time                  `json:"timestamp"`
-	RowsReturned        int64                      `json:"rows_returned"`
-	ErrorMessage        string                     `json:"error_message,omitempty"`
+	Query         string        `json:"query"`
+	ExecutionTime time.Duration `json:"execution_time"`
+	Timestamp     time.Time     `json:"timestamp"`
+	RowsReturned  int64         `json:"rows_returned"`
+	ErrorMessage  string        `json:"error_message,omitempty"`
 }
 
 type QueryPattern struct {
-	Pattern             string                     `json:"pattern"`
-	Count               int64                      `json:"count"`
-	AverageLatency      time.Duration              `json:"average_latency"`
-	LastSeen            time.Time                  `json:"last_seen"`
+	Pattern        string        `json:"pattern"`
+	Count          int64         `json:"count"`
+	AverageLatency time.Duration `json:"average_latency"`
+	LastSeen       time.Time     `json:"last_seen"`
 }
 
 // CacheManager handles intelligent caching
 type CacheManager struct {
-	queryCache          *QueryCache
-	resultCache         map[string]*ResultCache
-	cacheStats          *CacheStatistics
-	mu                  sync.RWMutex
+	queryCache  *QueryCache
+	resultCache map[string]*ResultCache
+	cacheStats  *CacheStatistics
+	mu          sync.RWMutex
 }
 
 type ResultCache struct {
-	CacheName           string                     `json:"cache_name"`
-	MaxSize             int64                      `json:"max_size_bytes"`
-	CurrentSize         int64                      `json:"current_size_bytes"`
-	Entries             map[string]*CacheEntry     `json:"entries"`
-	HitCount            int64                      `json:"hit_count"`
-	MissCount           int64                      `json:"miss_count"`
-	EvictionCount       int64                      `json:"eviction_count"`
+	CacheName     string                 `json:"cache_name"`
+	MaxSize       int64                  `json:"max_size_bytes"`
+	CurrentSize   int64                  `json:"current_size_bytes"`
+	Entries       map[string]*CacheEntry `json:"entries"`
+	HitCount      int64                  `json:"hit_count"`
+	MissCount     int64                  `json:"miss_count"`
+	EvictionCount int64                  `json:"eviction_count"`
 }
 
 type CacheStatistics struct {
-	TotalHits           int64                      `json:"total_hits"`
-	TotalMisses         int64                      `json:"total_misses"`
-	HitRate             float64                    `json:"hit_rate"`
-	TotalEvictions      int64                      `json:"total_evictions"`
-	CacheSize           int64                      `json:"cache_size_bytes"`
-	LastUpdated         time.Time                  `json:"last_updated"`
+	TotalHits      int64     `json:"total_hits"`
+	TotalMisses    int64     `json:"total_misses"`
+	HitRate        float64   `json:"hit_rate"`
+	TotalEvictions int64     `json:"total_evictions"`
+	CacheSize      int64     `json:"cache_size_bytes"`
+	LastUpdated    time.Time `json:"last_updated"`
 }
 
 // AggregationManager handles pre-computed aggregations
 type AggregationManager struct {
-	aggregationRules    map[string]*AggregationRule
-	aggregationJobs     map[string]*AggregationJob
-	aggregationStats    map[string]*AggregationStats
-	scheduler           *AggregationScheduler
-	mu                  sync.RWMutex
+	aggregationRules map[string]*AggregationRule
+	aggregationJobs  map[string]*AggregationJob
+	aggregationStats map[string]*AggregationStats
+	scheduler        *AggregationScheduler
+	mu               sync.RWMutex
 }
 
 type AggregationRule struct {
-	RuleID              string                     `json:"rule_id"`
-	RuleName            string                     `json:"rule_name"`
-	SourceMeasurement   string                     `json:"source_measurement"`
-	TargetMeasurement   string                     `json:"target_measurement"`
-	TimeWindow          time.Duration              `json:"time_window"`
-	AggregationFuncs    []AggregationFunction      `json:"aggregation_functions"`
-	GroupByTags         []string                   `json:"group_by_tags"`
-	FilterConditions    []FilterCondition          `json:"filter_conditions"`
-	Schedule            string                     `json:"schedule"`
-	Enabled             bool                       `json:"enabled"`
-	CreatedAt           time.Time                  `json:"created_at"`
+	RuleID            string                `json:"rule_id"`
+	RuleName          string                `json:"rule_name"`
+	SourceMeasurement string                `json:"source_measurement"`
+	TargetMeasurement string                `json:"target_measurement"`
+	TimeWindow        time.Duration         `json:"time_window"`
+	AggregationFuncs  []AggregationFunction `json:"aggregation_functions"`
+	GroupByTags       []string              `json:"group_by_tags"`
+	FilterConditions  []FilterCondition     `json:"filter_conditions"`
+	Schedule          string                `json:"schedule"`
+	Enabled           bool                  `json:"enabled"`
+	CreatedAt         time.Time             `json:"created_at"`
 }
 
 type AggregationFunction struct {
-	Function            string                     `json:"function"` // "mean", "sum", "max", "min", "count", "percentile"
-	SourceField         string                     `json:"source_field"`
-	TargetField         string                     `json:"target_field"`
-	Parameters          map[string]interface{}     `json:"parameters,omitempty"`
+	Function    string                 `json:"function"` // "mean", "sum", "max", "min", "count", "percentile"
+	SourceField string                 `json:"source_field"`
+	TargetField string                 `json:"target_field"`
+	Parameters  map[string]interface{} `json:"parameters,omitempty"`
 }
 
 type FilterCondition struct {
-	Field               string                     `json:"field"`
-	Operator            string                     `json:"operator"` // "=", "!=", ">", "<", ">=", "<=", "regex"
-	Value               interface{}                `json:"value"`
+	Field    string      `json:"field"`
+	Operator string      `json:"operator"` // "=", "!=", ">", "<", ">=", "<=", "regex"
+	Value    interface{} `json:"value"`
 }
 
 type AggregationJob struct {
-	JobID               string                     `json:"job_id"`
-	RuleID              string                     `json:"rule_id"`
-	Status              string                     `json:"status"`
-	StartTime           time.Time                  `json:"start_time"`
-	EndTime             time.Time                  `json:"end_time"`
-	ProcessedPoints     int64                      `json:"processed_points"`
-	GeneratedPoints     int64                      `json:"generated_points"`
-	ErrorMessage        string                     `json:"error_message,omitempty"`
+	JobID           string    `json:"job_id"`
+	RuleID          string    `json:"rule_id"`
+	Status          string    `json:"status"`
+	StartTime       time.Time `json:"start_time"`
+	EndTime         time.Time `json:"end_time"`
+	ProcessedPoints int64     `json:"processed_points"`
+	GeneratedPoints int64     `json:"generated_points"`
+	ErrorMessage    string    `json:"error_message,omitempty"`
 }
 
 type AggregationStats struct {
-	RuleID              string                     `json:"rule_id"`
-	TotalRuns           int64                      `json:"total_runs"`
-	SuccessfulRuns      int64                      `json:"successful_runs"`
-	FailedRuns          int64                      `json:"failed_runs"`
-	AverageRunTime      time.Duration              `json:"average_run_time"`
-	LastRun             time.Time                  `json:"last_run"`
-	TotalPointsProcessed int64                     `json:"total_points_processed"`
+	RuleID               string        `json:"rule_id"`
+	TotalRuns            int64         `json:"total_runs"`
+	SuccessfulRuns       int64         `json:"successful_runs"`
+	FailedRuns           int64         `json:"failed_runs"`
+	AverageRunTime       time.Duration `json:"average_run_time"`
+	LastRun              time.Time     `json:"last_run"`
+	TotalPointsProcessed int64         `json:"total_points_processed"`
 }
 
 type AggregationScheduler struct {
-	schedule            map[string]*ScheduledJob
-	jobQueue            chan *AggregationJob
-	activeJobs          map[string]*AggregationJob
-	mu                  sync.RWMutex
+	schedule   map[string]*ScheduledJob
+	jobQueue   chan *AggregationJob
+	activeJobs map[string]*AggregationJob
+	mu         sync.RWMutex
 }
 
 type ScheduledJob struct {
-	JobID               string                     `json:"job_id"`
-	RuleID              string                     `json:"rule_id"`
-	CronExpression      string                     `json:"cron_expression"`
-	LastRun             time.Time                  `json:"last_run"`
-	NextRun             time.Time                  `json:"next_run"`
-	Enabled             bool                       `json:"enabled"`
+	JobID          string    `json:"job_id"`
+	RuleID         string    `json:"rule_id"`
+	CronExpression string    `json:"cron_expression"`
+	LastRun        time.Time `json:"last_run"`
+	NextRun        time.Time `json:"next_run"`
+	Enabled        bool      `json:"enabled"`
 }
 
 // DownsampleManager handles data downsampling
 type DownsampleManager struct {
-	downsampleRules     map[string]*DownsampleRule
-	downsampleJobs      map[string]*DownsampleJob
-	downsampleStats     map[string]*DownsampleStats
-	mu                  sync.RWMutex
+	downsampleRules map[string]*DownsampleRule
+	downsampleJobs  map[string]*DownsampleJob
+	downsampleStats map[string]*DownsampleStats
+	mu              sync.RWMutex
 }
 
 type DownsampleJob struct {
-	JobID               string                     `json:"job_id"`
-	RuleID              string                     `json:"rule_id"`
-	Status              string                     `json:"status"`
-	StartTime           time.Time                  `json:"start_time"`
-	EndTime             time.Time                  `json:"end_time"`
-	SourcePoints        int64                      `json:"source_points"`
-	DownsampledPoints   int64                      `json:"downsampled_points"`
-	CompressionRatio    float64                    `json:"compression_ratio"`
-	ErrorMessage        string                     `json:"error_message,omitempty"`
+	JobID             string    `json:"job_id"`
+	RuleID            string    `json:"rule_id"`
+	Status            string    `json:"status"`
+	StartTime         time.Time `json:"start_time"`
+	EndTime           time.Time `json:"end_time"`
+	SourcePoints      int64     `json:"source_points"`
+	DownsampledPoints int64     `json:"downsampled_points"`
+	CompressionRatio  float64   `json:"compression_ratio"`
+	ErrorMessage      string    `json:"error_message,omitempty"`
 }
 
 type DownsampleStats struct {
-	RuleID              string                     `json:"rule_id"`
-	TotalJobs           int64                      `json:"total_jobs"`
-	SuccessfulJobs      int64                      `json:"successful_jobs"`
-	FailedJobs          int64                      `json:"failed_jobs"`
-	TotalSpaceSaved     int64                      `json:"total_space_saved_bytes"`
-	AverageCompression  float64                    `json:"average_compression_ratio"`
-	LastDownsample      time.Time                  `json:"last_downsample"`
+	RuleID             string    `json:"rule_id"`
+	TotalJobs          int64     `json:"total_jobs"`
+	SuccessfulJobs     int64     `json:"successful_jobs"`
+	FailedJobs         int64     `json:"failed_jobs"`
+	TotalSpaceSaved    int64     `json:"total_space_saved_bytes"`
+	AverageCompression float64   `json:"average_compression_ratio"`
+	LastDownsample     time.Time `json:"last_downsample"`
 }
 
 // Common types
 type TimeRange struct {
-	Start               time.Time                  `json:"start"`
-	End                 time.Time                  `json:"end"`
+	Start time.Time `json:"start"`
+	End   time.Time `json:"end"`
 }
 
 // OptimizerMetrics defines Prometheus metrics
 type OptimizerMetrics struct {
-	QueriesOptimized    prometheus.Counter
-	CacheHits           prometheus.Counter
-	CacheMisses         prometheus.Counter
-	CompressionRatio    prometheus.Gauge
-	RetentionCleanups   prometheus.Counter
-	AggregationJobs     *prometheus.CounterVec
-	DownsampleJobs      *prometheus.CounterVec
-	QueryLatency        *prometheus.HistogramVec
-	StorageSize         *prometheus.GaugeVec
-	IndexMaintenance    prometheus.Counter
+	QueriesOptimized  prometheus.Counter
+	CacheHits         prometheus.Counter
+	CacheMisses       prometheus.Counter
+	CompressionRatio  prometheus.Gauge
+	RetentionCleanups prometheus.Counter
+	AggregationJobs   *prometheus.CounterVec
+	DownsampleJobs    *prometheus.CounterVec
+	QueryLatency      *prometheus.HistogramVec
+	StorageSize       *prometheus.GaugeVec
+	IndexMaintenance  prometheus.Counter
 }
 
 func NewOptimizerMetrics() *OptimizerMetrics {
@@ -660,9 +658,9 @@ func NewTimeSeriesOptimizer() *TimeSeriesOptimizer {
 
 	queryOptimizer := &QueryOptimizer{
 		queryCache: &QueryCache{
-			cache:            make(map[string]*CacheEntry),
-			evictionPolicy:   "LRU",
-			maxCacheSize:     1024 * 1024 * 1024, // 1GB
+			cache:          make(map[string]*CacheEntry),
+			evictionPolicy: "LRU",
+			maxCacheSize:   1024 * 1024 * 1024, // 1GB
 		},
 		indexManager: &IndexManager{
 			indexes:    make(map[string]*TimeSeriesIndex),
@@ -673,7 +671,7 @@ func NewTimeSeriesOptimizer() *TimeSeriesOptimizer {
 			planCache:         make(map[string]*ExecutionPlan),
 			optimizationHints: make(map[string][]OptimizationHint),
 		},
-		queryStats:        &QueryStatistics{
+		queryStats: &QueryStatistics{
 			queryPatterns: make(map[string]*QueryPattern),
 		},
 		optimizationRules: make([]OptimizationRule, 0),
@@ -783,11 +781,11 @@ func (rm *RetentionManager) initializeDefaultRetentionPolicies() {
 				KeepOriginal:        true,
 			},
 		},
-		ArchiveAfter:   0, // Don't archive real-time data
-		DeleteAfter:    24 * time.Hour,
-		Priority:       1,
-		Enabled:        true,
-		CreatedAt:      time.Now(),
+		ArchiveAfter: 0, // Don't archive real-time data
+		DeleteAfter:  24 * time.Hour,
+		Priority:     1,
+		Enabled:      true,
+		CreatedAt:    time.Now(),
 	}
 
 	// Short-term data retention (medium resolution)
@@ -1103,10 +1101,10 @@ func (tso *TimeSeriesOptimizer) runAggregationJobs() {
 		// Check if it's time to run based on schedule
 		if tso.shouldRunAggregation(rule) {
 			job := &AggregationJob{
-				JobID:       fmt.Sprintf("%s_%d", ruleID, time.Now().Unix()),
-				RuleID:      ruleID,
-				Status:      "queued",
-				StartTime:   time.Now(),
+				JobID:     fmt.Sprintf("%s_%d", ruleID, time.Now().Unix()),
+				RuleID:    ruleID,
+				Status:    "queued",
+				StartTime: time.Now(),
 			}
 
 			// Queue aggregation job
@@ -1160,7 +1158,7 @@ func (tso *TimeSeriesOptimizer) runDownsampleJobs() {
 
 		job.EndTime = time.Now()
 		dm.downsampleJobs[job.JobID] = job
-		
+
 		tso.metrics.DownsampleJobs.WithLabelValues(ruleID, job.Status).Inc()
 	}
 }
@@ -1215,7 +1213,7 @@ func (tso *TimeSeriesOptimizer) runCacheMaintenance() {
 	cm.cacheStats.CacheSize = qc.currentCacheSize
 	cm.cacheStats.LastUpdated = now
 
-	log.Printf("Cache maintenance: evicted %d entries, hit rate: %.2f%%", 
+	log.Printf("Cache maintenance: evicted %d entries, hit rate: %.2f%%",
 		evictedCount, cm.cacheStats.HitRate*100)
 }
 
@@ -1396,7 +1394,7 @@ func (tso *TimeSeriesOptimizer) OptimizeQuery(query string) (string, error) {
 
 	// Generate execution plan
 	plan := tso.generateExecutionPlan(optimizedQuery)
-	
+
 	// Convert back to query string
 	optimizedQueryString := tso.queryInfoToString(optimizedQuery)
 
@@ -1434,7 +1432,7 @@ func (tso *TimeSeriesOptimizer) ExecuteQuery(query string) (interface{}, error) 
 // HTTP API endpoints
 func (tso *TimeSeriesOptimizer) setupHTTPRoutes(router *mux.Router) {
 	api := router.PathPrefix("/api/v1/optimizer").Subrouter()
-	
+
 	api.HandleFunc("/compression/status", tso.getCompressionStatus).Methods("GET")
 	api.HandleFunc("/retention/policies", tso.getRetentionPolicies).Methods("GET")
 	api.HandleFunc("/retention/policies", tso.createRetentionPolicy).Methods("POST")
@@ -1457,8 +1455,8 @@ func (tso *TimeSeriesOptimizer) getCompressionStatus(w http.ResponseWriter, r *h
 	tso.compressionMgr.mu.RUnlock()
 
 	response := map[string]interface{}{
-		"compression_stats":  stats,
-		"compression_policy": tso.compressionMgr.compressionPolicy,
+		"compression_stats":    stats,
+		"compression_policy":   tso.compressionMgr.compressionPolicy,
 		"available_algorithms": getAvailableAlgorithms(tso.compressionMgr.compressionAlgorithms),
 	}
 
@@ -1496,11 +1494,11 @@ func (tso *TimeSeriesOptimizer) getCacheStats(w http.ResponseWriter, r *http.Req
 	tso.cacheMgr.mu.RUnlock()
 
 	response := map[string]interface{}{
-		"cache_stats":       stats,
-		"cache_entries":     cacheEntries,
-		"cache_size_bytes":  cacheSize,
-		"max_size_bytes":    maxSize,
-		"utilization":       float64(cacheSize) / float64(maxSize) * 100,
+		"cache_stats":      stats,
+		"cache_entries":    cacheEntries,
+		"cache_size_bytes": cacheSize,
+		"max_size_bytes":   maxSize,
+		"utilization":      float64(cacheSize) / float64(maxSize) * 100,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -1551,12 +1549,12 @@ func (tso *TimeSeriesOptimizer) updateCompressionMetrics() {
 	cm := tso.compressionMgr
 	totalRatio := 0.0
 	count := 0
-	
+
 	for _, stats := range cm.compressionStats {
 		totalRatio += stats.CompressionRatio
 		count++
 	}
-	
+
 	if count > 0 {
 		avgRatio := totalRatio / float64(count)
 		tso.metrics.CompressionRatio.Set(avgRatio)
@@ -1608,7 +1606,7 @@ func (tso *TimeSeriesOptimizer) executeAggregationJob(job *AggregationJob) {
 	job.EndTime = time.Now()
 	job.ProcessedPoints = 10000
 	job.GeneratedPoints = 1000
-	
+
 	tso.metrics.AggregationJobs.WithLabelValues(job.RuleID, job.Status).Inc()
 }
 
@@ -1639,7 +1637,7 @@ func (tso *TimeSeriesOptimizer) checkQueryCache(key string) (string, bool) {
 	qc := tso.queryOptimizer.queryCache
 	qc.mu.RLock()
 	defer qc.mu.RUnlock()
-	
+
 	entry, exists := qc.cache[key]
 	if exists && time.Since(entry.CreatedAt) < entry.TTL {
 		entry.LastAccessed = time.Now()
@@ -1671,7 +1669,7 @@ func (tso *TimeSeriesOptimizer) cacheQueryResult(key, query string, plan *Execut
 	qc := tso.queryOptimizer.queryCache
 	qc.mu.Lock()
 	defer qc.mu.Unlock()
-	
+
 	entry := &CacheEntry{
 		QueryHash:    key,
 		Query:        query,
@@ -1682,7 +1680,7 @@ func (tso *TimeSeriesOptimizer) cacheQueryResult(key, query string, plan *Execut
 		TTL:          5 * time.Minute,
 		Size:         int64(len(query)),
 	}
-	
+
 	qc.cache[key] = entry
 	qc.currentCacheSize += entry.Size
 }
@@ -1691,9 +1689,9 @@ func (tso *TimeSeriesOptimizer) updateQueryStatistics(query string, duration tim
 	qs := tso.queryOptimizer.queryStats
 	qs.mu.Lock()
 	defer qs.mu.Unlock()
-	
+
 	qs.totalQueries++
-	
+
 	if duration > 5*time.Second {
 		slowQuery := &SlowQuery{
 			Query:         query,
@@ -1704,7 +1702,7 @@ func (tso *TimeSeriesOptimizer) updateQueryStatistics(query string, duration tim
 		if err != nil {
 			slowQuery.ErrorMessage = err.Error()
 		}
-		
+
 		qs.slowQueries = append(qs.slowQueries, slowQuery)
 		if len(qs.slowQueries) > 100 {
 			qs.slowQueries = qs.slowQueries[1:]
@@ -1724,7 +1722,7 @@ func (tso *TimeSeriesOptimizer) clearCache(w http.ResponseWriter, r *http.Reques
 	qc.cache = make(map[string]*CacheEntry)
 	qc.currentCacheSize = 0
 	qc.mu.Unlock()
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "cache cleared"})
 }
@@ -1762,24 +1760,24 @@ func (tso *TimeSeriesOptimizer) optimizeQueryEndpoint(w http.ResponseWriter, r *
 	var request struct {
 		Query string `json:"query"`
 	}
-	
+
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	
+
 	optimizedQuery, err := tso.OptimizeQuery(request.Query)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	response := map[string]interface{}{
-		"original_query":   request.Query,
-		"optimized_query":  optimizedQuery,
+		"original_query":       request.Query,
+		"optimized_query":      optimizedQuery,
 		"optimization_applied": true,
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
@@ -1804,8 +1802,8 @@ func (tso *TimeSeriesOptimizer) getArchiveStatus(w http.ResponseWriter, r *http.
 	am.mu.RUnlock()
 
 	response := map[string]interface{}{
-		"archive_policy":    policy,
-		"queue_size":        len(am.archiveQueue),
+		"archive_policy":     policy,
+		"queue_size":         len(am.archiveQueue),
 		"available_backends": getAvailableBackends(am.archiveBackends),
 	}
 
@@ -1836,12 +1834,12 @@ func main() {
 	// Setup HTTP server
 	router := mux.NewRouter()
 	optimizer.setupHTTPRoutes(router)
-	
+
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"status": "healthy"})
 	}).Methods("GET")
-	
+
 	router.Handle("/metrics", promhttp.Handler()).Methods("GET")
 
 	server := &http.Server{
@@ -1878,7 +1876,7 @@ func main() {
 	// Shutdown HTTP server
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
-	
+
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		log.Printf("HTTP server shutdown error: %v", err)
 	}
@@ -1888,51 +1886,60 @@ func main() {
 
 // Placeholder implementations for optimization rules
 type TimeRangeOptimizationRule struct{}
+
 func (r *TimeRangeOptimizationRule) Apply(query *QueryInfo) *QueryInfo { return query }
-func (r *TimeRangeOptimizationRule) GetRuleName() string { return "time_range_optimization" }
-func (r *TimeRangeOptimizationRule) GetPriority() int { return 10 }
+func (r *TimeRangeOptimizationRule) GetRuleName() string               { return "time_range_optimization" }
+func (r *TimeRangeOptimizationRule) GetPriority() int                  { return 10 }
 
 type IndexHintRule struct{}
+
 func (r *IndexHintRule) Apply(query *QueryInfo) *QueryInfo { return query }
-func (r *IndexHintRule) GetRuleName() string { return "index_hint" }
-func (r *IndexHintRule) GetPriority() int { return 8 }
+func (r *IndexHintRule) GetRuleName() string               { return "index_hint" }
+func (r *IndexHintRule) GetPriority() int                  { return 8 }
 
 type AggregationPushdownRule struct{}
+
 func (r *AggregationPushdownRule) Apply(query *QueryInfo) *QueryInfo { return query }
-func (r *AggregationPushdownRule) GetRuleName() string { return "aggregation_pushdown" }
-func (r *AggregationPushdownRule) GetPriority() int { return 7 }
+func (r *AggregationPushdownRule) GetRuleName() string               { return "aggregation_pushdown" }
+func (r *AggregationPushdownRule) GetPriority() int                  { return 7 }
 
 type PrecomputedResultRule struct{}
+
 func (r *PrecomputedResultRule) Apply(query *QueryInfo) *QueryInfo { return query }
-func (r *PrecomputedResultRule) GetRuleName() string { return "precomputed_result" }
-func (r *PrecomputedResultRule) GetPriority() int { return 9 }
+func (r *PrecomputedResultRule) GetRuleName() string               { return "precomputed_result" }
+func (r *PrecomputedResultRule) GetPriority() int                  { return 9 }
 
 type ParallelizationRule struct{}
+
 func (r *ParallelizationRule) Apply(query *QueryInfo) *QueryInfo { return query }
-func (r *ParallelizationRule) GetRuleName() string { return "parallelization" }
-func (r *ParallelizationRule) GetPriority() int { return 6 }
+func (r *ParallelizationRule) GetRuleName() string               { return "parallelization" }
+func (r *ParallelizationRule) GetPriority() int                  { return 6 }
 
 // Placeholder compression algorithms
 type GzipCompression struct{}
-func (g *GzipCompression) Compress(data []byte) ([]byte, error) { return data, nil }
-func (g *GzipCompression) Decompress(data []byte) ([]byte, error) { return data, nil }
+
+func (g *GzipCompression) Compress(data []byte) ([]byte, error)    { return data, nil }
+func (g *GzipCompression) Decompress(data []byte) ([]byte, error)  { return data, nil }
 func (g *GzipCompression) GetCompressionRatio(data []byte) float64 { return 0.4 }
-func (g *GzipCompression) GetName() string { return "gzip" }
+func (g *GzipCompression) GetName() string                         { return "gzip" }
 
 type SnappyCompression struct{}
-func (s *SnappyCompression) Compress(data []byte) ([]byte, error) { return data, nil }
-func (s *SnappyCompression) Decompress(data []byte) ([]byte, error) { return data, nil }
+
+func (s *SnappyCompression) Compress(data []byte) ([]byte, error)    { return data, nil }
+func (s *SnappyCompression) Decompress(data []byte) ([]byte, error)  { return data, nil }
 func (s *SnappyCompression) GetCompressionRatio(data []byte) float64 { return 0.6 }
-func (s *SnappyCompression) GetName() string { return "snappy" }
+func (s *SnappyCompression) GetName() string                         { return "snappy" }
 
 type LZ4Compression struct{}
-func (l *LZ4Compression) Compress(data []byte) ([]byte, error) { return data, nil }
-func (l *LZ4Compression) Decompress(data []byte) ([]byte, error) { return data, nil }
+
+func (l *LZ4Compression) Compress(data []byte) ([]byte, error)    { return data, nil }
+func (l *LZ4Compression) Decompress(data []byte) ([]byte, error)  { return data, nil }
 func (l *LZ4Compression) GetCompressionRatio(data []byte) float64 { return 0.5 }
-func (l *LZ4Compression) GetName() string { return "lz4" }
+func (l *LZ4Compression) GetName() string                         { return "lz4" }
 
 type ZstdCompression struct{}
-func (z *ZstdCompression) Compress(data []byte) ([]byte, error) { return data, nil }
-func (z *ZstdCompression) Decompress(data []byte) ([]byte, error) { return data, nil }
+
+func (z *ZstdCompression) Compress(data []byte) ([]byte, error)    { return data, nil }
+func (z *ZstdCompression) Decompress(data []byte) ([]byte, error)  { return data, nil }
 func (z *ZstdCompression) GetCompressionRatio(data []byte) float64 { return 0.3 }
-func (z *ZstdCompression) GetName() string { return "zstd" }
+func (z *ZstdCompression) GetName() string                         { return "zstd" }

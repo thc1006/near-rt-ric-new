@@ -1,0 +1,63 @@
+{
+    "annotations": {},
+    "editable": true,
+    "gnetId": null,
+    "graphTooltip": 0,
+    "links": [],
+    "panels": [
+        {
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "id": 1,
+            "title": "E2 Interface Connections",
+            "type": "graph",
+            "targets": [{
+                "expr": "near_rt_ric_e2_connection_total",
+                "legendFormat": "Active Connections"
+            }]
+        },
+        {
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "id": 2,
+            "title": "A1 Policy Requests",
+            "type": "graph",
+            "targets": [{
+                "expr": "near_rt_ric_a1_policy_requests_total",
+                "legendFormat": "Total Requests"
+            }]
+        },
+        {
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "id": 3,
+            "title": "RIC Controller CPU Usage",
+            "type": "graph",
+            "targets": [{
+                "expr": "process_cpu_seconds_total{job='near-rt-ric-controller'}",
+                "legendFormat": "CPU Seconds"
+            }]
+        },
+        {
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "id": 4,
+            "title": "Service Availability",
+            "type": "gauge",
+            "targets": [{
+                "expr": "service:near_rt_ric_availability:ratio_rate5m * 100",
+                "legendFormat": "Availability %"
+            }]
+        }
+    ],
+    "schemaVersion": 27,
+    "style": "dark",
+    "tags": ["oran", "l-release", "near-rt-ric"],
+    "templating": {
+        "list": []
+    },
+    "time": {
+        "from": "now-6h",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "",
+    "title": "O-RAN Near-RT RIC Dashboard",
+    "uid": "oran-near-rt-ric-dashboard"
+}

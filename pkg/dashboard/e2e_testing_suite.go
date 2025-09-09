@@ -144,7 +144,7 @@ type TestClientPool struct {
 	E2TermClient     *E2TerminationClient
 	E2MgrClient      *E2ManagerClient
 	SubMgrClient     *SubscriptionManagerClient
-	A1Client         *A1MediatorClient
+	A1Client         A1MediatorClient
 	O1Client         *O1MediatorClient
 	O2Client         *O2CloudClient
 	PorchClient      *PorchClient

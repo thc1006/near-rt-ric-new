@@ -1,0 +1,188 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ric-dashboard
+  namespace: ricplt
+  labels:
+    app: ric-dashboard
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: ric-dashboard
+  template:
+    metadata:
+      labels:
+        app: ric-dashboard
+    spec:
+      containers:
+      - name: ric-dashboard-frontend
+        image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-dashboard-frontend:1.0.0
+        ports:
+        - containerPort: 4200
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 4200
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          failureThreshold: 3
+        
+        # Security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+
+      - name: ric-dashboard-backend
+        image: nexus3.o-ran-sc.org:10002/o-ran-sc/ric-dashboard-backend:1.0.0
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: production
+        - name: RIC_PLATFORM_ENDPOINT
+          value: "http://ricplt-service:8080"
+        
+        # Enhanced health probes with more detailed checks
+        readinessProbe:
+          httpGet:
+            path: /api/health/ready
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        
+        livenessProbe:
+          httpGet:
+            path: /api/health/alive
+            port: 8080
+          initialDelaySeconds: 45
+          periodSeconds: 20
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        
+        # RIC component health configuration
+        volumeMounts:
+        - name: ric-component-config
+          mountPath: /etc/ric/components
+          readOnly: true
+        
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1
+            memory: 1Gi
+        
+        # Security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+
+      # Configure volume for RIC component health checks
+      volumes:
+      - name: ric-component-config
+        configMap:
+          name: ric-component-health-config
+          optional: true
+
+      # Pod-level affinity to spread across nodes
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - ric-dashboard
+              topologyKey: kubernetes.io/hostname
+
+      # Pull secrets for O-RAN SC registry
+      imagePullSecrets:
+      - name: o-ran-sc-registry-secret
+
+---
+# Configuration for RIC component health checks
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ric-component-health-config
+  namespace: ricplt
+data:
+  health-config.yaml: |
+    components:
+      e2mgr:
+        endpoint: "ricplt-e2mgr:3800"
+        port: 3800
+        path: "/health"
+        timeout: 5s
+      a1mediator:
+        endpoint: "ricplt-a1mediator:10000"
+        port: 10000
+        path: "/health"
+        timeout: 5s
+      appmgr:
+        endpoint: "ricplt-appmgr:8080"
+        port: 8080
+        path: "/health"
+        timeout: 5s
+      submgr:
+        endpoint: "ricplt-submgr:8080"
+        port: 8080
+        path: "/health"
+        timeout: 5s
+      rtmgr:
+        endpoint: "ricplt-rtmgr:4560"
+        port: 4560
+        path: "/health"
+        timeout: 5s
+    
+    healthCheckInterval: 30s
+    circuitBreakerThreshold: 3
+
+---
+# Service definition
+apiVersion: v1
+kind: Service
+metadata:
+  name: ric-dashboard
+  namespace: ricplt
+spec:
+  selector:
+    app: ric-dashboard
+  ports:
+  - name: frontend
+    port: 4200
+    targetPort: 4200
+  - name: backend
+    port: 8080
+    targetPort: 8080
+  type: LoadBalancer

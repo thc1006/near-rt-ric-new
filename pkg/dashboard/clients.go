@@ -35,7 +35,7 @@ type ClientManager struct {
 	subscriptionMgrClient *SubscriptionManagerClient
 	routingMgrClient      *RoutingManagerClient
 	e2tClient             *E2TClient
-	a1MediatorClient      *A1MediatorClient
+	a1MediatorClient      A1MediatorClient
 	o1MediatorClient      *O1MediatorClient
 	sctpManager           *SCTPConnectionManager
 }
@@ -266,7 +266,7 @@ func (cm *ClientManager) GetE2TClient() *E2TClient {
 }
 
 // GetA1MediatorClient returns the A1 Mediator client
-func (cm *ClientManager) GetA1MediatorClient() *A1MediatorClient {
+func (cm *ClientManager) GetA1MediatorClient() A1MediatorClient {
 	return cm.a1MediatorClient
 }
 

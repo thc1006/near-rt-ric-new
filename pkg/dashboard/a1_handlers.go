@@ -61,7 +61,7 @@ func (s *Server) A1PolicyTypesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetPolicyTypes handles GET requests for policy types
-func (s *Server) handleGetPolicyTypes(w http.ResponseWriter, r *http.Request, ctx context.Context, a1Client *A1MediatorClient) {
+func (s *Server) handleGetPolicyTypes(w http.ResponseWriter, r *http.Request, ctx context.Context, a1Client A1MediatorClient) {
 	policyTypes, err := a1Client.GetPolicyTypes(ctx)
 	if err != nil {
 		log.Printf("Failed to get policy types: %v", err)
@@ -108,7 +108,7 @@ func (s *Server) A1PolicyTypeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetPolicyType handles GET requests for a specific policy type
-func (s *Server) handleGetPolicyType(w http.ResponseWriter, r *http.Request, ctx context.Context, a1Client *A1MediatorClient, policyTypeID PolicyTypeID) {
+func (s *Server) handleGetPolicyType(w http.ResponseWriter, r *http.Request, ctx context.Context, a1Client A1MediatorClient, policyTypeID PolicyTypeID) {
 	policyType, err := a1Client.GetPolicyType(ctx, policyTypeID)
 	if err != nil {
 		log.Printf("Failed to get policy type %s: %v", policyTypeID, err)
@@ -129,7 +129,7 @@ func (s *Server) handleGetPolicyType(w http.ResponseWriter, r *http.Request, ctx
 }
 
 // handleCreatePolicyType handles POST requests to create a policy type
-func (s *Server) handleCreatePolicyType(w http.ResponseWriter, r *http.Request, ctx context.Context, a1Client *A1MediatorClient, policyTypeID PolicyTypeID) {
+func (s *Server) handleCreatePolicyType(w http.ResponseWriter, r *http.Request, ctx context.Context, a1Client A1MediatorClient, policyTypeID PolicyTypeID) {
 	var request PolicyTypeRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -145,11 +145,11 @@ func (s *Server) handleCreatePolicyType(w http.ResponseWriter, r *http.Request, 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	response := map[string]interface{}{
-		"status":         "success",
-		"message":        "Policy type created successfully",
-		"policyTypeId":   policyTypeID,
+		"status":       "success",
+		"message":      "Policy type created successfully",
+		"policyTypeId": policyTypeID,
 	}
-	
+
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Failed to encode policy type creation response: %v", err)
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
@@ -158,7 +158,7 @@ func (s *Server) handleCreatePolicyType(w http.ResponseWriter, r *http.Request, 
 }
 
 // handleDeletePolicyType handles DELETE requests for a policy type
-func (s *Server) handleDeletePolicyType(w http.ResponseWriter, r *http.Request, ctx context.Context, a1Client *A1MediatorClient, policyTypeID PolicyTypeID) {
+func (s *Server) handleDeletePolicyType(w http.ResponseWriter, r *http.Request, ctx context.Context, a1Client A1MediatorClient, policyTypeID PolicyTypeID) {
 	if err := a1Client.DeletePolicyType(ctx, policyTypeID); err != nil {
 		log.Printf("Failed to delete policy type %s: %v", policyTypeID, err)
 		if err.Error() == "policy type "+string(policyTypeID)+" not found" {
@@ -171,11 +171,11 @@ func (s *Server) handleDeletePolicyType(w http.ResponseWriter, r *http.Request, 
 
 	w.Header().Set("Content-Type", "application/json")
 	response := map[string]interface{}{
-		"status":         "success",
-		"message":        "Policy type deleted successfully",
-		"policyTypeId":   policyTypeID,
+		"status":       "success",
+		"message":      "Policy type deleted successfully",
+		"policyTypeId": policyTypeID,
 	}
-	
+
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Failed to encode policy type deletion response: %v", err)
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
@@ -210,7 +210,7 @@ func (s *Server) A1PolicyInstancesHandler(w http.ResponseWriter, r *http.Request
 }
 
 // handleGetPolicyInstances handles GET requests for policy instances
-func (s *Server) handleGetPolicyInstances(w http.ResponseWriter, r *http.Request, ctx context.Context, a1Client *A1MediatorClient, policyTypeID PolicyTypeID) {
+func (s *Server) handleGetPolicyInstances(w http.ResponseWriter, r *http.Request, ctx context.Context, a1Client A1MediatorClient, policyTypeID PolicyTypeID) {
 	policyInstances, err := a1Client.GetPolicyInstances(ctx, policyTypeID)
 	if err != nil {
 		log.Printf("Failed to get policy instances for type %s: %v", policyTypeID, err)
@@ -231,12 +231,12 @@ func (s *Server) A1PolicyInstanceHandler(w http.ResponseWriter, r *http.Request)
 	vars := mux.Vars(r)
 	policyTypeID := vars["policyTypeId"]
 	policyInstanceID := vars["policyInstanceId"]
-	
+
 	if policyTypeID == "" {
 		http.Error(w, "Policy type ID is required", http.StatusBadRequest)
 		return
 	}
-	
+
 	if policyInstanceID == "" {
 		http.Error(w, "Policy instance ID is required", http.StatusBadRequest)
 		return
@@ -264,7 +264,7 @@ func (s *Server) A1PolicyInstanceHandler(w http.ResponseWriter, r *http.Request)
 }
 
 // handleGetPolicyInstance handles GET requests for a specific policy instance
-func (s *Server) handleGetPolicyInstance(w http.ResponseWriter, r *http.Request, ctx context.Context, a1Client *A1MediatorClient, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID) {
+func (s *Server) handleGetPolicyInstance(w http.ResponseWriter, r *http.Request, ctx context.Context, a1Client A1MediatorClient, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID) {
 	policyInstance, err := a1Client.GetPolicyInstance(ctx, policyTypeID, policyInstanceID)
 	if err != nil {
 		log.Printf("Failed to get policy instance %s: %v", policyInstanceID, err)
@@ -285,7 +285,7 @@ func (s *Server) handleGetPolicyInstance(w http.ResponseWriter, r *http.Request,
 }
 
 // handleCreateOrUpdatePolicyInstance handles PUT requests to create or update a policy instance
-func (s *Server) handleCreateOrUpdatePolicyInstance(w http.ResponseWriter, r *http.Request, ctx context.Context, a1Client *A1MediatorClient, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID) {
+func (s *Server) handleCreateOrUpdatePolicyInstance(w http.ResponseWriter, r *http.Request, ctx context.Context, a1Client A1MediatorClient, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID) {
 	var request PolicyInstanceRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -302,7 +302,7 @@ func (s *Server) handleCreateOrUpdatePolicyInstance(w http.ResponseWriter, r *ht
 			PolicyInstanceID: policyInstanceID,
 			Policy:           request.Policy,
 		}
-		
+
 		if err := a1Client.UpdatePolicyInstance(ctx, policyTypeID, update); err != nil {
 			log.Printf("Failed to update policy instance %s: %v", policyInstanceID, err)
 			http.Error(w, "Failed to update policy instance", http.StatusInternalServerError)
@@ -316,7 +316,7 @@ func (s *Server) handleCreateOrUpdatePolicyInstance(w http.ResponseWriter, r *ht
 			"policyTypeId":     policyTypeID,
 			"policyInstanceId": policyInstanceID,
 		}
-		
+
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			log.Printf("Failed to encode policy instance update response: %v", err)
 			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
@@ -338,7 +338,7 @@ func (s *Server) handleCreateOrUpdatePolicyInstance(w http.ResponseWriter, r *ht
 			"policyTypeId":     policyTypeID,
 			"policyInstanceId": policyInstanceID,
 		}
-		
+
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			log.Printf("Failed to encode policy instance creation response: %v", err)
 			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
@@ -348,7 +348,7 @@ func (s *Server) handleCreateOrUpdatePolicyInstance(w http.ResponseWriter, r *ht
 }
 
 // handleDeletePolicyInstance handles DELETE requests for a policy instance
-func (s *Server) handleDeletePolicyInstance(w http.ResponseWriter, r *http.Request, ctx context.Context, a1Client *A1MediatorClient, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID) {
+func (s *Server) handleDeletePolicyInstance(w http.ResponseWriter, r *http.Request, ctx context.Context, a1Client A1MediatorClient, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID) {
 	if err := a1Client.DeletePolicyInstance(ctx, policyTypeID, policyInstanceID); err != nil {
 		log.Printf("Failed to delete policy instance %s: %v", policyInstanceID, err)
 		if err.Error() == "policy instance "+string(policyInstanceID)+" not found" {
@@ -366,7 +366,7 @@ func (s *Server) handleDeletePolicyInstance(w http.ResponseWriter, r *http.Reque
 		"policyTypeId":     policyTypeID,
 		"policyInstanceId": policyInstanceID,
 	}
-	
+
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Failed to encode policy instance deletion response: %v", err)
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
@@ -379,12 +379,12 @@ func (s *Server) A1PolicyInstanceStatusHandler(w http.ResponseWriter, r *http.Re
 	vars := mux.Vars(r)
 	policyTypeID := vars["policyTypeId"]
 	policyInstanceID := vars["policyInstanceId"]
-	
+
 	if policyTypeID == "" {
 		http.Error(w, "Policy type ID is required", http.StatusBadRequest)
 		return
 	}
-	
+
 	if policyInstanceID == "" {
 		http.Error(w, "Policy instance ID is required", http.StatusBadRequest)
 		return
@@ -408,7 +408,7 @@ func (s *Server) A1PolicyInstanceStatusHandler(w http.ResponseWriter, r *http.Re
 }
 
 // handleGetPolicyInstanceStatus handles GET requests for policy instance status
-func (s *Server) handleGetPolicyInstanceStatus(w http.ResponseWriter, r *http.Request, ctx context.Context, a1Client *A1MediatorClient, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID) {
+func (s *Server) handleGetPolicyInstanceStatus(w http.ResponseWriter, r *http.Request, ctx context.Context, a1Client A1MediatorClient, policyTypeID PolicyTypeID, policyInstanceID PolicyInstanceID) {
 	status, err := a1Client.GetPolicyInstanceStatus(ctx, policyTypeID, policyInstanceID)
 	if err != nil {
 		log.Printf("Failed to get policy instance status %s: %v", policyInstanceID, err)

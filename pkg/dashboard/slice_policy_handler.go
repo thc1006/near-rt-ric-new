@@ -32,12 +32,12 @@ type A1SlicePolicy struct {
 // A1PolicyManager handles A1 interface policy management
 type A1PolicyManager struct {
 	// Integration with A1 Mediator from existing dashboard package
-	a1Mediator *A1MediatorClient
+	a1Mediator A1MediatorClient
 	policies   map[uuid.UUID]*A1SlicePolicy
 }
 
 // NewA1PolicyManager initializes a new policy management system
-func NewA1PolicyManager(a1Mediator *A1MediatorClient) *A1PolicyManager {
+func NewA1PolicyManager(a1Mediator A1MediatorClient) *A1PolicyManager {
 	return &A1PolicyManager{
 		a1Mediator: a1Mediator,
 		policies:   make(map[uuid.UUID]*A1SlicePolicy),

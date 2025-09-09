@@ -2,11 +2,10 @@ package main
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/oran/near-rt-ric-new/api/proto/e2mgr"
-	"github.com/oran/near-rt-ric-new/api/proto/submgr"
 	"github.com/oran/near-rt-ric-new/api/proto/rtmgr"
+	"github.com/oran/near-rt-ric-new/api/proto/submgr"
 )
 
 func main() {

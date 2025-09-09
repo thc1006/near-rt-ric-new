@@ -62,7 +62,7 @@ func (am *AuthMiddleware) RequirePermission(resource, action string) func(http.H
 					am.getClientIP(r),
 					r.UserAgent(),
 				)
-				am.respondWithError(w, http.StatusForbidden, "Insufficient permissions", 
+				am.respondWithError(w, http.StatusForbidden, "Insufficient permissions",
 					"Access denied for resource: "+resource+", action: "+action)
 				return
 			}
@@ -102,7 +102,7 @@ func (am *AuthMiddleware) RequireRole(requiredRole string) func(http.Handler) ht
 					am.getClientIP(r),
 					r.UserAgent(),
 				)
-				am.respondWithError(w, http.StatusForbidden, "Insufficient role", 
+				am.respondWithError(w, http.StatusForbidden, "Insufficient role",
 					"Required role: "+requiredRole)
 				return
 			}
@@ -118,7 +118,7 @@ func (am *AuthMiddleware) RequireRole(requiredRole string) func(http.Handler) ht
 func (am *AuthMiddleware) OptionalAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		claims, _ := am.extractAndValidateToken(r)
-		
+
 		// Add claims to request context (may be nil)
 		ctx := context.WithValue(r.Context(), "claims", claims)
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -157,7 +157,7 @@ func (am *AuthMiddleware) OperatorOrAdmin(next http.Handler) http.Handler {
 				am.getClientIP(r),
 				r.UserAgent(),
 			)
-			am.respondWithError(w, http.StatusForbidden, "Insufficient role", 
+			am.respondWithError(w, http.StatusForbidden, "Insufficient role",
 				"Required role: operator or admin")
 			return
 		}
@@ -183,7 +183,7 @@ func (am *AuthMiddleware) extractAndValidateToken(r *http.Request) (*JWTClaims, 
 	}
 
 	tokenString := parts[1]
-	
+
 	// Validate token
 	claims, err := am.authService.ValidateToken(tokenString)
 	if err != nil {

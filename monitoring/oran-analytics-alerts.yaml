@@ -1,628 +1,78 @@
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
-  name: oran-analytics-alerts
+  name: oran-l-release-alerts
   namespace: monitoring
-  labels:
-    app: prometheus
-    component: analytics
 spec:
   groups:
-  # ============================================================================
-  # O-RAN Network Health Alerts
-  # ============================================================================
-  - name: oran-network-health
-    interval: 30s
+  - name: near-rt-ric-component-alerts
     rules:
-    - alert: NetworkHealthCritical
-      expr: oran_network_health_score < 50
+    # E2 Interface Alerts
+    - alert: E2ConnectionLow
+      expr: near_rt_ric_e2_connection_total < 10
       for: 5m
       labels:
-        severity: critical
-        category: network_health
-        component: o-ran
+        severity: warning
+        component: e2-interface
       annotations:
-        summary: "O-RAN Network Health Critical"
-        description: "Network health score {{ $value }} is below critical threshold (50). Immediate attention required."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/network-health-critical"
-        dashboard_url: "http://grafana:3000/d/oran-advanced-analytics"
+        summary: "Low E2 Interface Connections"
+        description: "Total E2 connections below threshold"
 
-    - alert: NetworkHealthDegraded
-      expr: oran_network_health_score < 75 and oran_network_health_score >= 50
+    - alert: E2ConnectionDropRate
+      expr: rate(near_rt_ric_e2_connection_dropped_total[5m]) > 0.1
       for: 10m
       labels:
-        severity: warning
-        category: network_health
-        component: o-ran
+        severity: critical
+        component: e2-interface
       annotations:
-        summary: "O-RAN Network Health Degraded"
-        description: "Network health score {{ $value }} indicates degraded performance. Investigation recommended."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/network-health-degraded"
+        summary: "High E2 Connection Drop Rate"
+        description: "More than 10% of E2 connections are dropping"
 
-  # ============================================================================
-  # E2 Interface & Telemetry Processing Alerts
-  # ============================================================================
-  - name: oran-e2-processing
-    interval: 30s
-    rules:
-    - alert: E2ProcessingLatencyHigh
-      expr: histogram_quantile(0.95, rate(oran_e2_processing_latency_seconds_bucket[5m])) * 1000 > 100
+    # A1 Interface Alerts
+    - alert: A1PolicyRequestFailure
+      expr: near_rt_ric_a1_policy_requests_total{status='failed'} / near_rt_ric_a1_policy_requests_total * 100 > 10
       for: 5m
       labels:
         severity: warning
-        category: performance
-        component: e2-processor
+        component: a1-interface
       annotations:
-        summary: "High E2 Processing Latency"
-        description: "E2 indication processing P95 latency {{ $value }}ms exceeds threshold (100ms) for RAN function {{ $labels.ran_function }}"
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/e2-latency-high"
+        summary: "High A1 Policy Request Failure Rate"
+        description: "More than 10% of A1 policy requests are failing"
 
-    - alert: E2ProcessingFailureRateHigh
-      expr: rate(oran_e2_correlation_errors_total[5m]) > 10
-      for: 5m
+    # Near-RT RIC Controller Alerts
+    - alert: RICControllerHighCPUUsage
+      expr: process_cpu_seconds_total{job='near-rt-ric-controller'} > 80
+      for: 10m
       labels:
         severity: critical
-        category: reliability
-        component: e2-processor
+        component: ric-controller
       annotations:
-        summary: "High E2 Processing Failure Rate"
-        description: "E2 correlation errors occurring at {{ $value }} errors/sec. Data quality may be compromised."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/e2-correlation-errors"
+        summary: "High CPU Usage in Near-RT RIC Controller"
+        description: "Near-RT RIC Controller CPU usage exceeding 80%"
 
-    - alert: E2ActiveSessionsLow
-      expr: oran_e2_active_sessions < 10
+    - alert: RICControllerMemoryPressure
+      expr: process_resident_memory_bytes{job='near-rt-ric-controller'} / process_virtual_memory_bytes{job='near-rt-ric-controller'} > 0.9
       for: 15m
       labels:
         severity: warning
-        category: capacity
-        component: e2-processor
+        component: ric-controller
       annotations:
-        summary: "Low E2 Active Sessions"
-        description: "Only {{ $value }} active E2 sessions detected. Network may be underutilized or components disconnected."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/low-active-sessions"
+        summary: "High Memory Pressure in Near-RT RIC Controller"
+        description: "Near-RT RIC Controller memory usage over 90%"
 
-  # ============================================================================
-  # KPI Performance Alerts
-  # ============================================================================
-  - name: oran-kpi-performance
-    interval: 30s
+  - name: service-level-objectives
     rules:
-    - alert: PRBUtilizationCritical
-      expr: max by (source, cell_id) (prb_utilization_dl{source=~".+"}) > 95
-      for: 5m
-      labels:
-        severity: critical
-        category: capacity
-        component: ran
-      annotations:
-        summary: "Critical PRB Utilization"
-        description: "PRB utilization {{ $value }}% in cell {{ $labels.cell_id }} exceeds critical threshold (95%). Network congestion imminent."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/prb-critical"
+    - record: service:near_rt_ric_availability:ratio_rate5m
+      expr: |
+        sum(rate(near_rt_ric_health_ok_total[5m])) 
+        / 
+        sum(rate(near_rt_ric_health_total[5m]))
 
-    - alert: PRBUtilizationHigh
-      expr: max by (source, cell_id) (prb_utilization_dl{source=~".+"}) > 80
-      for: 10m
-      labels:
-        severity: warning
-        category: capacity
-        component: ran
-      annotations:
-        summary: "High PRB Utilization"
-        description: "PRB utilization {{ $value }}% in cell {{ $labels.cell_id }} exceeds warning threshold (80%)."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/prb-high"
-
-    - alert: ThroughputLow
-      expr: min by (source, cell_id) (throughput_dl_mbps{source=~".+"}) < 10
-      for: 10m
-      labels:
-        severity: warning
-        category: performance
-        component: ran
-      annotations:
-        summary: "Low Downlink Throughput"
-        description: "Downlink throughput {{ $value }} Mbps in cell {{ $labels.cell_id }} is below threshold (10 Mbps)."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/throughput-low"
-
-    - alert: CallDropRateHigh
-      expr: max by (source, cell_id) (call_drop_rate{source=~".+"}) > 5
-      for: 5m
-      labels:
-        severity: critical
-        category: quality
-        component: ran
-      annotations:
-        summary: "High Call Drop Rate"
-        description: "Call drop rate {{ $value }}% in cell {{ $labels.cell_id }} exceeds critical threshold (5%)."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/call-drop-high"
-
-    - alert: SignalQualityPoor
-      expr: min by (source, cell_id) (rsrp{source=~".+"}) < -110
-      for: 15m
-      labels:
-        severity: warning
-        category: quality
-        component: ran
-      annotations:
-        summary: "Poor Signal Quality (RSRP)"
-        description: "RSRP {{ $value }} dBm in cell {{ $labels.cell_id }} indicates poor signal quality."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/signal-quality-poor"
-
-    - alert: EnergyEfficiencyLow
-      expr: min by (source) (energy_efficiency{source=~".+"}) < 1.0
+    - alert: ServiceLevelObjectiveViolation
+      expr: service:near_rt_ric_availability:ratio_rate5m < 0.99
       for: 30m
       labels:
-        severity: info
-        category: efficiency
-        component: ran
-      annotations:
-        summary: "Low Energy Efficiency"
-        description: "Energy efficiency {{ $value }} Mbps/W for source {{ $labels.source }} is below optimal threshold."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/energy-efficiency-low"
-
-  # ============================================================================
-  # ML/AI Analytics Alerts
-  # ============================================================================
-  - name: oran-ml-analytics
-    interval: 60s
-    rules:
-    - alert: AnomalyDetectionHigh
-      expr: increase(oran_anomalies_detected_total{severity="critical"}[10m]) > 5
-      for: 2m
-      labels:
         severity: critical
-        category: anomaly
-        component: ml-predictor
       annotations:
-        summary: "High Critical Anomaly Rate"
-        description: "{{ $value }} critical anomalies detected in the last 10 minutes for metric {{ $labels.metric_name }}."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/anomaly-critical"
-
-    - alert: PredictionAccuracyLow
-      expr: oran_prediction_accuracy < 0.7
-      for: 30m
-      labels:
-        severity: warning
-        category: ml_performance
-        component: ml-predictor
-      annotations:
-        summary: "ML Prediction Accuracy Low"
-        description: "Overall ML prediction accuracy {{ $value }} is below threshold (70%). Model retraining may be required."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/ml-accuracy-low"
-
-    - alert: TrendAnalysisStale
-      expr: time() - oran_trends_calculated_total > 900
-      for: 5m
-      labels:
-        severity: warning
-        category: data_freshness
-        component: performance-analytics
-      annotations:
-        summary: "Trend Analysis Data Stale"
-        description: "Trend calculations haven't been updated for more than 15 minutes. Analytics may be impacted."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/trend-analysis-stale"
-
-    - alert: CorrelationAnalysisError
-      expr: rate(oran_e2_correlation_errors_total[5m]) > 5
-      for: 10m
-      labels:
-        severity: warning
-        category: data_quality
-        component: performance-analytics
-      annotations:
-        summary: "High Correlation Analysis Error Rate"
-        description: "Correlation analysis errors occurring at {{ $value }} errors/sec. Data relationships may be incorrect."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/correlation-errors"
-
-  # ============================================================================
-  # SLA Compliance Alerts
-  # ============================================================================
-  - name: oran-sla-compliance
-    interval: 60s
-    rules:
-    - alert: SLAViolationCritical
-      expr: increase(oran_sla_violations_total{severity="critical"}[5m]) > 0
-      for: 0s
-      labels:
-        severity: critical
-        category: sla
-        component: performance-tracker
-      annotations:
-        summary: "Critical SLA Violation"
-        description: "Critical SLA violation for service {{ $labels.service }}, metric {{ $labels.metric }}."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/sla-violation-critical"
-
-    - alert: SLAComplianceLow
-      expr: oran_performance_score < 95
-      for: 15m
-      labels:
-        severity: warning
-        category: sla
-        component: performance-tracker
-      annotations:
-        summary: "SLA Compliance Below Target"
-        description: "SLA compliance {{ $value }}% for service {{ $labels.service }} is below target (95%)."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/sla-compliance-low"
-
-  # ============================================================================
-  # Time Series Optimization Alerts
-  # ============================================================================
-  - name: oran-timeseries-optimization
-    interval: 120s
-    rules:
-    - alert: QueryPerformanceDegraded
-      expr: histogram_quantile(0.95, rate(oran_timeseries_query_latency_seconds_bucket[5m])) > 5
-      for: 10m
-      labels:
-        severity: warning
-        category: performance
-        component: timeseries-optimizer
-      annotations:
-        summary: "Query Performance Degraded"
-        description: "Time series query P95 latency {{ $value }}s exceeds threshold (5s). Query optimization needed."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/query-performance-degraded"
-
-    - alert: CacheHitRateLow
-      expr: (oran_timeseries_cache_hits_total / (oran_timeseries_cache_hits_total + oran_timeseries_cache_misses_total)) < 0.5
-      for: 30m
-      labels:
-        severity: info
-        category: performance
-        component: timeseries-optimizer
-      annotations:
-        summary: "Low Cache Hit Rate"
-        description: "Time series cache hit rate {{ $value }} is below optimal threshold (50%)."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/cache-hit-rate-low"
-
-    - alert: CompressionRateLow
-      expr: oran_timeseries_compression_ratio < 0.3
-      for: 60m
-      labels:
-        severity: info
-        category: storage
-        component: timeseries-optimizer
-      annotations:
-        summary: "Low Compression Ratio"
-        description: "Data compression ratio {{ $value }} indicates inefficient storage utilization."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/compression-ratio-low"
-
-    - alert: RetentionCleanupFailed
-      expr: time() - oran_timeseries_retention_cleanups_total > 7200
-      for: 10m
-      labels:
-        severity: warning
-        category: storage
-        component: timeseries-optimizer
-      annotations:
-        summary: "Retention Cleanup Overdue"
-        description: "Data retention cleanup hasn't run for more than 2 hours. Storage usage may increase."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/retention-cleanup-failed"
-
-    - alert: AggregationJobsFailing
-      expr: increase(oran_timeseries_aggregation_jobs_total{status="failed"}[1h]) > 3
-      for: 5m
-      labels:
-        severity: warning
-        category: data_processing
-        component: timeseries-optimizer
-      annotations:
-        summary: "Aggregation Jobs Failing"
-        description: "{{ $value }} aggregation jobs failed in the last hour for rule {{ $labels.rule_id }}."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/aggregation-jobs-failing"
-
-    - alert: DownsampleJobsFailing
-      expr: increase(oran_timeseries_downsample_jobs_total{status="failed"}[1h]) > 2
-      for: 5m
-      labels:
-        severity: warning
-        category: data_processing
-        component: timeseries-optimizer
-      annotations:
-        summary: "Downsample Jobs Failing"
-        description: "{{ $value }} downsample jobs failed in the last hour for rule {{ $labels.rule_id }}."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/downsample-jobs-failing"
-
-  # ============================================================================
-  # Analytics Infrastructure Alerts
-  # ============================================================================
-  - name: oran-analytics-infrastructure
-    interval: 60s
-    rules:
-    - alert: InfluxDBConnectionFailed
-      expr: up{job="influxdb"} == 0
-      for: 2m
-      labels:
-        severity: critical
-        category: infrastructure
-        component: influxdb
-      annotations:
-        summary: "InfluxDB Connection Failed"
-        description: "InfluxDB is not reachable. All time series data collection is impacted."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/influxdb-down"
-
-    - alert: KafkaConnectionFailed
-      expr: up{job="kafka"} == 0
-      for: 2m
-      labels:
-        severity: critical
-        category: infrastructure
-        component: kafka
-      annotations:
-        summary: "Kafka Connection Failed"
-        description: "Kafka is not reachable. Real-time data streaming is impacted."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/kafka-down"
-
-    - alert: AnalyticsServiceDown
-      expr: up{job=~".*analytics.*"} == 0
-      for: 1m
-      labels:
-        severity: critical
-        category: infrastructure
-        component: analytics-services
-      annotations:
-        summary: "Analytics Service Down"
-        description: "Analytics service {{ $labels.job }} is not responding."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/service-down"
-
-    - alert: TelemetryProcessingBacklog
-      expr: rate(oran_telemetry_events_received_total[5m]) - rate(oran_telemetry_events_processed_total[5m]) > 100
-      for: 10m
-      labels:
-        severity: warning
-        category: throughput
-        component: telemetry-collector
-      annotations:
-        summary: "Telemetry Processing Backlog"
-        description: "Telemetry events are being received faster than processed. Backlog of {{ $value }} events/sec."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/telemetry-backlog"
-
-    - alert: AnalyticsMemoryUsageHigh
-      expr: container_memory_usage_bytes{container=~".*analytics.*"} / container_spec_memory_limit_bytes > 0.9
-      for: 5m
-      labels:
-        severity: warning
-        category: resources
-        component: analytics-services
-      annotations:
-        summary: "High Memory Usage in Analytics Service"
-        description: "Memory usage {{ $value | humanizePercentage }} in container {{ $labels.container }} exceeds 90%."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/memory-usage-high"
-
-    - alert: AnalyticsCPUUsageHigh
-      expr: rate(container_cpu_usage_seconds_total{container=~".*analytics.*"}[5m]) > 0.8
-      for: 10m
-      labels:
-        severity: warning
-        category: resources
-        component: analytics-services
-      annotations:
-        summary: "High CPU Usage in Analytics Service"
-        description: "CPU usage {{ $value | humanizePercentage }} in container {{ $labels.container }} exceeds 80%."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/cpu-usage-high"
-
-  # ============================================================================
-  # Data Quality Alerts
-  # ============================================================================
-  - name: oran-data-quality
-    interval: 120s
-    rules:
-    - alert: DataIngestionRateAnomalous
-      expr: abs(rate(oran_telemetry_events_processed_total[5m]) - rate(oran_telemetry_events_processed_total[5m] offset 1h)) > 1000
-      for: 15m
-      labels:
-        severity: warning
-        category: data_quality
-        component: telemetry-collector
-      annotations:
-        summary: "Anomalous Data Ingestion Rate"
-        description: "Data ingestion rate has changed significantly compared to same time 1 hour ago. Current: {{ $value }} events/sec."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/data-ingestion-anomaly"
-
-    - alert: MissingDataSources
-      expr: count by (source) (rate(oran_e2_indications_processed_total[10m])) < 3
-      for: 20m
-      labels:
-        severity: warning
-        category: data_completeness
-        component: e2-processor
-      annotations:
-        summary: "Missing Data Sources"
-        description: "Only {{ $value }} data sources are reporting. Expected minimum of 3."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/missing-data-sources"
-
-    - alert: DataValidationErrors
-      expr: rate(oran_telemetry_events_dropped_total[5m]) / rate(oran_telemetry_events_received_total[5m]) > 0.1
-      for: 10m
-      labels:
-        severity: warning
-        category: data_quality
-        component: telemetry-collector
-      annotations:
-        summary: "High Data Validation Error Rate"
-        description: "{{ $value | humanizePercentage }} of incoming data is being dropped due to validation errors."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/data-validation-errors"
-
-  # ============================================================================
-  # Predictive Alerts (ML-based)
-  # ============================================================================
-  - name: oran-predictive-alerts
-    interval: 300s  # 5 minutes for predictive alerts
-    rules:
-    - alert: PredictedCapacityShortage
-      expr: predicted_prb_utilization > 90
-      for: 0s  # Fire immediately as this is a prediction
-      labels:
-        severity: warning
-        category: predictive
-        component: ml-predictor
-        alert_type: preventive
-      annotations:
-        summary: "Predicted Capacity Shortage"
-        description: "ML model predicts PRB utilization will reach {{ $value }}% in the next hour for cell {{ $labels.cell_id }}."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/predicted-capacity-shortage"
-        recommended_actions: "Consider load balancing, resource scaling, or traffic shaping"
-
-    - alert: PredictedQualityDegradation
-      expr: predicted_rsrp < -100
-      for: 0s
-      labels:
-        severity: info
-        category: predictive
-        component: ml-predictor
-        alert_type: preventive
-      annotations:
-        summary: "Predicted Signal Quality Degradation"
-        description: "ML model predicts RSRP will drop to {{ $value }} dBm in cell {{ $labels.cell_id }}."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/predicted-quality-degradation"
-        recommended_actions: "Check antenna alignment, power settings, or interference sources"
-
-    - alert: PredictedServiceDisruption
-      expr: predicted_service_availability < 0.99
-      for: 0s
-      labels:
-        severity: critical
-        category: predictive
-        component: ml-predictor
-        alert_type: preventive
-      annotations:
-        summary: "Predicted Service Disruption"
-        description: "ML model predicts service availability will drop to {{ $value | humanizePercentage }} for service {{ $labels.service }}."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/predicted-service-disruption"
-        recommended_actions: "Immediate preventive maintenance, backup activation, or load redistribution"
-
-  # ============================================================================
-  # Business Impact Alerts
-  # ============================================================================
-  - name: oran-business-impact
-    interval: 300s
-    rules:
-    - alert: ServiceRevenueImpact
-      expr: estimated_revenue_impact > 10000
-      for: 5m
-      labels:
-        severity: critical
-        category: business
-        component: business-analytics
-        escalation: executive
-      annotations:
-        summary: "Significant Revenue Impact Detected"
-        description: "Estimated revenue impact of ${{ $value }} detected due to network performance issues."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/revenue-impact"
-        business_context: "Service degradation affecting premium customers"
-
-    - alert: CustomerExperienceImpact
-      expr: customer_satisfaction_score < 3.0
-      for: 30m
-      labels:
-        severity: warning
-        category: business
-        component: business-analytics
-      annotations:
-        summary: "Customer Experience Impact"
-        description: "Customer satisfaction score {{ $value }} indicates poor user experience."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/customer-experience"
-
-    - alert: SLABreach
-      expr: sla_compliance_percentage < 99.0
-      for: 10m
-      labels:
-        severity: critical
-        category: business
-        component: sla-monitor
-        escalation: legal
-      annotations:
-        summary: "SLA Breach Detected"
-        description: "SLA compliance {{ $value }}% breaches contractual obligations for service {{ $labels.service }}."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/sla-breach"
-        legal_impact: "Potential financial penalties and customer compensation"
-
-  # ============================================================================
-  # Security-Related Analytics Alerts
-  # ============================================================================
-  - name: oran-security-analytics
-    interval: 60s
-    rules:
-    - alert: AbnormalTrafficPattern
-      expr: rate(oran_telemetry_events_received_total[5m]) > 10000
-      for: 5m
-      labels:
-        severity: warning
-        category: security
-        component: security-analytics
-      annotations:
-        summary: "Abnormal Traffic Pattern Detected"
-        description: "Unusually high telemetry event rate {{ $value }} events/sec may indicate DDoS or system compromise."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/abnormal-traffic"
-        security_context: "Potential DDoS attack or system compromise"
-
-    - alert: UnauthorizedDataAccess
-      expr: rate(unauthorized_api_requests[5m]) > 5
-      for: 2m
-      labels:
-        severity: critical
-        category: security
-        component: api-security
-        escalation: security_team
-      annotations:
-        summary: "Unauthorized Data Access Attempts"
-        description: "{{ $value }} unauthorized API requests/sec detected from source {{ $labels.source_ip }}."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/unauthorized-access"
-        security_context: "Potential data breach attempt"
-
-    - alert: DataExfiltrationSuspicion
-      expr: rate(api_response_bytes_total[5m]) > 1000000
-      for: 10m
-      labels:
-        severity: warning
-        category: security
-        component: data-security
-      annotations:
-        summary: "Suspicious Data Exfiltration"
-        description: "High data egress rate {{ $value }} bytes/sec from analytics APIs."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/data-exfiltration"
-
-  # ============================================================================
-  # Compliance and Audit Alerts
-  # ============================================================================
-  - name: oran-compliance
-    interval: 600s  # 10 minutes for compliance checks
-    rules:
-    - alert: DataRetentionViolation
-      expr: data_age_days > 365
-      for: 0s
-      labels:
-        severity: critical
-        category: compliance
-        component: data-governance
-        escalation: compliance_team
-      annotations:
-        summary: "Data Retention Policy Violation"
-        description: "Data older than {{ $value }} days violates retention policy for measurement {{ $labels.measurement }}."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/retention-violation"
-        compliance_risk: "GDPR/regulatory violation risk"
-
-    - alert: DataPrivacyBreach
-      expr: personal_data_exposed > 0
-      for: 0s
-      labels:
-        severity: critical
-        category: compliance
-        component: privacy-protection
-        escalation: legal_team
-      annotations:
-        summary: "Potential Data Privacy Breach"
-        description: "{{ $value }} instances of potentially exposed personal data detected."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/privacy-breach"
-        legal_requirement: "Mandatory breach notification within 72 hours"
-
-    - alert: AuditLogIntegrityIssue
-      expr: audit_log_checksum_mismatch > 0
-      for: 0s
-      labels:
-        severity: critical
-        category: compliance
-        component: audit-system
-      annotations:
-        summary: "Audit Log Integrity Issue"
-        description: "{{ $value }} audit log checksum mismatches detected. Log tampering suspected."
-        runbook_url: "https://wiki.company.com/o-ran/runbooks/audit-integrity"
-        compliance_impact: "Audit trail compromised - regulatory reporting affected"
+        summary: "Service Level Objective Violation"
+        description: "Near-RT RIC availability below 99% for extended period"

@@ -63,12 +63,12 @@ type PolicyFilter struct {
 
 // A1Stats represents statistics from A1 Mediator
 type A1Stats struct {
-	PolicyTypesByStatus    map[string]uint32 `json:"policy_types_by_status"`
-	PolicyInstancesByType  map[string]uint32 `json:"policy_instances_by_type"`
+	PolicyTypesByStatus     map[string]uint32 `json:"policy_types_by_status"`
+	PolicyInstancesByType   map[string]uint32 `json:"policy_instances_by_type"`
 	PolicyInstancesByStatus map[string]uint32 `json:"policy_instances_by_status"`
-	TotalPolicyTypes       uint32            `json:"total_policy_types"`
-	TotalPolicyInstances   uint32            `json:"total_policy_instances"`
-	LastUpdated            time.Time         `json:"last_updated"`
+	TotalPolicyTypes        uint32            `json:"total_policy_types"`
+	TotalPolicyInstances    uint32            `json:"total_policy_instances"`
+	LastUpdated             time.Time         `json:"last_updated"`
 }
 
 // A1Health represents health information from A1 Mediator
@@ -126,31 +126,31 @@ const (
 type PolicyInstanceStatus string
 
 const (
-	PolicyInstanceStatusActive    PolicyInstanceStatus = "ACTIVE"
-	PolicyInstanceStatusInactive  PolicyInstanceStatus = "INACTIVE"
-	PolicyInstanceStatusDeleted   PolicyInstanceStatus = "DELETED"
-	PolicyInstanceStatusPending   PolicyInstanceStatus = "PENDING"
-	PolicyInstanceStatusError     PolicyInstanceStatus = "ERROR"
+	PolicyInstanceStatusActive   PolicyInstanceStatus = "ACTIVE"
+	PolicyInstanceStatusInactive PolicyInstanceStatus = "INACTIVE"
+	PolicyInstanceStatusDeleted  PolicyInstanceStatus = "DELETED"
+	PolicyInstanceStatusPending  PolicyInstanceStatus = "PENDING"
+	PolicyInstanceStatusError    PolicyInstanceStatus = "ERROR"
 )
 
 // PolicyConflictType represents the type of policy conflict
 type PolicyConflictType string
 
 const (
-	PolicyConflictTypeResource   PolicyConflictType = "RESOURCE"
-	PolicyConflictTypeParameter  PolicyConflictType = "PARAMETER"
-	PolicyConflictTypePriority   PolicyConflictType = "PRIORITY"
-	PolicyConflictTypeExclusive  PolicyConflictType = "EXCLUSIVE"
+	PolicyConflictTypeResource  PolicyConflictType = "RESOURCE"
+	PolicyConflictTypeParameter PolicyConflictType = "PARAMETER"
+	PolicyConflictTypePriority  PolicyConflictType = "PRIORITY"
+	PolicyConflictTypeExclusive PolicyConflictType = "EXCLUSIVE"
 )
 
 // PolicyDistributionStatusType represents the distribution status type
 type PolicyDistributionStatusType string
 
 const (
-	PolicyDistributionStatusPending    PolicyDistributionStatusType = "PENDING"
-	PolicyDistributionStatusDeployed   PolicyDistributionStatusType = "DEPLOYED"
-	PolicyDistributionStatusFailed     PolicyDistributionStatusType = "FAILED"
-	PolicyDistributionStatusWithdrawn  PolicyDistributionStatusType = "WITHDRAWN"
+	PolicyDistributionStatusPending   PolicyDistributionStatusType = "PENDING"
+	PolicyDistributionStatusDeployed  PolicyDistributionStatusType = "DEPLOYED"
+	PolicyDistributionStatusFailed    PolicyDistributionStatusType = "FAILED"
+	PolicyDistributionStatusWithdrawn PolicyDistributionStatusType = "WITHDRAWN"
 )
 
 // PolicyComplianceStatusType represents the compliance status type

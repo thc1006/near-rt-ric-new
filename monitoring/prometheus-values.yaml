@@ -1,100 +1,125 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alertmanager:
+  enabled: true
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['job']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      receiver: 'slack'
+    receivers:
+      - name: 'slack'
+        slack_configs:
+          - api_url: '${SLACK_WEBHOOK_URL}'
+            channel: '#oran-monitoring'
+            send_resolved: true
+
 prometheus:
   prometheusSpec:
-    # Extended retention for comprehensive analysis
-    retention: 45d
-    # Increased resource allocation for O-RAN telemetry
-    resources:
-      requests:
-        memory: 4Gi
-        cpu: 2
-      limits:
-        memory: 8Gi
-        cpu: 4
-    
-    # Service discovery for O-RAN components
-    serviceMonitorSelector:
-      matchLabels:
-        oran-monitoring: enabled
-    
-    # Additional scrape configurations
-    additionalScrapeConfigs:
-      - job_name: 'oran-e2'
-        metrics_path: '/metrics'
-        static_configs:
-          - targets: 
-            - 'near-rt-ric-e2:9090'
-      - job_name: 'oran-a1'
-        metrics_path: '/metrics'
-        static_configs:
-          - targets: 
-            - 'near-rt-ric-a1:9090'
-      - job_name: 'oran-o1'
-        metrics_path: '/metrics'
-        static_configs:
-          - targets: 
-            - 'near-rt-ric-o1:9090'
-
-    # Storage configuration for long-term metrics
+    replicas: 2
+    retention: 30d
+    retentionSize: "50GB"
     storageSpec:
       volumeClaimTemplate:
         spec:
-          storageClassName: standard
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
               storage: 100Gi
+    additionalScrapeConfigs:
+      - job_name: 'near-rt-ric-components'
+        metrics_path: '/metrics'
+        static_configs:
+          - targets: 
+            - 'e2-service:9090'
+            - 'a1-service:9090'
+            - 'o1-service:9090'
+            - 'near-rt-ric-controller:9100'
+      
+      - job_name: 'kubernetes-nodes'
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+          - target_label: __address__
+            replacement: kubernetes.default.svc:443
+          - source_labels: [__meta_kubernetes_node_name]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /api/v1/nodes/${1}/proxy/metrics
 
 grafana:
-  # Authentication and security
-  adminPassword: "O-RAN_Monitoring2025!"
-  
-  # Resources for dashboard rendering
-  resources:
-    requests:
-      cpu: 500m
-      memory: 512Mi
-    limits:
-      cpu: 2
-      memory: 2Gi
-  
-  # Persistent dashboard storage
+  adminPassword: ${GRAFANA_ADMIN_PASSWORD}
   persistence:
     enabled: true
     size: 10Gi
   
-  # Additional data sources
-  additionalDataSources:
-    - name: Loki
-      type: loki
-      url: http://loki.monitoring.svc:3100
-      access: proxy
-      isDefault: false
-    
-    - name: Jaeger
-      type: jaeger
-      url: http://jaeger-query.monitoring.svc:16686
-      access: proxy
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'oran-dashboards'
+          orgId: 1
+          folder: 'O-RAN'
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/oran
 
-  # Sidecar for automatic dashboard loading
-  sidecar:
-    dashboards:
-      enabled: true
-      label: grafana_dashboard
-      searchNamespace: ALL
-
-  # Plugins for enhanced visualization
-  plugins:
-    - grafana-piechart-panel
-    - grafana-worldmap-panel
-    - grafana-clock-panel
-
-# Prometheus Operator configurations
-prometheusOperator:
-  # Increased resources for complex service discovery
-  resources:
-    requests:
-      cpu: 200m
-      memory: 400Mi
-    limits:
-      cpu: 1
-      memory: 1Gi
+  dashboards:
+    oran-dashboards:
+      e2-interface-dashboard:
+        json: |
+          {
+            "annotations": {},
+            "editable": true,
+            "gnetId": null,
+            "graphTooltip": 0,
+            "id": null,
+            "links": [],
+            "panels": [
+              {
+                "title": "E2 Interface Metrics",
+                "type": "stat",
+                "targets": [
+                  {
+                    "expr": "near_rt_ric_e2_connection_total",
+                    "legendFormat": "Total Connections"
+                  }
+                ]
+              }
+            ],
+            "title": "O-RAN E2 Interface Dashboard"
+          }
+      
+      a1-interface-dashboard:
+        json: |
+          {
+            "annotations": {},
+            "editable": true,
+            "gnetId": null,
+            "graphTooltip": 0,
+            "id": null,
+            "links": [],
+            "panels": [
+              {
+                "title": "A1 Interface Metrics",
+                "type": "stat",
+                "targets": [
+                  {
+                    "expr": "near_rt_ric_a1_policy_requests_total",
+                    "legendFormat": "Policy Requests"
+                  }
+                ]
+              }
+            ],
+            "title": "O-RAN A1 Interface Dashboard"
+          }

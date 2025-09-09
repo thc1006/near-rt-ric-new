@@ -1,0 +1,406 @@
+version: '3.8'
+
+services:
+  # =============================================================================
+  # Production O-RAN Near-RT RIC Core Components
+  # =============================================================================
+  
+  dashboard-api:
+    build:
+      context: .
+      dockerfile: build/dashboard-api/Dockerfile
+      args:
+        - GO_VERSION=1.24.6
+        - BUILD_VERSION=${VERSION:-v1.0.0}
+        - ENABLE_FIPS=true
+    image: oran/dashboard-api:${VERSION:-latest}
+    container_name: oran-dashboard-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"     # Dashboard API
+      - "9090:9090"     # Metrics endpoint
+    environment:
+      - GO_ENV=production
+      - LOG_LEVEL=info
+      - LOG_FORMAT=json
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=oran_prod
+      - DB_USER=oran_prod
+      - DB_PASSWORD=${DB_PASSWORD:-secure_password_123}
+      - DB_SSL_MODE=require
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-secure_redis_123}
+      - JAEGER_AGENT_HOST=jaeger
+      - JAEGER_AGENT_PORT=6831
+      - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_key_here}
+      - ENABLE_CORS=true
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8080
+      - ENABLE_TLS=false
+      - CERT_FILE=/certs/server.crt
+      - KEY_FILE=/certs/server.key
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - oran-production
+    volumes:
+      - ./configs:/configs:ro
+      - ./certs:/certs:ro
+      - api-logs:/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  ric-core:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - GO_VERSION=1.24.6
+        - BUILD_VERSION=${VERSION:-v1.0.0}
+    image: oran/ric-core:${VERSION:-latest}
+    container_name: oran-ric-core
+    restart: unless-stopped
+    ports:
+      - "36421:36421"   # E2 SCTP
+      - "38412:38412"   # S1-C/F1-C
+      - "38422:38422"   # X2-C/Xn-C
+      - "8081:8081"     # HTTP API
+      - "9091:9091"     # Metrics
+    environment:
+      - GO_ENV=production
+      - LOG_LEVEL=info
+      - E2_BIND_ADDR=0.0.0.0:36421
+      - S1_BIND_ADDR=0.0.0.0:38412
+      - X2_BIND_ADDR=0.0.0.0:38422
+      - ENABLE_TLS=true
+      - CERT_FILE=/certs/ric.crt
+      - KEY_FILE=/certs/ric.key
+      - CA_FILE=/certs/ca.crt
+    networks:
+      - oran-production
+    volumes:
+      - ./configs/ric:/configs:ro
+      - ./certs:/certs:ro
+      - ric-data:/data
+      - ric-logs:/logs
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test: ["CMD", "/ric", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+
+  xapp-manager:
+    build:
+      context: .
+      dockerfile: build/xapp-hello-world/Dockerfile
+      args:
+        - GO_VERSION=1.24.6
+    image: oran/xapp-manager:${VERSION:-latest}
+    container_name: oran-xapp-manager
+    restart: unless-stopped
+    ports:
+      - "8082:8082"     # xApp Manager API
+      - "9092:9092"     # xApp Metrics
+    environment:
+      - GO_ENV=production
+      - LOG_LEVEL=info
+      - RMR_SEED_RT=/configs/routes.txt
+      - RIC_HOST=ric-core
+      - RIC_PORT=8081
+      - XAPP_REGISTRY_URL=http://dashboard-api:8080/xapps
+    depends_on:
+      - ric-core
+      - dashboard-api
+    networks:
+      - oran-production
+    volumes:
+      - ./configs/xapp:/configs:ro
+      - xapp-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+  # =============================================================================
+  # Web Dashboard (Production Build)
+  # =============================================================================
+
+  web-dashboard:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile.prod
+      args:
+        - NODE_ENV=production
+        - REACT_APP_API_URL=http://localhost:8080
+        - REACT_APP_WS_URL=ws://localhost:8080/ws
+        - REACT_APP_VERSION=${VERSION:-v1.0.0}
+    image: oran/web-dashboard:${VERSION:-latest}
+    container_name: oran-web-dashboard
+    restart: unless-stopped
+    ports:
+      - "3000:80"       # Nginx serving React app
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - dashboard-api
+    networks:
+      - oran-production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # =============================================================================
+  # Database & Cache
+  # =============================================================================
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: oran-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=oran_prod
+      - POSTGRES_USER=oran_prod
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-secure_password_123}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/db/init-production.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - postgres-backups:/backups
+    networks:
+      - oran-production
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oran_prod"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  redis:
+    image: redis:7-alpine
+    container_name: oran-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:-secure_redis_123}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+      - ./configs/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - oran-production
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # Monitoring & Observability Stack
+  # =============================================================================
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: oran-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./configs/prometheus/prometheus-production.yml:/etc/prometheus/prometheus.yml:ro
+      - ./configs/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=10GB'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    networks:
+      - oran-production
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: oran-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"     # Grafana on different port to avoid conflict
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin123}
+      - GF_SECURITY_SECRET_KEY=${GRAFANA_SECRET:-grafana_secret_key}
+      - GF_INSTALL_PLUGINS=redis-datasource,grafana-worldmap-panel,grafana-clock-panel
+      - GF_RENDERING_SERVER_URL=http://grafana-renderer:8081/render
+      - GF_RENDERING_CALLBACK_URL=http://grafana:3000/
+      - GF_LOG_FILTERS=rendering:debug
+    volumes:
+      - ./configs/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./configs/grafana/datasources-production:/etc/grafana/provisioning/datasources:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - oran-production
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: oran-jaeger
+    restart: unless-stopped
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"   # Jaeger UI
+      - "14268:14268"
+      - "14250:14250"
+      - "9411:9411"
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+      - COLLECTOR_OTLP_ENABLED=true
+      - SPAN_STORAGE_TYPE=elasticsearch
+      - ES_SERVER_URLS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - oran-production
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+    container_name: oran-elasticsearch
+    restart: unless-stopped
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - oran-production
+
+  # =============================================================================
+  # Load Balancer & Reverse Proxy
+  # =============================================================================
+
+  nginx:
+    image: nginx:alpine
+    container_name: oran-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"         # Main entry point
+      - "443:443"       # HTTPS
+    volumes:
+      - ./configs/nginx/nginx-production.conf:/etc/nginx/nginx.conf:ro
+      - ./configs/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certs:/etc/nginx/certs:ro
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      - dashboard-api
+      - web-dashboard
+    networks:
+      - oran-production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# =============================================================================
+# Networks
+# =============================================================================
+
+networks:
+  oran-production:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+          gateway: 172.30.0.1
+    driver_opts:
+      com.docker.network.bridge.name: oran-prod-br
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+
+# =============================================================================
+# Volumes
+# =============================================================================
+
+volumes:
+  postgres-data:
+    driver: local
+  postgres-backups:
+    driver: local
+  redis-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  elasticsearch-data:
+    driver: local
+  ric-data:
+    driver: local
+  ric-logs:
+    driver: local
+  api-logs:
+    driver: local
+  xapp-data:
+    driver: local
+  nginx-logs:
+    driver: local

@@ -14,7 +14,7 @@ import (
 // A1ComplianceTest implements O-RAN.WG2.A1 specification conformance testing
 type A1ComplianceTest struct {
 	runner     *ComplianceTestRunner
-	a1Client   *A1MediatorClient
+	a1Client   A1MediatorClient
 	baseURL    string
 	httpClient *http.Client
 	testData   *A1TestData
@@ -22,28 +22,28 @@ type A1ComplianceTest struct {
 
 // A1TestData contains test vectors for A1 compliance
 type A1TestData struct {
-	ValidPolicyTypes     []PolicyTypeTestData     `json:"validPolicyTypes"`
-	InvalidPolicyTypes   []PolicyTypeTestData     `json:"invalidPolicyTypes"`
-	ValidPolicyInstances []PolicyInstanceTestData `json:"validPolicyInstances"`
+	ValidPolicyTypes       []PolicyTypeTestData     `json:"validPolicyTypes"`
+	InvalidPolicyTypes     []PolicyTypeTestData     `json:"invalidPolicyTypes"`
+	ValidPolicyInstances   []PolicyInstanceTestData `json:"validPolicyInstances"`
 	InvalidPolicyInstances []PolicyInstanceTestData `json:"invalidPolicyInstances"`
-	AuthTokens           AuthTokenTestData        `json:"authTokens"`
+	AuthTokens             AuthTokenTestData        `json:"authTokens"`
 }
 
 // PolicyTypeTestData represents test data for policy types
 type PolicyTypeTestData struct {
-	ID          string          `json:"policy_type_id"`
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	Schema      json.RawMessage `json:"policy_type_schema"`
-	ExpectedResult string       `json:"expectedResult"`
+	ID             string          `json:"policy_type_id"`
+	Name           string          `json:"name"`
+	Description    string          `json:"description"`
+	Schema         json.RawMessage `json:"policy_type_schema"`
+	ExpectedResult string          `json:"expectedResult"`
 }
 
 // PolicyInstanceTestData represents test data for policy instances
 type PolicyInstanceTestData struct {
-	PolicyTypeID string          `json:"policy_type_id"`
-	InstanceID   string          `json:"policy_instance_id"`
-	Policy       json.RawMessage `json:"policy"`
-	ExpectedResult string        `json:"expectedResult"`
+	PolicyTypeID   string          `json:"policy_type_id"`
+	InstanceID     string          `json:"policy_instance_id"`
+	Policy         json.RawMessage `json:"policy"`
+	ExpectedResult string          `json:"expectedResult"`
 }
 
 // AuthTokenTestData contains authentication test data
@@ -66,7 +66,7 @@ func NewA1ComplianceTest(runner *ComplianceTestRunner) *A1ComplianceTest {
 // runA1Test executes A1 compliance tests
 func (r *ComplianceTestRunner) runA1Test(ctx context.Context, test ComplianceTest) TestResult {
 	a1Test := NewA1ComplianceTest(r)
-	
+
 	switch test.ID {
 	case "a1-001":
 		return a1Test.testHealthCheck(ctx, test)
@@ -104,7 +104,7 @@ func (t *A1ComplianceTest) testHealthCheck(ctx context.Context, test ComplianceT
 		Timestamp: time.Now(),
 		Evidence:  make([]Evidence, 0),
 	}
-	
+
 	// Test health check endpoint
 	req, err := http.NewRequestWithContext(ctx, "GET", t.baseURL+"/a1-p/healthcheck", nil)
 	if err != nil {
@@ -112,7 +112,7 @@ func (t *A1ComplianceTest) testHealthCheck(ctx context.Context, test ComplianceT
 		result.Message = fmt.Sprintf("Failed to create health check request: %v", err)
 		return result
 	}
-	
+
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
 		result.Status = StatusFailed
@@ -126,7 +126,7 @@ func (t *A1ComplianceTest) testHealthCheck(ctx context.Context, test ComplianceT
 		return result
 	}
 	defer resp.Body.Close()
-	
+
 	// Validate response
 	if resp.StatusCode != http.StatusOK {
 		result.Status = StatusFailed
@@ -139,7 +139,7 @@ func (t *A1ComplianceTest) testHealthCheck(ctx context.Context, test ComplianceT
 		})
 		return result
 	}
-	
+
 	// Validate content type
 	contentType := resp.Header.Get("Content-Type")
 	if !strings.Contains(contentType, "application/json") {
@@ -153,7 +153,7 @@ func (t *A1ComplianceTest) testHealthCheck(ctx context.Context, test ComplianceT
 		})
 		return result
 	}
-	
+
 	result.Status = StatusPassed
 	result.Message = "Health check endpoint compliant with A1 specifications"
 	result.Evidence = append(result.Evidence, Evidence{
@@ -162,7 +162,7 @@ func (t *A1ComplianceTest) testHealthCheck(ctx context.Context, test ComplianceT
 		Data:        fmt.Sprintf("Status: %d, Content-Type: %s", resp.StatusCode, contentType),
 		Timestamp:   time.Now(),
 	})
-	
+
 	return result
 }
 
@@ -173,14 +173,14 @@ func (t *A1ComplianceTest) testPolicyTypeManagement(ctx context.Context, test Co
 		Timestamp: time.Now(),
 		Evidence:  make([]Evidence, 0),
 	}
-	
+
 	// Test GET /a1-p/policytypes
 	if err := t.testGetPolicyTypes(ctx, &result); err != nil {
 		result.Status = StatusFailed
 		result.Message = fmt.Sprintf("Policy types GET test failed: %v", err)
 		return result
 	}
-	
+
 	// Test POST /a1-p/policytypes/{policy_type_id}
 	for _, policyType := range t.testData.ValidPolicyTypes {
 		if err := t.testCreatePolicyType(ctx, policyType, &result); err != nil {
@@ -189,7 +189,7 @@ func (t *A1ComplianceTest) testPolicyTypeManagement(ctx context.Context, test Co
 			return result
 		}
 	}
-	
+
 	// Test GET /a1-p/policytypes/{policy_type_id}
 	for _, policyType := range t.testData.ValidPolicyTypes {
 		if err := t.testGetPolicyType(ctx, policyType.ID, &result); err != nil {
@@ -198,7 +198,7 @@ func (t *A1ComplianceTest) testPolicyTypeManagement(ctx context.Context, test Co
 			return result
 		}
 	}
-	
+
 	// Test DELETE /a1-p/policytypes/{policy_type_id}
 	for _, policyType := range t.testData.ValidPolicyTypes {
 		if err := t.testDeletePolicyType(ctx, policyType.ID, &result); err != nil {
@@ -207,10 +207,10 @@ func (t *A1ComplianceTest) testPolicyTypeManagement(ctx context.Context, test Co
 			return result
 		}
 	}
-	
+
 	result.Status = StatusPassed
 	result.Message = "Policy type management endpoints compliant with A1 specifications"
-	
+
 	return result
 }
 
@@ -221,7 +221,7 @@ func (t *A1ComplianceTest) testPolicyInstanceManagement(ctx context.Context, tes
 		Timestamp: time.Now(),
 		Evidence:  make([]Evidence, 0),
 	}
-	
+
 	// First create a policy type for testing instances
 	testPolicyType := t.testData.ValidPolicyTypes[0]
 	if err := t.testCreatePolicyType(ctx, testPolicyType, &result); err != nil {
@@ -229,14 +229,14 @@ func (t *A1ComplianceTest) testPolicyInstanceManagement(ctx context.Context, tes
 		result.Message = fmt.Sprintf("Failed to create test policy type: %v", err)
 		return result
 	}
-	
+
 	// Test GET /a1-p/policytypes/{policy_type_id}/policies
 	if err := t.testGetPolicyInstances(ctx, testPolicyType.ID, &result); err != nil {
 		result.Status = StatusFailed
 		result.Message = fmt.Sprintf("Policy instances GET test failed: %v", err)
 		return result
 	}
-	
+
 	// Test PUT /a1-p/policytypes/{policy_type_id}/policies/{policy_instance_id}
 	for _, instance := range t.testData.ValidPolicyInstances {
 		if instance.PolicyTypeID == testPolicyType.ID {
@@ -247,7 +247,7 @@ func (t *A1ComplianceTest) testPolicyInstanceManagement(ctx context.Context, tes
 			}
 		}
 	}
-	
+
 	// Test GET /a1-p/policytypes/{policy_type_id}/policies/{policy_instance_id}
 	for _, instance := range t.testData.ValidPolicyInstances {
 		if instance.PolicyTypeID == testPolicyType.ID {
@@ -258,7 +258,7 @@ func (t *A1ComplianceTest) testPolicyInstanceManagement(ctx context.Context, tes
 			}
 		}
 	}
-	
+
 	// Test GET /a1-p/policytypes/{policy_type_id}/policies/{policy_instance_id}/status
 	for _, instance := range t.testData.ValidPolicyInstances {
 		if instance.PolicyTypeID == testPolicyType.ID {
@@ -269,7 +269,7 @@ func (t *A1ComplianceTest) testPolicyInstanceManagement(ctx context.Context, tes
 			}
 		}
 	}
-	
+
 	// Test DELETE /a1-p/policytypes/{policy_type_id}/policies/{policy_instance_id}
 	for _, instance := range t.testData.ValidPolicyInstances {
 		if instance.PolicyTypeID == testPolicyType.ID {
@@ -280,10 +280,10 @@ func (t *A1ComplianceTest) testPolicyInstanceManagement(ctx context.Context, tes
 			}
 		}
 	}
-	
+
 	result.Status = StatusPassed
 	result.Message = "Policy instance management endpoints compliant with A1 specifications"
-	
+
 	return result
 }
 
@@ -294,11 +294,11 @@ func (t *A1ComplianceTest) testAuthentication(ctx context.Context, test Complian
 		Timestamp: time.Now(),
 		Evidence:  make([]Evidence, 0),
 	}
-	
+
 	// Test with valid token
 	req, _ := http.NewRequestWithContext(ctx, "GET", t.baseURL+"/a1-p/policytypes", nil)
 	req.Header.Set("Authorization", "Bearer "+t.testData.AuthTokens.ValidToken)
-	
+
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
 		result.Status = StatusFailed
@@ -306,7 +306,7 @@ func (t *A1ComplianceTest) testAuthentication(ctx context.Context, test Complian
 		return result
 	}
 	resp.Body.Close()
-	
+
 	if resp.StatusCode == http.StatusUnauthorized {
 		result.Status = StatusFailed
 		result.Message = "Valid JWT token was rejected"
@@ -318,11 +318,11 @@ func (t *A1ComplianceTest) testAuthentication(ctx context.Context, test Complian
 		})
 		return result
 	}
-	
+
 	// Test with invalid token
 	req, _ = http.NewRequestWithContext(ctx, "GET", t.baseURL+"/a1-p/policytypes", nil)
 	req.Header.Set("Authorization", "Bearer "+t.testData.AuthTokens.InvalidToken)
-	
+
 	resp, err = t.httpClient.Do(req)
 	if err == nil {
 		resp.Body.Close()
@@ -338,10 +338,10 @@ func (t *A1ComplianceTest) testAuthentication(ctx context.Context, test Complian
 			return result
 		}
 	}
-	
+
 	// Test without token
 	req, _ = http.NewRequestWithContext(ctx, "GET", t.baseURL+"/a1-p/policytypes", nil)
-	
+
 	resp, err = t.httpClient.Do(req)
 	if err == nil {
 		resp.Body.Close()
@@ -357,7 +357,7 @@ func (t *A1ComplianceTest) testAuthentication(ctx context.Context, test Complian
 			return result
 		}
 	}
-	
+
 	result.Status = StatusPassed
 	result.Message = "JWT authentication compliant with A1 specifications"
 	result.Evidence = append(result.Evidence, Evidence{
@@ -366,7 +366,7 @@ func (t *A1ComplianceTest) testAuthentication(ctx context.Context, test Complian
 		Data:        "Valid tokens accepted, invalid tokens rejected",
 		Timestamp:   time.Now(),
 	})
-	
+
 	return result
 }
 
@@ -377,7 +377,7 @@ func (t *A1ComplianceTest) testAuthorization(ctx context.Context, test Complianc
 		Timestamp: time.Now(),
 		Evidence:  make([]Evidence, 0),
 	}
-	
+
 	// This would test different user roles and permissions
 	// For now, we'll do a basic check
 	result.Status = StatusPassed
@@ -388,7 +388,7 @@ func (t *A1ComplianceTest) testAuthorization(ctx context.Context, test Complianc
 		Data:        "Role-based access control implemented",
 		Timestamp:   time.Now(),
 	})
-	
+
 	return result
 }
 
@@ -399,7 +399,7 @@ func (t *A1ComplianceTest) testJSONSchemaValidation(ctx context.Context, test Co
 		Timestamp: time.Now(),
 		Evidence:  make([]Evidence, 0),
 	}
-	
+
 	// Test with invalid policy instances that should fail schema validation
 	for _, invalidInstance := range t.testData.InvalidPolicyInstances {
 		if err := t.testCreatePolicyInstance(ctx, invalidInstance, &result); err == nil {
@@ -414,7 +414,7 @@ func (t *A1ComplianceTest) testJSONSchemaValidation(ctx context.Context, test Co
 			return result
 		}
 	}
-	
+
 	result.Status = StatusPassed
 	result.Message = "JSON schema validation compliant with A1 specifications"
 	result.Evidence = append(result.Evidence, Evidence{
@@ -423,7 +423,7 @@ func (t *A1ComplianceTest) testJSONSchemaValidation(ctx context.Context, test Co
 		Data:        "Invalid policy instances properly rejected",
 		Timestamp:   time.Now(),
 	})
-	
+
 	return result
 }
 
@@ -434,11 +434,11 @@ func (t *A1ComplianceTest) testErrorResponses(ctx context.Context, test Complian
 		Timestamp: time.Now(),
 		Evidence:  make([]Evidence, 0),
 	}
-	
+
 	// Test 404 for non-existent policy type
 	req, _ := http.NewRequestWithContext(ctx, "GET", t.baseURL+"/a1-p/policytypes/non-existent", nil)
 	req.Header.Set("Authorization", "Bearer "+t.testData.AuthTokens.ValidToken)
-	
+
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
 		result.Status = StatusError
@@ -446,7 +446,7 @@ func (t *A1ComplianceTest) testErrorResponses(ctx context.Context, test Complian
 		return result
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusNotFound {
 		result.Status = StatusFailed
 		result.Message = fmt.Sprintf("Expected 404 for non-existent policy type, got %d", resp.StatusCode)
@@ -458,7 +458,7 @@ func (t *A1ComplianceTest) testErrorResponses(ctx context.Context, test Complian
 		})
 		return result
 	}
-	
+
 	// Validate error response format
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -466,7 +466,7 @@ func (t *A1ComplianceTest) testErrorResponses(ctx context.Context, test Complian
 		result.Message = fmt.Sprintf("Failed to read error response: %v", err)
 		return result
 	}
-	
+
 	var errorResponse map[string]interface{}
 	if err := json.Unmarshal(body, &errorResponse); err != nil {
 		result.Status = StatusFailed
@@ -479,7 +479,7 @@ func (t *A1ComplianceTest) testErrorResponses(ctx context.Context, test Complian
 		})
 		return result
 	}
-	
+
 	result.Status = StatusPassed
 	result.Message = "Error responses compliant with A1 specifications"
 	result.Evidence = append(result.Evidence, Evidence{
@@ -488,7 +488,7 @@ func (t *A1ComplianceTest) testErrorResponses(ctx context.Context, test Complian
 		Data:        "404 errors returned with valid JSON format",
 		Timestamp:   time.Now(),
 	})
-	
+
 	return result
 }
 
@@ -499,7 +499,7 @@ func (t *A1ComplianceTest) testAPIVersioning(ctx context.Context, test Complianc
 		Timestamp: time.Now(),
 		Evidence:  make([]Evidence, 0),
 	}
-	
+
 	// Test that API uses correct version prefix
 	if !strings.Contains(t.baseURL, "/a1-p/") {
 		result.Status = StatusFailed
@@ -512,7 +512,7 @@ func (t *A1ComplianceTest) testAPIVersioning(ctx context.Context, test Complianc
 		})
 		return result
 	}
-	
+
 	result.Status = StatusPassed
 	result.Message = "API versioning compliant with A1 specifications"
 	result.Evidence = append(result.Evidence, Evidence{
@@ -521,7 +521,7 @@ func (t *A1ComplianceTest) testAPIVersioning(ctx context.Context, test Complianc
 		Data:        "/a1-p/ prefix validated",
 		Timestamp:   time.Now(),
 	})
-	
+
 	return result
 }
 
@@ -532,12 +532,12 @@ func (t *A1ComplianceTest) testContentNegotiation(ctx context.Context, test Comp
 		Timestamp: time.Now(),
 		Evidence:  make([]Evidence, 0),
 	}
-	
+
 	// Test Accept header handling
 	req, _ := http.NewRequestWithContext(ctx, "GET", t.baseURL+"/a1-p/healthcheck", nil)
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Bearer "+t.testData.AuthTokens.ValidToken)
-	
+
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
 		result.Status = StatusError
@@ -545,7 +545,7 @@ func (t *A1ComplianceTest) testContentNegotiation(ctx context.Context, test Comp
 		return result
 	}
 	defer resp.Body.Close()
-	
+
 	contentType := resp.Header.Get("Content-Type")
 	if !strings.Contains(contentType, "application/json") {
 		result.Status = StatusFailed
@@ -558,7 +558,7 @@ func (t *A1ComplianceTest) testContentNegotiation(ctx context.Context, test Comp
 		})
 		return result
 	}
-	
+
 	result.Status = StatusPassed
 	result.Message = "Content negotiation compliant with A1 specifications"
 	result.Evidence = append(result.Evidence, Evidence{
@@ -567,7 +567,7 @@ func (t *A1ComplianceTest) testContentNegotiation(ctx context.Context, test Comp
 		Data:        contentType,
 		Timestamp:   time.Now(),
 	})
-	
+
 	return result
 }
 
@@ -578,7 +578,7 @@ func (t *A1ComplianceTest) testRateLimiting(ctx context.Context, test Compliance
 		Timestamp: time.Now(),
 		Evidence:  make([]Evidence, 0),
 	}
-	
+
 	// This would test rate limiting by making many requests
 	// For now, we'll assume it's implemented correctly
 	result.Status = StatusPassed
@@ -589,7 +589,7 @@ func (t *A1ComplianceTest) testRateLimiting(ctx context.Context, test Compliance
 		Data:        "Rate limiting implemented according to specifications",
 		Timestamp:   time.Now(),
 	})
-	
+
 	return result
 }
 
@@ -598,24 +598,24 @@ func (t *A1ComplianceTest) testRateLimiting(ctx context.Context, test Compliance
 func (t *A1ComplianceTest) testGetPolicyTypes(ctx context.Context, result *TestResult) error {
 	req, _ := http.NewRequestWithContext(ctx, "GET", t.baseURL+"/a1-p/policytypes", nil)
 	req.Header.Set("Authorization", "Bearer "+t.testData.AuthTokens.ValidToken)
-	
+
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("GET policy types returned status %d", resp.StatusCode)
 	}
-	
+
 	result.Evidence = append(result.Evidence, Evidence{
 		Type:        "get_policy_types_success",
 		Description: "GET /a1-p/policytypes endpoint working correctly",
 		Data:        fmt.Sprintf("Status: %d", resp.StatusCode),
 		Timestamp:   time.Now(),
 	})
-	
+
 	return nil
 }
 
@@ -625,212 +625,212 @@ func (t *A1ComplianceTest) testCreatePolicyType(ctx context.Context, policyType 
 		"description":        policyType.Description,
 		"policy_type_schema": policyType.Schema,
 	})
-	
+
 	req, _ := http.NewRequestWithContext(ctx, "POST", t.baseURL+"/a1-p/policytypes/"+policyType.ID, bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+t.testData.AuthTokens.ValidToken)
-	
+
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	
+
 	expectedStatus := http.StatusCreated
 	if policyType.ExpectedResult == "conflict" {
 		expectedStatus = http.StatusConflict
 	}
-	
+
 	if resp.StatusCode != expectedStatus {
 		return fmt.Errorf("POST policy type returned status %d, expected %d", resp.StatusCode, expectedStatus)
 	}
-	
+
 	result.Evidence = append(result.Evidence, Evidence{
 		Type:        "create_policy_type_success",
 		Description: fmt.Sprintf("POST /a1-p/policytypes/%s endpoint working correctly", policyType.ID),
 		Data:        fmt.Sprintf("Status: %d", resp.StatusCode),
 		Timestamp:   time.Now(),
 	})
-	
+
 	return nil
 }
 
 func (t *A1ComplianceTest) testGetPolicyType(ctx context.Context, policyTypeID string, result *TestResult) error {
 	req, _ := http.NewRequestWithContext(ctx, "GET", t.baseURL+"/a1-p/policytypes/"+policyTypeID, nil)
 	req.Header.Set("Authorization", "Bearer "+t.testData.AuthTokens.ValidToken)
-	
+
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("GET policy type returned status %d", resp.StatusCode)
 	}
-	
+
 	result.Evidence = append(result.Evidence, Evidence{
 		Type:        "get_policy_type_success",
 		Description: fmt.Sprintf("GET /a1-p/policytypes/%s endpoint working correctly", policyTypeID),
 		Data:        fmt.Sprintf("Status: %d", resp.StatusCode),
 		Timestamp:   time.Now(),
 	})
-	
+
 	return nil
 }
 
 func (t *A1ComplianceTest) testDeletePolicyType(ctx context.Context, policyTypeID string, result *TestResult) error {
 	req, _ := http.NewRequestWithContext(ctx, "DELETE", t.baseURL+"/a1-p/policytypes/"+policyTypeID, nil)
 	req.Header.Set("Authorization", "Bearer "+t.testData.AuthTokens.ValidToken)
-	
+
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("DELETE policy type returned status %d", resp.StatusCode)
 	}
-	
+
 	result.Evidence = append(result.Evidence, Evidence{
 		Type:        "delete_policy_type_success",
 		Description: fmt.Sprintf("DELETE /a1-p/policytypes/%s endpoint working correctly", policyTypeID),
 		Data:        fmt.Sprintf("Status: %d", resp.StatusCode),
 		Timestamp:   time.Now(),
 	})
-	
+
 	return nil
 }
 
 func (t *A1ComplianceTest) testGetPolicyInstances(ctx context.Context, policyTypeID string, result *TestResult) error {
 	req, _ := http.NewRequestWithContext(ctx, "GET", t.baseURL+"/a1-p/policytypes/"+policyTypeID+"/policies", nil)
 	req.Header.Set("Authorization", "Bearer "+t.testData.AuthTokens.ValidToken)
-	
+
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("GET policy instances returned status %d", resp.StatusCode)
 	}
-	
+
 	result.Evidence = append(result.Evidence, Evidence{
 		Type:        "get_policy_instances_success",
 		Description: fmt.Sprintf("GET /a1-p/policytypes/%s/policies endpoint working correctly", policyTypeID),
 		Data:        fmt.Sprintf("Status: %d", resp.StatusCode),
 		Timestamp:   time.Now(),
 	})
-	
+
 	return nil
 }
 
 func (t *A1ComplianceTest) testCreatePolicyInstance(ctx context.Context, instance PolicyInstanceTestData, result *TestResult) error {
-	req, _ := http.NewRequestWithContext(ctx, "PUT", 
-		t.baseURL+"/a1-p/policytypes/"+instance.PolicyTypeID+"/policies/"+instance.InstanceID, 
+	req, _ := http.NewRequestWithContext(ctx, "PUT",
+		t.baseURL+"/a1-p/policytypes/"+instance.PolicyTypeID+"/policies/"+instance.InstanceID,
 		bytes.NewBuffer(instance.Policy))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+t.testData.AuthTokens.ValidToken)
-	
+
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	
+
 	expectedStatus := http.StatusCreated
 	if instance.ExpectedResult == "invalid" {
 		expectedStatus = http.StatusBadRequest
 	}
-	
+
 	if resp.StatusCode != expectedStatus {
 		return fmt.Errorf("PUT policy instance returned status %d, expected %d", resp.StatusCode, expectedStatus)
 	}
-	
+
 	result.Evidence = append(result.Evidence, Evidence{
 		Type:        "create_policy_instance_success",
 		Description: fmt.Sprintf("PUT policy instance %s working correctly", instance.InstanceID),
 		Data:        fmt.Sprintf("Status: %d", resp.StatusCode),
 		Timestamp:   time.Now(),
 	})
-	
+
 	return nil
 }
 
 func (t *A1ComplianceTest) testGetPolicyInstance(ctx context.Context, instance PolicyInstanceTestData, result *TestResult) error {
-	req, _ := http.NewRequestWithContext(ctx, "GET", 
+	req, _ := http.NewRequestWithContext(ctx, "GET",
 		t.baseURL+"/a1-p/policytypes/"+instance.PolicyTypeID+"/policies/"+instance.InstanceID, nil)
 	req.Header.Set("Authorization", "Bearer "+t.testData.AuthTokens.ValidToken)
-	
+
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("GET policy instance returned status %d", resp.StatusCode)
 	}
-	
+
 	result.Evidence = append(result.Evidence, Evidence{
 		Type:        "get_policy_instance_success",
 		Description: fmt.Sprintf("GET policy instance %s working correctly", instance.InstanceID),
 		Data:        fmt.Sprintf("Status: %d", resp.StatusCode),
 		Timestamp:   time.Now(),
 	})
-	
+
 	return nil
 }
 
 func (t *A1ComplianceTest) testGetPolicyInstanceStatus(ctx context.Context, instance PolicyInstanceTestData, result *TestResult) error {
-	req, _ := http.NewRequestWithContext(ctx, "GET", 
+	req, _ := http.NewRequestWithContext(ctx, "GET",
 		t.baseURL+"/a1-p/policytypes/"+instance.PolicyTypeID+"/policies/"+instance.InstanceID+"/status", nil)
 	req.Header.Set("Authorization", "Bearer "+t.testData.AuthTokens.ValidToken)
-	
+
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("GET policy instance status returned status %d", resp.StatusCode)
 	}
-	
+
 	result.Evidence = append(result.Evidence, Evidence{
 		Type:        "get_policy_instance_status_success",
 		Description: fmt.Sprintf("GET policy instance status %s working correctly", instance.InstanceID),
 		Data:        fmt.Sprintf("Status: %d", resp.StatusCode),
 		Timestamp:   time.Now(),
 	})
-	
+
 	return nil
 }
 
 func (t *A1ComplianceTest) testDeletePolicyInstance(ctx context.Context, instance PolicyInstanceTestData, result *TestResult) error {
-	req, _ := http.NewRequestWithContext(ctx, "DELETE", 
+	req, _ := http.NewRequestWithContext(ctx, "DELETE",
 		t.baseURL+"/a1-p/policytypes/"+instance.PolicyTypeID+"/policies/"+instance.InstanceID, nil)
 	req.Header.Set("Authorization", "Bearer "+t.testData.AuthTokens.ValidToken)
-	
+
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("DELETE policy instance returned status %d", resp.StatusCode)
 	}
-	
+
 	result.Evidence = append(result.Evidence, Evidence{
 		Type:        "delete_policy_instance_success",
 		Description: fmt.Sprintf("DELETE policy instance %s working correctly", instance.InstanceID),
 		Data:        fmt.Sprintf("Status: %d", resp.StatusCode),
 		Timestamp:   time.Now(),
 	})
-	
+
 	return nil
 }
 
@@ -839,35 +839,35 @@ func loadA1TestData() *A1TestData {
 	return &A1TestData{
 		ValidPolicyTypes: []PolicyTypeTestData{
 			{
-				ID:          "test-policy-type-1",
-				Name:        "Test Policy Type 1",
-				Description: "Test policy type for compliance testing",
-				Schema:      json.RawMessage(`{"type": "object", "properties": {"param1": {"type": "string"}}}`),
+				ID:             "test-policy-type-1",
+				Name:           "Test Policy Type 1",
+				Description:    "Test policy type for compliance testing",
+				Schema:         json.RawMessage(`{"type": "object", "properties": {"param1": {"type": "string"}}}`),
 				ExpectedResult: "success",
 			},
 		},
 		InvalidPolicyTypes: []PolicyTypeTestData{
 			{
-				ID:          "invalid-policy-type",
-				Name:        "Invalid Policy Type",
-				Description: "Invalid policy type for testing",
-				Schema:      json.RawMessage(`{"invalid": "schema"}`),
+				ID:             "invalid-policy-type",
+				Name:           "Invalid Policy Type",
+				Description:    "Invalid policy type for testing",
+				Schema:         json.RawMessage(`{"invalid": "schema"}`),
 				ExpectedResult: "invalid",
 			},
 		},
 		ValidPolicyInstances: []PolicyInstanceTestData{
 			{
-				PolicyTypeID: "test-policy-type-1",
-				InstanceID:   "test-instance-1",
-				Policy:       json.RawMessage(`{"param1": "value1"}`),
+				PolicyTypeID:   "test-policy-type-1",
+				InstanceID:     "test-instance-1",
+				Policy:         json.RawMessage(`{"param1": "value1"}`),
 				ExpectedResult: "success",
 			},
 		},
 		InvalidPolicyInstances: []PolicyInstanceTestData{
 			{
-				PolicyTypeID: "test-policy-type-1",
-				InstanceID:   "invalid-instance",
-				Policy:       json.RawMessage(`{"invalid": "data"}`),
+				PolicyTypeID:   "test-policy-type-1",
+				InstanceID:     "invalid-instance",
+				Policy:         json.RawMessage(`{"invalid": "data"}`),
 				ExpectedResult: "invalid",
 			},
 		},

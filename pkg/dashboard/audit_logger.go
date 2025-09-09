@@ -18,10 +18,10 @@ import (
 
 // AuditLogger handles security audit logging
 type AuditLogger struct {
-	events     []AuditEvent
-	logFile    *os.File
-	maxEvents  int
-	mutex      sync.RWMutex
+	events    []AuditEvent
+	logFile   *os.File
+	maxEvents int
+	mutex     sync.RWMutex
 }
 
 // NewAuditLogger creates a new audit logger
@@ -63,7 +63,7 @@ func (al *AuditLogger) LogEvent(event *AuditEvent) {
 	al.writeToFile(event)
 
 	// Log to standard logger for immediate visibility
-	log.Printf("AUDIT: %s - User: %s, Resource: %s, Action: %s, Result: %s", 
+	log.Printf("AUDIT: %s - User: %s, Resource: %s, Action: %s, Result: %s",
 		event.EventType, event.Username, event.Resource, event.Action, event.Result)
 }
 
@@ -152,13 +152,13 @@ func (al *AuditLogger) GetSecurityEvents(limit int) []AuditEvent {
 	defer al.mutex.RUnlock()
 
 	securityEventTypes := map[string]bool{
-		EventTypeLogin:              true,
-		EventTypeLogout:             true,
-		EventTypeLoginFailed:        true,
-		EventTypePasswordChanged:    true,
-		EventTypeAccessDenied:       true,
-		EventTypePermissionGranted:  true,
-		EventTypePermissionRevoked:  true,
+		EventTypeLogin:             true,
+		EventTypeLogout:            true,
+		EventTypeLoginFailed:       true,
+		EventTypePasswordChanged:   true,
+		EventTypeAccessDenied:      true,
+		EventTypePermissionGranted: true,
+		EventTypePermissionRevoked: true,
 	}
 
 	var securityEvents []AuditEvent
