@@ -173,14 +173,6 @@ type ComplianceTestResult struct {
 	Duration    time.Duration `json:"duration"`
 	Details     map[string]interface{} `json:"details,omitempty"`
 }
-type StandardCompliance struct {
-	Standard    ComplianceStandard     `json:"standard"`
-	TestResults []ComplianceTestResult `json:"testResults"`
-	OverallStatus string               `json:"overallStatus"`
-	ComplianceScore float64            `json:"complianceScore"`
-	Violations  []ComplianceViolation  `json:"violations"`
-	GeneratedAt time.Time              `json:"generatedAt"`
-}
 type ComplianceTest struct {
 	ID          string                 `json:"id"`
 	Name        string                 `json:"name"`
@@ -388,6 +380,7 @@ type TestResult struct {
 	EndTime     time.Time              `json:"endTime"`
 	Duration    time.Duration          `json:"duration"`
 	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+	Timestamp   time.Time              `json:"timestamp"`
 }
 
 type TestStatus int

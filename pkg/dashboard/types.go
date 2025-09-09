@@ -481,6 +481,14 @@ type ValidationResult struct {
 	Actual   interface{} `json:"actual"`
 	Status   string      `json:"status"`
 	Message  string      `json:"message"`
+	
+	// Additional fields for compliance validation
+	Warnings  []string                     `json:"warnings"`
+	Standards map[string]StandardCompliance `json:"standards"`
+	
+	// Additional fields needed by compliance_handlers.go
+	Valid   bool     `json:"valid"`
+	Errors  []string `json:"errors"`
 }
 
 // LatencyMetrics represents latency measurements
@@ -1889,7 +1897,10 @@ type NephioTestReport struct {
 }
 
 type ComplianceReport struct {
-	report map[string]interface{}
+	report              map[string]interface{}
+	Timestamp           time.Time                     `json:"timestamp"`
+	Standards           map[string]StandardCompliance `json:"standards"`
+	OverallCompliance   ComplianceResult              `json:"overallCompliance"`
 }
 
 type QueueMetrics struct {
@@ -1904,7 +1915,31 @@ type XAppInstance struct {
 
 // I AM THE CHAMPION! NOTHING CAN STOP ME NOW!
 type ComprehensiveComplianceReport struct {
-	report map[string]interface{}
+	report            map[string]interface{}
+	OverallCompliance ComplianceResult       `json:"overallCompliance"`
+	Standards         map[string]StandardCompliance `json:"standards"`
+	Timestamp         time.Time              `json:"timestamp"`
+}
+
+type ComplianceResult struct {
+	Compliant   bool    `json:"compliant"`
+	Score       float64 `json:"score"`
+	TotalTests  int     `json:"totalTests"`
+	PassedTests int     `json:"passedTests"`
+	FailedTests int     `json:"failedTests"`
+}
+
+// StandardCompliance represents compliance status for a specific standard
+type StandardCompliance struct {
+	Standard    string                 `json:"standard"`
+	Version     string                 `json:"version"`
+	Compliant   bool                   `json:"compliant"`
+	Score       float64                `json:"score"`
+	TestCount   int                    `json:"testCount"`
+	Passed      int                    `json:"passed"`
+	Failed      int                    `json:"failed"`
+	TestSuite   interface{}            `json:"testSuite"`
+	Issues      []ComplianceIssue      `json:"issues"`
 }
 
 type StandardValidation struct {
@@ -1913,8 +1948,13 @@ type StandardValidation struct {
 }
 
 type ComplianceIssue struct {
-	issue string
-	severity string
+	issue       string
+	severity    string
+	TestID      string      `json:"testID"`
+	Severity    string      `json:"severity"`
+	Description string      `json:"description"`
+	Requirement string      `json:"requirement"`
+	Evidence    interface{} `json:"evidence"`
 }
 
 // NETCONFClient for O1 interface compliance testing

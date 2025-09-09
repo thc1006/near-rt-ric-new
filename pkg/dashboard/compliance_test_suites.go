@@ -743,10 +743,10 @@ func (m *ComplianceTestSuiteManager) extractIssuesFromSuite(suite *ComplianceTes
 			if test != nil {
 				issue := ComplianceIssue{
 					TestID:      result.TestID,
-					Severity:    test.Severity,
+					Severity:    string(test.Severity),
 					Description: result.Message,
 					Requirement: test.Requirement,
-					Evidence:    result.Evidence,
+					Evidence:    nil, // result.Evidence field doesn't exist
 				}
 				issues = append(issues, issue)
 			}
@@ -757,16 +757,16 @@ func (m *ComplianceTestSuiteManager) extractIssuesFromSuite(suite *ComplianceTes
 }
 
 // calculateOverallCompliance computes overall compliance metrics
-func (m *ComplianceTestSuiteManager) calculateOverallCompliance(standards map[string]StandardCompliance) OverallCompliance {
-	overall := OverallCompliance{}
+func (m *ComplianceTestSuiteManager) calculateOverallCompliance(standards map[string]StandardCompliance) ComplianceResult {
+	overall := ComplianceResult{}
 	
 	totalScore := 0.0
 	standardCount := 0
 	
 	for _, standard := range standards {
-		overall.TotalTests += standard.TestSuite.Summary.Total
-		overall.PassedTests += standard.TestSuite.Summary.Passed
-		overall.FailedTests += standard.TestSuite.Summary.Failed
+		overall.TotalTests += standard.TestCount
+		overall.PassedTests += standard.Passed
+		overall.FailedTests += standard.Failed
 		
 		totalScore += standard.Score
 		standardCount++
