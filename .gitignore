@@ -87,4 +87,7 @@ security_test_report.yaml
 *.mov
 *.mp3
 *.wav
-*.flac.claude/
+*.flac
+
+# Claude agents (local development only)
+.claude/agents/
