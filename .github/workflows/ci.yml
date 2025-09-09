@@ -118,7 +118,7 @@ jobs:
           REDIS_HOST: localhost
           REDIS_PORT: 6379
         run: |
-          go test -v -race -tags=integration ./tests/integration/...
+          go test -v -race -tags=integration ./test/integration/...
 
   # ============================================================================
   # UI Testing
