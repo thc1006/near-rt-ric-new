@@ -3,14 +3,14 @@
 
 ---
 # Registry Secret for O-RAN SC Nexus
-apiVersion: v1
-kind: Secret
-metadata:
-  name: oran-sc-registry-secret
-  namespace: ricplt
-type: kubernetes.io/dockerconfigjson
-data:
-  .dockerconfigjson: eyJhdXRocyI6eyJuZXh1czMuby1yYW4tc2Mub3JnOjEwMDAyIjp7InVzZXJuYW1lIjoiZG9ja2VyIiwicGFzc3dvcmQiOiJkb2NrZXIiLCJhdXRoIjoiWkc5amEyVnlPbVJ2WTJ0bGNnPT0ifX19
+# NOTE: Create this secret separately using kubectl:
+# kubectl create secret docker-registry oran-sc-registry-secret \
+#   --docker-server=nexus3.o-ran-sc.org:10002 \
+#   --docker-username=<username> \
+#   --docker-password=<password> \
+#   --namespace=ricplt
+# 
+# DO NOT hardcode credentials in deployment files!
 
 ---
 # Redis Database for RIC Platform
