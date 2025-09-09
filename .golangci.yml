@@ -44,7 +44,7 @@ linters:
     - godot
     - gofmt
     - goimports
-    - gomnd
+    - mnd  # Replaced gomnd with mnd
     - goprintffuncname
     - gosec
     - lll
@@ -66,9 +66,9 @@ linters:
     - gochecknoglobals
     - gochecknoinits
     - godox
-    - goerr113
+    # Removed goerr113
     - golint
-    - maligned
+    # Removed maligned
     - nlreturn
     - testpackage
     - wrapcheck
@@ -96,7 +96,7 @@ linters-settings:
   dupl:
     threshold: 100
     
-  gomnd:
+  mnd:  # Updated from gomnd
     settings:
       mnd:
         checks:
@@ -202,7 +202,7 @@ issues:
         - errcheck
         - dupl
         - gosec
-        - gomnd
+        - mnd  # Updated from gomnd
         
     # Exclude generated files
     - path: \.pb\.go

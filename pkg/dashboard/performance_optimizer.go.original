@@ -7,7 +7,6 @@ package dashboard
 
 import (
 	"context"
-	"runtime/debug"
 	"fmt"
 	"runtime"
 	"sync"
@@ -323,7 +322,7 @@ func (tp *ThreadPool) Start(ctx context.Context, cpuManager *CPUAffinityManager)
 	// Start workers
 	for i, worker := range tp.workers {
 		// Assign CPU core
-		threadID := uint64(i) // Get goroutine ID
+		threadID := runtime.Goid() // Get goroutine ID
 		coreID := cpuManager.AssignCore(string(rune(threadID)), i < len(tp.workers)/2) // First half are critical
 		worker.coreID = coreID
 		
@@ -474,7 +473,6 @@ func (w *Worker) processItem(item WorkItem) WorkResult {
 func (w *Worker) processE2APMessage(data unsafe.Pointer, size int) (unsafe.Pointer, int, error) {
 	// Zero-copy processing - work directly with the memory
 	bytes := (*[1 << 30]byte)(data)[:size:size]
-	_ = bytes // Use the variable to avoid unused variable error
 	
 	// Process message in-place
 	// This is a placeholder for actual E2AP message processing
@@ -589,7 +587,7 @@ func (gco *GCOptimizer) OptimizeGC() {
 		gco.targetGCPercent = 200
 	}
 	
-	debug.SetGCPercent(gco.targetGCPercent)
+	runtime.SetGCPercent(gco.targetGCPercent)
 	gco.lastOptimization = time.Now()
 }
 

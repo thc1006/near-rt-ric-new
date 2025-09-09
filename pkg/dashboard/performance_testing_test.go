@@ -2,6 +2,8 @@ package dashboard
 
 import (
 	"context"
+	"net/http"
+	"net/url"
 	"testing"
 	"time"
 
@@ -25,12 +27,13 @@ func (m *MockSubscriptionManagerClient) GetSubscriptions() ([]Subscription, erro
 // MockPrometheusClient for testing
 type MockPrometheusClient struct{}
 
-func (m *MockPrometheusClient) URL(ep string, args map[string]string) *api.URL {
-	return &api.URL{}
+func (m *MockPrometheusClient) URL(ep string, args map[string]string) *url.URL {
+	u, _ := url.Parse("http://localhost:9090/api/v1/" + ep)
+	return u
 }
 
-func (m *MockPrometheusClient) Do(ctx context.Context, req *api.Request) (*api.Response, []byte, api.Warnings, error) {
-	return &api.Response{}, []byte{}, nil, nil
+func (m *MockPrometheusClient) Do(ctx context.Context, req *http.Request) (*http.Response, []byte, []string, error) {
+	return &http.Response{StatusCode: 200}, []byte("{}"), nil, nil
 }
 
 func TestNewPerformanceTestSuite(t *testing.T) {

@@ -17,6 +17,680 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// AdaptiveBackpressureManager manages adaptive backpressure for high-throughput scenarios
+type AdaptiveBackpressureManager struct {
+	// Configuration
+	maxQueueSize       int
+	highWatermark      int
+	lowWatermark       int
+	adaptationInterval time.Duration
+
+	// State tracking
+	currentQueueSize  atomic.Int64
+	backpressureLevel atomic.Int64 // 0-100
+	isActive          atomic.Bool
+	adaptiveRates     map[string]*BackpressureRate
+
+	// Metrics
+	totalDropped      atomic.Uint64
+	totalBackpressure atomic.Uint64
+	averageLatency    atomic.Uint64
+
+	mu sync.RWMutex
+}
+
+// BackpressureRate represents adaptive rate control for specific message types
+type BackpressureRate struct {
+	MessageType    string
+	CurrentRate    float64
+	TargetRate     float64
+	AdjustmentStep float64
+	LastAdjusted   time.Time
+}
+
+// RealTimeProfilerImpl provides real-time performance profiling
+type RealTimeProfilerImpl struct {
+	// Profiling configuration
+	enabled          atomic.Bool
+	profileInterval  time.Duration
+	maxSampleCount   int
+	cpuProfiler      *CPUProfiler
+	memoryProfiler   *MemoryProfiler
+	latencyProfiler  *LatencyProfiler
+	
+	// Sample storage
+	cpuSamples      []CPUSample
+	memorySamples   []MemorySample
+	latencySamples  []LatencySample
+	
+	// Analysis results
+	performanceReport *PerformanceReport
+	bottleneckAnalysis *BottleneckAnalysis
+	
+	mu sync.RWMutex
+}
+
+// CPUProfiler tracks CPU usage patterns
+type CPUProfiler struct {
+	coreCount      int
+	affinityMap    map[int]string // core -> component mapping
+	utilizationMap map[int]float64 // core -> utilization
+	hotspots       []CPUHotspot
+}
+
+// MemoryProfiler tracks memory allocation patterns
+type MemoryProfiler struct {
+	heapSize       uint64
+	allocCount     uint64
+	gcCount        uint64
+	hugePagesUsed  uint64
+	memoryPools    map[string]*MemoryPool
+}
+
+// LatencyProfiler tracks latency distribution across components
+type LatencyProfiler struct {
+	samples         map[string][]time.Duration
+	percentiles     map[string]LatencyPercentiles
+	alertThresholds map[string]time.Duration
+}
+
+// CPUSample represents a CPU profiling sample
+type CPUSample struct {
+	Timestamp      time.Time
+	CoreID         int
+	Utilization    float64
+	Component      string
+	ThreadCount    int
+}
+
+// MemorySample represents a memory profiling sample
+type MemorySample struct {
+	Timestamp     time.Time
+	HeapAlloc     uint64
+	HeapInuse     uint64
+	StackInuse    uint64
+	GCCount       uint32
+	GCPauseNs     uint64
+}
+
+// LatencySample definition moved to stability_testing.go
+
+// PerformanceReport contains comprehensive performance analysis
+type PerformanceReport struct {
+	GeneratedAt       time.Time
+	Duration          time.Duration
+	CPUUtilization    CPUUtilizationReport
+	MemoryUtilization MemoryUtilizationReport
+	LatencyAnalysis   LatencyAnalysisReport
+	Recommendations   []PerformanceRecommendation
+}
+
+// BottleneckAnalysis identifies performance bottlenecks
+type BottleneckAnalysis struct {
+	CPUBottlenecks    []CPUBottleneck
+	MemoryBottlenecks []MemoryBottleneck
+	IOBottlenecks     []IOBottleneck
+	NetworkBottlenecks []NetworkBottleneck
+	Severity          BottleneckSeverity
+}
+
+// PerformanceAnalyzerImpl analyzes performance data and trends
+type PerformanceAnalyzerImpl struct {
+	// Analysis configuration
+	analysisWindow     time.Duration
+	trendAnalyzer      *TrendAnalyzer
+	anomalyDetector    *AnomalyDetector
+	predictiveModel    *PredictiveModel
+	
+	// Data storage
+	historicalData     *TimeSeriesStorage
+	performanceMetrics map[string]*MetricSeries
+	
+	// Analysis results
+	currentTrends      []PerformanceTrend
+	detectedAnomalies  []PerformanceAnomaly
+	predictions        []PerformancePrediction
+	
+	mu sync.RWMutex
+}
+
+// TrendAnalyzer identifies performance trends over time
+type TrendAnalyzer struct {
+	trendTypes       []TrendType
+	confidenceLevel  float64
+	minDataPoints    int
+	trendModels      map[string]*TrendModel
+}
+
+// AnomalyDetector definition moved to anomaly_detector.go
+
+// PredictiveModel predicts future performance characteristics
+type PredictiveModel struct {
+	modelType        ModelType
+	trainingData     []TrainingDataPoint
+	accuracy         float64
+	confidenceLevel  float64
+	predictionWindow time.Duration
+}
+
+// TimeSeriesStorage stores time-series performance data
+type TimeSeriesStorage struct {
+	capacity       int
+	retention      time.Duration
+	dataPoints     map[string][]DataPoint
+	indexedQueries map[string]*QueryIndex
+	mu             sync.RWMutex
+}
+
+// AutoPerformanceTunerImpl automatically tunes system performance
+type AutoPerformanceTunerImpl struct {
+	// Tuning configuration
+	enabled               atomic.Bool
+	tuningInterval        time.Duration
+	aggressiveness       TuningAggressiveness
+	safetyMargin         float64
+	
+	// Tuning strategies
+	cpuTuner             *CPUTuner
+	memoryTuner          *MemoryTuner
+	networkTuner         *NetworkTuner
+	e2NodeTuner          *E2NodeTuner
+	
+	// Tuning state
+	currentOptimizations []ActiveOptimization
+	tuningHistory        []TuningEvent
+	performanceBaseline  *PerformanceBaseline
+	
+	// Safety mechanisms
+	rollbackCapability   bool
+	maxTuningChanges     int
+	tuningLimits         map[string]TuningLimit
+	
+	mu sync.RWMutex
+}
+
+// CPUTuner optimizes CPU-related performance parameters
+type CPUTuner struct {
+	affinityOptimizer    *AffinityOptimizer
+	frequencyScaler      *FrequencyScaler
+	cacheOptimizer       *CacheOptimizer
+	threadPoolManager    *ThreadPoolManager
+}
+
+// MemoryTuner optimizes memory allocation and usage
+type MemoryTuner struct {
+	poolSizeOptimizer    *PoolSizeOptimizer
+	gcTuner              *GCTuner
+	hugePagesManager     *HugePagesManager
+	memoryAllocator      *OptimizedAllocator
+}
+
+// NetworkTuner optimizes network performance
+type NetworkTuner struct {
+	connectionOptimizer  *ConnectionOptimizer
+	bufferSizeManager    *BufferSizeManager
+	bandwidthController  *BandwidthController
+	tcpOptimizer        *TCPOptimizer
+}
+
+// E2NodeTuner specifically optimizes E2 node handling
+type E2NodeTuner struct {
+	connectionPoolTuner  *ConnectionPoolTuner
+	subscriptionOptimizer *SubscriptionOptimizer
+	loadBalanceTuner     *LoadBalanceTuner
+	indicationProcessor  *IndicationProcessorTuner
+}
+
+// CircuitBreakerCluster manages circuit breakers for different components
+type CircuitBreakerCluster interface {
+	IsOpen(nodeID string) bool
+	RecordFailure(nodeID string)
+	RecordSuccess(nodeID string)
+	GetState(nodeID string) CircuitBreakerState
+	Reset(nodeID string) error
+	GetMetrics() CircuitBreakerMetrics
+}
+
+// CircuitBreakerState represents the state of a circuit breaker
+type CircuitBreakerState int
+
+const (
+	CircuitBreakerClosed CircuitBreakerState = iota
+	CircuitBreakerOpen
+	CircuitBreakerHalfOpen
+)
+
+// CircuitBreakerMetrics contains metrics for all circuit breakers
+type CircuitBreakerMetrics struct {
+	TotalBreakers         int
+	OpenBreakers          int
+	HalfOpenBreakers      int
+	ClosedBreakers        int
+	TotalFailures         uint64
+	TotalSuccesses        uint64
+	TotalRequests         uint64
+	AverageFailureRate    float64
+}
+
+// ComprehensiveHealthMonitor monitors system health across all components
+type ComprehensiveHealthMonitor struct {
+	// Monitoring configuration
+	checkInterval        time.Duration
+	healthCheckers       map[string]HealthChecker
+	alertManager         *AlertManager
+	healthHistory        *HealthHistory
+	
+	// Component health tracking
+	systemHealth         *SystemHealth
+	componentHealth      map[string]*ComponentHealth
+	serviceHealth        map[string]*ServiceHealth
+	
+	// Health metrics
+	overallHealthScore   atomic.Uint64 // 0-100
+	criticalAlerts       atomic.Uint64
+	warningAlerts        atomic.Uint64
+	
+	// Recovery mechanisms
+	autoRecovery         bool
+	recoveryStrategies   map[string]RecoveryStrategy
+	
+	mu sync.RWMutex
+}
+
+// HealthChecker definition moved to types.go
+
+// SystemHealth represents overall system health
+type SystemHealth struct {
+	OverallScore     float64
+	CPUHealth        ComponentHealth
+	MemoryHealth     ComponentHealth
+	NetworkHealth    ComponentHealth
+	StorageHealth    ComponentHealth
+	E2NodeHealth     ComponentHealth
+	SMOHealth        ComponentHealth
+	NephioHealth     ComponentHealth
+	LastChecked      time.Time
+}
+
+// ComponentHealth represents health of individual components
+type ComponentHealth struct {
+	Name             string
+	Status           HealthStatus
+	Score            float64
+	LastChecked      time.Time
+	ErrorCount       uint64
+	WarningCount     uint64
+	ResponseTime     time.Duration
+	Availability     float64
+	Details          map[string]interface{}
+}
+
+// ServiceHealth represents health of external services
+// ServiceHealth definition moved to graceful_degradation.go
+
+// HealthStatus definition moved to types.go
+
+// HealthResult represents the result of a health check
+type HealthResult struct {
+	Status      HealthStatus
+	Score       float64
+	Message     string
+	Details     map[string]interface{}
+	Timestamp   time.Time
+	CheckedBy   string
+}
+
+// HealthMetrics contains detailed health metrics
+type HealthMetrics struct {
+	Availability        float64
+	ResponseTimeP50     time.Duration
+	ResponseTimeP95     time.Duration
+	ResponseTimeP99     time.Duration
+	ErrorRate           float64
+	ThroughputRPS       float64
+	ConcurrentRequests  int64
+}
+
+// Supporting types for the new implementations
+
+// CPUHotspot represents a CPU performance hotspot
+type CPUHotspot struct {
+	CoreID       int
+	Component    string
+	Utilization  float64
+	Duration     time.Duration
+	Impact       HotspotImpact
+}
+
+// HotspotImpact represents the impact level of a performance hotspot
+type HotspotImpact int
+
+const (
+	HotspotImpactLow HotspotImpact = iota
+	HotspotImpactMedium
+	HotspotImpactHigh
+	HotspotImpactCritical
+)
+
+// MemoryPool represents a managed memory pool
+// MemoryPool definition moved to performance_optimizer.go
+
+// LatencyPercentiles contains latency percentile data
+type LatencyPercentiles struct {
+	P50  time.Duration
+	P75  time.Duration
+	P90  time.Duration
+	P95  time.Duration
+	P99  time.Duration
+	P999 time.Duration
+}
+
+// CPUUtilizationReport contains CPU utilization analysis
+type CPUUtilizationReport struct {
+	AverageUtilization float64
+	PeakUtilization    float64
+	CoreUtilization    map[int]float64
+	Hotspots          []CPUHotspot
+}
+
+// MemoryUtilizationReport contains memory utilization analysis
+type MemoryUtilizationReport struct {
+	HeapUtilization    float64
+	StackUtilization   float64
+	GCPressure        float64
+	MemoryLeaks       []MemoryLeak
+}
+
+// LatencyAnalysisReport contains latency analysis
+type LatencyAnalysisReport struct {
+	ComponentLatencies map[string]LatencyPercentiles
+	WorstPerformers   []LatencyOutlier
+	ImprovementAreas  []LatencyImprovement
+}
+
+// PerformanceRecommendation suggests performance improvements
+type PerformanceRecommendation struct {
+	Category    string
+	Priority    RecommendationPriority
+	Description string
+	Impact      string
+	Effort      string
+	Actions     []string
+}
+
+// RecommendationPriority represents the priority of a recommendation
+type RecommendationPriority int
+
+const (
+	RecommendationPriorityLow RecommendationPriority = iota
+	RecommendationPriorityMedium
+	RecommendationPriorityHigh
+	RecommendationPriorityCritical
+)
+
+// Constructor functions for the new types
+
+// NewAdaptiveBackpressureManager creates a new adaptive backpressure manager
+func NewAdaptiveBackpressureManager(maxQueueSize int) *AdaptiveBackpressureManager {
+	return &AdaptiveBackpressureManager{
+		maxQueueSize:       maxQueueSize,
+		highWatermark:     int(float64(maxQueueSize) * 0.8),
+		lowWatermark:      int(float64(maxQueueSize) * 0.3),
+		adaptationInterval: time.Second * 5,
+		adaptiveRates:     make(map[string]*BackpressureRate),
+	}
+}
+
+// NewRealTimeProfilerImpl creates a new real-time profiler
+func NewRealTimeProfilerImpl(interval time.Duration) *RealTimeProfilerImpl {
+	return &RealTimeProfilerImpl{
+		profileInterval:  interval,
+		maxSampleCount:  10000,
+		cpuProfiler:     &CPUProfiler{coreCount: runtime.NumCPU()},
+		memoryProfiler:  &MemoryProfiler{memoryPools: make(map[string]*MemoryPool)},
+		latencyProfiler: &LatencyProfiler{
+			samples:         make(map[string][]time.Duration),
+			percentiles:     make(map[string]LatencyPercentiles),
+			alertThresholds: make(map[string]time.Duration),
+		},
+	}
+}
+
+// NewPerformanceAnalyzerImpl creates a new performance analyzer
+func NewPerformanceAnalyzerImpl() *PerformanceAnalyzerImpl {
+	return &PerformanceAnalyzerImpl{
+		analysisWindow:     time.Hour,
+		trendAnalyzer:      &TrendAnalyzer{confidenceLevel: 0.95, minDataPoints: 100},
+		anomalyDetector:    &AnomalyDetector{sensitivity: 0.8, alertThreshold: 0.9},
+		predictiveModel:    &PredictiveModel{modelType: ModelTypeLinearRegression, confidenceLevel: 0.9},
+		historicalData:     &TimeSeriesStorage{capacity: 100000, retention: time.Hour * 24},
+		performanceMetrics: make(map[string]*MetricSeries),
+	}
+}
+
+// NewAutoPerformanceTunerImpl creates a new auto performance tuner
+func NewAutoPerformanceTunerImpl(config *AdvancedPerformanceConfig) *AutoPerformanceTunerImpl {
+	return &AutoPerformanceTunerImpl{
+		tuningInterval:      config.AutoTuningInterval,
+		aggressiveness:     TuningAggressivenessModerate,
+		safetyMargin:       0.1,
+		cpuTuner:           &CPUTuner{},
+		memoryTuner:        &MemoryTuner{},
+		networkTuner:       &NetworkTuner{},
+		e2NodeTuner:        &E2NodeTuner{},
+		rollbackCapability: true,
+		maxTuningChanges:   10,
+		tuningLimits:       make(map[string]TuningLimit),
+	}
+}
+
+// NewMockCircuitBreakerCluster creates a mock circuit breaker cluster for testing
+func NewMockCircuitBreakerCluster() CircuitBreakerCluster {
+	return &MockCircuitBreakerCluster{
+		breakers: make(map[string]*MockCircuitBreaker),
+	}
+}
+
+// MockCircuitBreakerCluster is a mock implementation of CircuitBreakerCluster
+type MockCircuitBreakerCluster struct {
+	breakers map[string]*MockCircuitBreaker
+	mu       sync.RWMutex
+}
+
+// MockCircuitBreaker is a mock circuit breaker
+type MockCircuitBreaker struct {
+	state        CircuitBreakerState
+	failures     uint64
+	successes    uint64
+	lastFailure  time.Time
+	lastSuccess  time.Time
+}
+
+func (m *MockCircuitBreakerCluster) IsOpen(nodeID string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	
+	breaker, exists := m.breakers[nodeID]
+	if !exists {
+		m.breakers[nodeID] = &MockCircuitBreaker{state: CircuitBreakerClosed}
+		return false
+	}
+	
+	return breaker.state == CircuitBreakerOpen
+}
+
+func (m *MockCircuitBreakerCluster) RecordFailure(nodeID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	
+	breaker, exists := m.breakers[nodeID]
+	if !exists {
+		breaker = &MockCircuitBreaker{state: CircuitBreakerClosed}
+		m.breakers[nodeID] = breaker
+	}
+	
+	breaker.failures++
+	breaker.lastFailure = time.Now()
+	
+	// Simple threshold-based state change
+	if breaker.failures > 5 {
+		breaker.state = CircuitBreakerOpen
+	}
+}
+
+func (m *MockCircuitBreakerCluster) RecordSuccess(nodeID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	
+	breaker, exists := m.breakers[nodeID]
+	if !exists {
+		breaker = &MockCircuitBreaker{state: CircuitBreakerClosed}
+		m.breakers[nodeID] = breaker
+	}
+	
+	breaker.successes++
+	breaker.lastSuccess = time.Now()
+	
+	// Reset on success
+	if breaker.state == CircuitBreakerOpen {
+		breaker.state = CircuitBreakerClosed
+		breaker.failures = 0
+	}
+}
+
+func (m *MockCircuitBreakerCluster) GetState(nodeID string) CircuitBreakerState {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	
+	breaker, exists := m.breakers[nodeID]
+	if !exists {
+		return CircuitBreakerClosed
+	}
+	
+	return breaker.state
+}
+
+func (m *MockCircuitBreakerCluster) Reset(nodeID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	
+	breaker, exists := m.breakers[nodeID]
+	if !exists {
+		return fmt.Errorf("circuit breaker not found for node: %s", nodeID)
+	}
+	
+	breaker.state = CircuitBreakerClosed
+	breaker.failures = 0
+	return nil
+}
+
+func (m *MockCircuitBreakerCluster) GetMetrics() CircuitBreakerMetrics {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	
+	metrics := CircuitBreakerMetrics{
+		TotalBreakers: len(m.breakers),
+	}
+	
+	for _, breaker := range m.breakers {
+		switch breaker.state {
+		case CircuitBreakerOpen:
+			metrics.OpenBreakers++
+		case CircuitBreakerHalfOpen:
+			metrics.HalfOpenBreakers++
+		case CircuitBreakerClosed:
+			metrics.ClosedBreakers++
+		}
+		
+		metrics.TotalFailures += breaker.failures
+		metrics.TotalSuccesses += breaker.successes
+	}
+	
+	metrics.TotalRequests = metrics.TotalFailures + metrics.TotalSuccesses
+	if metrics.TotalRequests > 0 {
+		metrics.AverageFailureRate = float64(metrics.TotalFailures) / float64(metrics.TotalRequests) * 100
+	}
+	
+	return metrics
+}
+
+// NewComprehensiveHealthMonitor creates a new comprehensive health monitor
+func NewComprehensiveHealthMonitor(config *AdvancedPerformanceConfig) *ComprehensiveHealthMonitor {
+	return &ComprehensiveHealthMonitor{
+		checkInterval:     time.Second * 30,
+		healthCheckers:    make(map[string]HealthChecker),
+		alertManager:      &AlertManager{},
+		healthHistory:     &HealthHistory{},
+		systemHealth:      &SystemHealth{},
+		componentHealth:   make(map[string]*ComponentHealth),
+		serviceHealth:     make(map[string]*ServiceHealth),
+		autoRecovery:      true,
+		recoveryStrategies: make(map[string]RecoveryStrategy),
+	}
+}
+
+// Additional supporting types and enums
+
+type TuningAggressiveness int
+
+const (
+	TuningAggressivenessConservative TuningAggressiveness = iota
+	TuningAggressivenessModerate
+	TuningAggressivenessAggressive
+)
+
+type ModelType int
+
+const (
+	ModelTypeLinearRegression ModelType = iota
+	ModelTypeNeuralNetwork
+	ModelTypeTimeSeriesARIMA
+)
+
+type TrendType int
+type DetectionMethod int
+type BottleneckSeverity int
+
+// Placeholder types that would be fully implemented
+type TrendModel struct{}
+type BaselineModel struct{}
+type TrainingDataPoint struct{}
+type DataPoint struct{}
+type QueryIndex struct{}
+type ActiveOptimization struct{}
+type TuningEvent struct{}
+type PerformanceBaseline struct{}
+type TuningLimit struct{}
+type AffinityOptimizer struct{}
+type FrequencyScaler struct{}
+type CacheOptimizer struct{}
+type ThreadPoolManager struct{}
+type PoolSizeOptimizer struct{}
+type GCTuner struct{}
+type HugePagesManager struct{}
+type OptimizedAllocator struct{}
+type ConnectionOptimizer struct{}
+type BufferSizeManager struct{}
+type BandwidthController struct{}
+type TCPOptimizer struct{}
+type ConnectionPoolTuner struct{}
+type LoadBalanceTuner struct{}
+type IndicationProcessorTuner struct{}
+type AlertManager struct{}
+type HealthHistory struct{}
+type RecoveryStrategy struct{}
+type MetricSeries struct{}
+type PerformanceTrend struct{}
+type PerformanceAnomaly struct{}
+type PerformancePrediction struct{}
+type CPUBottleneck struct{}
+type MemoryBottleneck struct{}
+type IOBottleneck struct{}
+type NetworkBottleneck struct{}
+type MemoryLeak struct{}
+type LatencyOutlier struct{}
+type LatencyImprovement struct{}
+
 // AdvancedSMOPerformanceOptimizer implements Phase 8 requirements for O-RAN L Release
 // with Nephio R5 integration and production-grade performance optimizations
 type AdvancedSMOPerformanceOptimizer struct {
@@ -448,11 +1122,18 @@ func (aspo *AdvancedSMOPerformanceOptimizer) initializePerformanceComponents() {
 	aspo.gcOptimizer = NewProductionGCOptimizer()
 
 	// Initialize performance monitoring
-	aspo.realTimeProfiler = NewRealTimeProfiler(aspo.config.ProfilingInterval)
-	aspo.performanceAnalyzer = NewPerformanceAnalyzer()
-	aspo.autoTuner = NewAutoPerformanceTuner(aspo.config)
+	aspo.realTimeProfiler = NewRealTimeProfilerImpl(aspo.config.ProfilingInterval)
+	aspo.performanceAnalyzer = NewPerformanceAnalyzerImpl()
+	aspo.autoTuner = NewAutoPerformanceTunerImpl(aspo.config)
+	
+	// Initialize backpressure manager
+	aspo.backpressureManager = NewAdaptiveBackpressureManager(10000)
+	
 	// Initialize circuit breaker cluster
 	aspo.circuitBreakerCluster = NewMockCircuitBreakerCluster()
+	
+	// Initialize health monitor
+	aspo.healthMonitor = NewComprehensiveHealthMonitor(aspo.config)
 }
 
 // initializeSMOIntegration initializes SMO integration components

@@ -97,13 +97,13 @@ type BatchOptions struct {
 
 // BatchResponse represents a batch operation response
 type BatchResponse struct {
-	Results   []BatchResult `json:"results"`
+	Results   []BatchOperationResult `json:"results"`
 	Summary   BatchSummary  `json:"summary"`
 	Timestamp time.Time     `json:"timestamp"`
 }
 
-// BatchResult represents the result of a single batch operation
-type BatchResult struct {
+// BatchOperationResult represents the result of a single batch operation
+type BatchOperationResult struct {
 	ID      string      `json:"id"`
 	Success bool        `json:"success"`
 	Data    interface{} `json:"data,omitempty"`

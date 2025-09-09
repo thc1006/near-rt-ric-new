@@ -16,11 +16,8 @@ import (
 // SMO Integration Implementation for O-RAN L Release 2025 September
 
 // Missing type definitions for compilation
-type OCloudManager = OCloudManagerImpl
-type SIMDOperation struct {
-	Name   string
-	Vector []float64
-}
+// OCloudManager alias moved - see types.go for full definition
+// SIMDOperation definition moved to types.go
 type WeightedLoadBalancer struct {
 	weights map[string]float64
 	mu      sync.RWMutex
@@ -103,6 +100,16 @@ type AdvancedPerformanceConfig struct {
 	OCloudManagerEndpoint       string
 	PackageRepoEndpoint         string
 	NephioHealthCheckInterval   time.Duration
+	
+	// Additional fields required by the performance optimizer
+	EnableNUMAAwareness         bool
+	WorkerThreadCount           int
+	HTTPConnectionPoolSize      int
+	BatchProcessingInterval     time.Duration
+	CircuitBreakerTimeout       time.Duration
+	EnableRealTimeProfiling     bool
+	EnableAutoTuning            bool
+	AutoTuningInterval          time.Duration
 }
 type ProcessingResult struct {
 	NodeID           string
@@ -114,976 +121,482 @@ type ProcessingResult struct {
 type E2MessageType int
 type SubscriptionID string
 
-// Load balancer algorithm constants
+// Load balancer algorithm constants - RoundRobin moved to types.go
 const (
-	RoundRobin LoadBalancingAlgorithm = iota
+	CleanRoundRobin LoadBalancingAlgorithm = iota
 	WeightedRoundRobin
 	LeastConnections
 	WeightedLeastConnections
-	ConsistentHashing
-	ResourceBased
-	LatencyBased
+	IPHash
+	PerformanceBased
 )
 
-// Performance testing types that were originally missing
-type PerformanceTestRunner struct {
-	Suite           *PerformanceTestSuite
-	ValidationRules *ValidationRules
-	TestReport      *ComprehensiveTestReport
+type BatchResult struct {
+	ProcessedCount   uint64
+	FailedCount      uint64
+	TotalTimeNs      int64
+	AvgLatencyNs     int64
+}
+type NetworkInterfaceStats struct {
+	InterfaceName   string
+	BytesReceived   uint64
+	BytesTransmitted uint64
+	PacketsReceived uint64
+	PacketsTransmitted uint64
+	ErrorsReceived  uint64
+	ErrorsTransmitted uint64
+	DroppedReceived uint64
+	DroppedTransmitted uint64
 }
 
-type PerformanceTestSuite struct {
-	e2Manager        *E2ManagerClient
-	subManager       *SubscriptionManagerClient
-	prometheusClient interface{}
+type CleanComplianceViolation struct {
+	ViolationID   string                 `json:"violationId"`
+	Requirement   string                 `json:"requirement"`
+	Description   string                 `json:"description"`
+	Severity      string                 `json:"severity"`
+	DetectedAt    time.Time              `json:"detectedAt"`
+	Component     string                 `json:"component"`
+	Details       map[string]interface{} `json:"details,omitempty"`
+}
+type ComplianceStandard struct {
+	Name        string `json:"name"`
+	Version     string `json:"version"`
+	Description string `json:"description"`
+}
+type ComplianceTestResult struct {
+	TestID      string    `json:"testId"`
+	Name        string    `json:"name"`
+	Status      string    `json:"status"`
+	Message     string    `json:"message,omitempty"`
+	StartTime   time.Time `json:"startTime"`
+	EndTime     time.Time `json:"endTime"`
+	Duration    time.Duration `json:"duration"`
+	Details     map[string]interface{} `json:"details,omitempty"`
+}
+type StandardCompliance struct {
+	Standard    ComplianceStandard     `json:"standard"`
+	TestResults []ComplianceTestResult `json:"testResults"`
+	OverallStatus string               `json:"overallStatus"`
+	ComplianceScore float64            `json:"complianceScore"`
+	Violations  []ComplianceViolation  `json:"violations"`
+	GeneratedAt time.Time              `json:"generatedAt"`
+}
+type ComplianceTest struct {
+	ID          string                 `json:"id"`
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Category    string                 `json:"category"`
+	Requirement string                 `json:"requirement"`
+	Severity    TestSeverity           `json:"severity"`
+	Tags        []string               `json:"tags"`
+	Config      map[string]interface{} `json:"config"`
+}
+type ComplianceTestSuite struct {
+	Name        string            `json:"name"`
+	Version     string            `json:"version"`
+	Description string            `json:"description"`
+	Standard    ComplianceStandard `json:"standard"`
+	Tests       []ComplianceTest  `json:"tests"`
+	Config      map[string]interface{} `json:"config"`
 }
 
-type LoadTestResults struct {
-	MaxConcurrentE2Nodes int
-	Duration             time.Duration
-	SuccessRate          float64
+// Throughput-related types
+type ThroughputSample struct {
+	Timestamp        time.Time `json:"timestamp"`
+	RequestsPerSec   float64   `json:"requestsPerSec"`
+	BytesPerSec      float64   `json:"bytesPerSec"`
+	MessagesPerSec   float64   `json:"messagesPerSec"`
+	ConcurrentUsers  int       `json:"concurrentUsers"`
 }
 
-type ThroughputResults struct {
-	MaxIndicationsPerSecond int
-	AverageThroughput       float64
-	PeakThroughput          float64
+type ResourceConsumption struct {
+	CPUPercentage  float64 `json:"cpuPercentage"`
+	MemoryMB       float64 `json:"memoryMB"`
+	NetworkMbps    float64 `json:"networkMbps"`
+	DiskIOPS       float64 `json:"diskIOPS"`
+	GoroutineCount int     `json:"goroutineCount"`
 }
 
-type LatencyResults struct {
-	EndToEndLatencyMs *LatencyMetrics
+type CleanScalingPolicy struct {
+	MetricName       string  `json:"metricName"`
+	TargetValue      float64 `json:"targetValue"`
+	ScaleUpThreshold float64 `json:"scaleUpThreshold"`
+	ScaleDownThreshold float64 `json:"scaleDownThreshold"`
+	MinInstances     int     `json:"minInstances"`
+	MaxInstances     int     `json:"maxInstances"`
 }
 
-type StressTestResults struct {
-	ResourceExhaustionPoint *ResourceExhaustionPoint
-	RecoveryMetrics         *RecoveryMetrics
+// Energy and sustainability metrics
+type SustainabilityMetrics struct {
+	PowerConsumptionWatts float64   `json:"powerConsumptionWatts"`
+	EnergyEfficiencyRatio float64   `json:"energyEfficiencyRatio"`
+	CarbonFootprintKg     float64   `json:"carbonFootprintKg"`
+	Timestamp             time.Time `json:"timestamp"`
 }
 
-type RecoveryMetrics struct {
-	SuccessfulRecoveries int
-	FailedRecoveries     int
-	AverageRecoveryTime  time.Duration
+// Performance optimization types
+type OptimizationTarget struct {
+	Metric      string  `json:"metric"`
+	TargetValue float64 `json:"targetValue"`
+	Weight      float64 `json:"weight"`
+	Priority    int     `json:"priority"`
 }
 
-type StabilityResults struct {
-	TestDurationHours    float64
-	MemoryLeakDetected   bool
-	MemoryUsageOverTime  []MemoryUsageSample
+type CleanResourceAllocation struct {
+	ID                string                 `json:"id"`
+	Type              string                 `json:"type"`
+	AllocatedResources AllocatedResources     `json:"allocatedResources"`
+	RequestedResources ResourceRequirements   `json:"requestedResources"`
+	Status            string                 `json:"status"`
+	AllocationTime    time.Time              `json:"allocationTime"`
+	ExpirationTime    *time.Time             `json:"expirationTime,omitempty"`
+	Metadata          map[string]interface{} `json:"metadata,omitempty"`
 }
 
-type MemoryUsageSample struct {
-	Timestamp time.Time
-	UsageMB   float64
+// CleanEventTrigger represents an E2 subscription event trigger
+type CleanEventTrigger struct {
+	TriggerType EventTriggerType       `json:"triggerType"`
+	Period      *time.Duration         `json:"period,omitempty"`
+	Condition   map[string]interface{} `json:"condition,omitempty"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// Missing type definitions for compilation compatibility
-type CircuitBreakerCluster interface {
-	IsOpen(nodeID string) bool
-	RecordFailure(nodeID string)
-	RecordSuccess(nodeID string)
-}
+// ServiceModelType moved to types.go
+type CleanServiceModelType int
 
-type TestResults struct {
-	StartTime time.Time
-	EndTime   time.Time
-	Passed    bool
-	Metrics   map[string]interface{}
-}
+const (
+	CleanServiceModelTypeKPM CleanServiceModelType = iota
+	CleanServiceModelTypeRC
+	CleanServiceModelTypeNI
+	ServiceModelTypeCellConfig
+	ServiceModelTypeMRO
+	ServiceModelTypeRSM
+	ServiceModelTypeMLS
+	ServiceModelTypeQOE
+	ServiceModelTypePCI
+	ServiceModelTypeUEID
+)
 
-type ResourceExhaustionPoint struct {
-	ResourceType string
-	Threshold    float64
-	Current      float64
-}
-
-type WebSocketPool struct {
-	connections map[string]interface{}
-	mu          sync.RWMutex
-}
-
-type BroadcastMessage struct {
-	Type    string
-	Payload []byte
-	Target  string
-}
-
-type WSManagerStats struct {
-	ActiveConnections int
-	MessagesSent      int64
-	MessagesReceived  int64
-}
-
-type BackendHealthChecker struct {
-	backends map[string]*Backend
-	mu       sync.RWMutex
-}
-
-type CompressionHandler struct {
-	enabled bool
-	level   int
-}
-
-type AuthenticationManager struct {
-	tokens map[string]interface{}
-	mu     sync.RWMutex
-}
-
-type RateLimitManager struct {
-	limits map[string]int
-	mu     sync.RWMutex
-}
-
-type RequestRouter struct {
-	routes map[string]interface{}
-	mu     sync.RWMutex
-}
-
-type StickySessionManager struct {
-	sessions map[string]string
-	mu       sync.RWMutex
-}
-
-type E2ConnectionManager struct {
-	connections map[string]interface{}
-	mu          sync.RWMutex
-}
-
-type E2NodeRouter struct {
-	routes map[string]interface{}
-	mu     sync.RWMutex
-}
-
-type E2LoadDistributor struct {
-	distribution map[string]int
-	mu           sync.RWMutex
-}
-
-type E2AlertManager struct {
-	alerts map[string]interface{}
-	mu     sync.RWMutex
-}
-
-type E2NodeMapShard struct {
-	shard map[string]interface{}
-	mu    sync.RWMutex
-}
-
-type HighPerformanceSubscriptionManager struct {
-	subscriptions map[string]interface{}
-	mu            sync.RWMutex
-}
-
-type APIHealthChecker struct {
-	checks map[string]bool
-	mu     sync.RWMutex
-}
-
-type E2NodeManagerStats struct {
-	NodeCount        int
-	ActiveNodes      int
-	ConnectionErrors int64
-}
-
-type IndicationPipeline struct {
-	stages []interface{}
-	mu     sync.RWMutex
-}
-
-type IndicationBatchProcessor struct {
-	batchSize int
-	queue     []interface{}
-	mu        sync.RWMutex
-}
-
-type IndicationSIMDProcessor struct {
-	operations map[string]interface{}
-	mu         sync.RWMutex
-}
-
-type IndicationCompressionHandler struct {
-	enabled bool
-	level   int
-}
-
-type IndicationRoutingEngine struct {
-	routes map[string]interface{}
-	mu     sync.RWMutex
-}
-
-type FastSubscriptionMatcher struct {
-	matchers map[string]interface{}
-	mu       sync.RWMutex
-}
-
-type IndicationProcessorStats struct {
-	ProcessedCount int64
-	ErrorCount     int64
-	AverageLatency time.Duration
-}
-
-type ErrorHandler struct {
-	handlers map[string]func(error) error
-	mu       sync.RWMutex
-}
-
-type ServiceModelType int
-
-type RAppManagerClient struct {
-	endpoint string
-	client   interface{}
-}
-
-type RequestCache struct {
-	cache map[string]interface{}
-	mu    sync.RWMutex
-}
-
-type PackageCache struct {
-	packages map[string]interface{}
-	mu       sync.RWMutex
-}
-
-type PackageValidator struct {
-	rules map[string]interface{}
-	mu    sync.RWMutex
-}
-
-type PackageDeployer struct {
-	deployments map[string]interface{}
-	mu          sync.RWMutex
-}
-
-type PackageBatchProcessor struct {
-	batch map[string]interface{}
-	mu    sync.RWMutex
-}
-
-type EnergyManager struct {
-	metrics map[string]float64
-	mu      sync.RWMutex
-}
-
-type ActionType string
-
-// Performance test suite constructor
-func NewPerformanceTestSuite(e2Manager *E2ManagerClient, subManager *SubscriptionManagerClient, prometheusClient interface{}) *PerformanceTestSuite {
-	return &PerformanceTestSuite{
-		e2Manager:        e2Manager,
-		subManager:       subManager,
-		prometheusClient: prometheusClient,
+func (s ServiceModelType) String() string {
+	switch s {
+	case ServiceModelTypeKPM:
+		return "KPM"
+	case ServiceModelTypeRC:
+		return "RC"
+	case ServiceModelTypeNI:
+		return "NI"
+	case ServiceModelTypeCellConfig:
+		return "CELL_CONFIG"
+	case ServiceModelTypeMRO:
+		return "MRO"
+	case ServiceModelTypeRSM:
+		return "RSM"
+	case ServiceModelTypeMLS:
+		return "MLS"
+	case ServiceModelTypeQOE:
+		return "QOE"
+	case ServiceModelTypePCI:
+		return "PCI"
+	case ServiceModelTypeUEID:
+		return "UEID"
+	default:
+		return "UNKNOWN"
 	}
 }
 
-func (pts *PerformanceTestSuite) RunAllPerformanceTests(ctx context.Context) (*TestResults, error) {
-	return &TestResults{
-		StartTime: time.Now(),
-		EndTime:   time.Now().Add(time.Hour),
-		Passed:    true,
-		Metrics: map[string]interface{}{
-			"LoadTestResults":    &LoadTestResults{MaxConcurrentE2Nodes: 150},
-			"ThroughputResults":  &ThroughputResults{MaxIndicationsPerSecond: 15000},
-			"LatencyResults":     &LatencyResults{EndToEndLatencyMs: &LatencyMetrics{P99: 8.5}},
-			"StressTestResults":  &StressTestResults{},
-			"StabilityResults":   &StabilityResults{TestDurationHours: 25.0},
-		},
-	}, nil
-}
-type SimpleA1MediatorClient struct {
-	endpoint string
-	mu       sync.RWMutex
+// ServiceModelRegistry manages service model definitions
+type CleanServiceModelRegistry struct {
+	models      map[string]*ServiceModelDefinition
+	statistics  map[string]*ServiceModelStatistics
+	mu          sync.RWMutex
+	initialized bool
 }
 
-// GetHealth returns the health status of the A1 Mediator
-func (c *SimpleA1MediatorClient) GetHealth(ctx context.Context) (*HealthStatus, error) {
-	// Implementation would check A1 Mediator health
-	status := HealthStatusHealthy
-	return &status, nil
+// NewServiceModelRegistry creates a new service model registry
+func NewCleanServiceModelRegistry() *CleanServiceModelRegistry {
+	return &CleanServiceModelRegistry{
+		models:     make(map[string]*ServiceModelDefinition),
+		statistics: make(map[string]*ServiceModelStatistics),
+	}
 }
 
-// GetPolicyTypes returns all policy types
-func (c *SimpleA1MediatorClient) GetPolicyTypes(ctx context.Context) ([]PolicyType, error) {
-	// Implementation would fetch policy types from A1 Mediator
-	return []PolicyType{}, nil
+// XApp configuration and management types
+type CleanXAppConfig struct {
+	Name         string                 `json:"name"`
+	Version      string                 `json:"version"`
+	Image        string                 `json:"image"`
+	Resources    ResourceRequirements   `json:"resources"`
+	Config       map[string]interface{} `json:"config"`
+	Environment  map[string]string      `json:"environment"`
+	Replicas     int                    `json:"replicas"`
+	ServicePorts []ServicePort          `json:"servicePorts,omitempty"`
 }
 
-// GetPolicyType returns a specific policy type
-func (c *SimpleA1MediatorClient) GetPolicyType(ctx context.Context, typeID PolicyTypeID) (*PolicyType, error) {
-	// Implementation would fetch specific policy type
-	return &PolicyType{PolicyTypeID: typeID}, nil
+type ServicePort struct {
+	Name       string `json:"name"`
+	Port       int    `json:"port"`
+	TargetPort int    `json:"targetPort"`
+	Protocol   string `json:"protocol"`
 }
 
-// CreatePolicyType creates a new policy type
-func (c *SimpleA1MediatorClient) CreatePolicyType(ctx context.Context, typeID PolicyTypeID, request *PolicyTypeRequest) error {
-	// Implementation would create policy type in A1 Mediator
-	return nil
+type CleanXAppStatus struct {
+	State       string            `json:"state"`
+	Phase       string            `json:"phase"`
+	Replicas    int              `json:"replicas"`
+	ReadyReplicas int            `json:"readyReplicas"`
+	Conditions  []StatusCondition `json:"conditions"`
+	LastUpdated time.Time        `json:"lastUpdated"`
 }
 
-// DeletePolicyType deletes a policy type
-func (c *SimpleA1MediatorClient) DeletePolicyType(ctx context.Context, typeID PolicyTypeID) error {
-	// Implementation would delete policy type from A1 Mediator
-	return nil
+type StatusCondition struct {
+	Type    string    `json:"type"`
+	Status  string    `json:"status"`
+	Reason  string    `json:"reason,omitempty"`
+	Message string    `json:"message,omitempty"`
+	LastTransitionTime time.Time `json:"lastTransitionTime"`
 }
 
-// GetPolicyInstances returns policy instances for a type
-func (c *SimpleA1MediatorClient) GetPolicyInstances(ctx context.Context, typeID PolicyTypeID) ([]PolicyInstance, error) {
-	// Implementation would fetch policy instances
-	return []PolicyInstance{}, nil
+// Performance and monitoring types
+type ComponentMetrics struct {
+	ComponentID   string                 `json:"componentId"`
+	CPUUsage      float64                `json:"cpuUsage"`
+	MemoryUsage   int64                  `json:"memoryUsage"`
+	NetworkIO     NetworkIOMetrics       `json:"networkIO"`
+	RequestRate   float64                `json:"requestRate"`
+	ErrorRate     float64                `json:"errorRate"`
+	ResponseTime  time.Duration          `json:"responseTime"`
+	CustomMetrics map[string]interface{} `json:"customMetrics,omitempty"`
+	Timestamp     time.Time              `json:"timestamp"`
 }
 
-// GetPolicyInstance returns a specific policy instance
-func (c *SimpleA1MediatorClient) GetPolicyInstance(ctx context.Context, typeID PolicyTypeID, instanceID PolicyInstanceID) (*PolicyInstance, error) {
-	// Implementation would fetch specific policy instance
-	return &PolicyInstance{PolicyInstanceID: instanceID, PolicyTypeID: typeID}, nil
+type NetworkIOMetrics struct {
+	BytesIn  uint64 `json:"bytesIn"`
+	BytesOut uint64 `json:"bytesOut"`
+	PacketsIn uint64 `json:"packetsIn"`
+	PacketsOut uint64 `json:"packetsOut"`
 }
 
-// CreatePolicyInstance creates a new policy instance
-func (c *SimpleA1MediatorClient) CreatePolicyInstance(ctx context.Context, typeID PolicyTypeID, instance *PolicyInstance) error {
-	// Implementation would create policy instance
-	return nil
+// Testing and validation types
+type TestResult struct {
+	TestID      string                 `json:"testId"`
+	Status      TestStatus             `json:"status"`
+	Message     string                 `json:"message,omitempty"`
+	StartTime   time.Time              `json:"startTime"`
+	EndTime     time.Time              `json:"endTime"`
+	Duration    time.Duration          `json:"duration"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// UpdatePolicyInstance updates a policy instance
-func (c *SimpleA1MediatorClient) UpdatePolicyInstance(ctx context.Context, typeID PolicyTypeID, instanceID PolicyInstanceID, instance *PolicyInstance) error {
-	// Implementation would update policy instance
-	return nil
+type TestStatus int
+
+const (
+	StatusPending TestStatus = iota
+	StatusRunning
+	StatusPassed
+	StatusFailed
+	StatusSkipped
+	StatusError
+)
+
+func (s TestStatus) String() string {
+	switch s {
+	case StatusPending:
+		return "pending"
+	case StatusRunning:
+		return "running"
+	case StatusPassed:
+		return "passed"
+	case StatusFailed:
+		return "failed"
+	case StatusSkipped:
+		return "skipped"
+	case StatusError:
+		return "error"
+	default:
+		return "unknown"
+	}
 }
 
-// DeletePolicyInstance deletes a policy instance
-func (c *SimpleA1MediatorClient) DeletePolicyInstance(ctx context.Context, typeID PolicyTypeID, instanceID PolicyInstanceID) error {
-	// Implementation would delete policy instance
-	return nil
+// Priority definition moved to types.go
+
+func (p Priority) String() string {
+	switch p {
+	case PriorityLow:
+		return "low"
+	case PriorityMedium:
+		return "medium"
+	case PriorityHigh:
+		return "high"
+	case PriorityCritical:
+		return "critical"
+	default:
+		return "unknown"
+	}
 }
 
-// GetPolicyInstanceStatus returns the status of a policy instance
-func (c *SimpleA1MediatorClient) GetPolicyInstanceStatus(ctx context.Context, typeID PolicyTypeID, instanceID PolicyInstanceID) (*PolicyStatus, error) {
-	// Implementation would get policy instance status
-	return &PolicyStatus{}, nil
+type CleanTestSummary struct {
+	TestsExecuted int
+	TestsPassed   int
+	TestsFailed   int
+	
+	// Additional fields required by compliance testing
+	Total    int           `json:"total"`
+	Passed   int           `json:"passed"`
+	Failed   int           `json:"failed"`
+	Skipped  int           `json:"skipped"`
+	Duration time.Duration `json:"duration"`
+	Coverage float64       `json:"coverage"`
 }
-type TestSummary struct {
-	TestsRun    int
-	TestsPassed int
-	TestsFailed int
-}
-type TestSeverity int
-type Logger interface {
-	Info(args ...interface{})
-	Warn(args ...interface{})
-	Error(args ...interface{})
-	Debug(args ...interface{})
-}
+
+// Note: TestSeverity and constants are defined in types.go to avoid duplication
+
 type LatencyAnalyzer struct {
 	mu sync.RWMutex
 }
 type ThroughputMonitor struct {
 	mu sync.RWMutex
 }
-type ResourceMonitor struct {
-	mu sync.RWMutex
-}
-type SMOPerformanceMonitor struct {
-	mu sync.RWMutex
-}
-type NephioPerformanceMonitor struct {
-	mu sync.RWMutex
-}
-type E2InterfaceMonitor struct {
-	mu sync.RWMutex
-}
-type IndicationMonitor struct {
-	mu sync.RWMutex
-}
-type SubscriptionMonitor struct {
-	mu sync.RWMutex
-}
-type APIPerformanceMonitor struct {
-	mu sync.RWMutex
-}
-type ConnectionMonitor struct {
-	mu sync.RWMutex
-}
-type PerformancePredictor struct {
-	mu sync.RWMutex
-}
-type LoadTester struct {
-	mu sync.RWMutex
-}
-type StressTester struct {
-	mu sync.RWMutex
-}
-type BenchmarkResult struct {
-	Duration time.Duration
-	Success  bool
-}
-// LatencyMetrics type is defined in types.go
-type E2NodeConnectionStatus int
-type E2NodeSimulator struct {
-	mu sync.RWMutex
-}
-type GlobalRICID struct {
-	PLMNID string
-	RicID  string
-}
-type E2NodeComponentID struct {
-	Type string
-	ID   string
-}
-type E2NodeComponentConfigUpdateAck struct {
-	ComponentID E2NodeComponentID
-	Success     bool
-}
-type E2APMessage struct {
-	Type    string
-	Payload []byte
-}
-type MessageHandler func([]byte) error
-type TestPriority int
-type E2TerminationClient struct {
-	mu sync.RWMutex
-}
-type O2CloudClient struct {
-	mu sync.RWMutex
-}
-type PorchClient struct {
-	mu sync.RWMutex
-}
-type KubernetesClient struct {
-	mu sync.RWMutex
-}
-// ValidationResult type is defined in types.go
-type ServiceModelRegistry struct {
-	mu sync.RWMutex
-}
-type E2SMKPMIndicationHeader struct {
-	Type string
-}
-type E2SMKPMIndicationMessage struct {
-	Type string
-}
-type E2SMNIIndicationHeader struct {
-	Type string
-}
-type E2SMNIIndicationMessage struct {
-	Type string
-}
-type RANParameter struct {
-	ID    int
-	Value interface{}
-}
-type E2SMRCControlHeader struct {
-	Type string
-}
-type E2SMRCControlMessage struct {
-	Type string
-}
-type SCTPStats struct {
-	Connections int
-	Errors      int
-}
-type StreamDirection int
-type StreamStats struct {
-	InBytes  int64
-	OutBytes int64
-}
-type HTTPConnectionPool struct {
-	mu sync.RWMutex
-}
-type SCTPConnectionPool struct {
-	mu sync.RWMutex
-}
-type E2MemoryPool struct {
-	mu sync.RWMutex
-}
-type E2ConnectionFactory struct {
-	mu sync.RWMutex
-}
-type E2ConnectionValidator struct {
-	mu sync.RWMutex
-}
-type E2PoolStats struct {
-	Active int
-	Idle   int
-}
-type E2HealthChecker struct {
-	mu sync.RWMutex
-}
-type CPULoadBalancer struct {
-	mu sync.RWMutex
-}
-type Worker struct {
-	ID int
-}
-type ConnectionRateLimiter struct {
+// ResourceMonitor definition moved to types.go
+// ComplianceValidator definition moved to compliance_validator.go
+type CleanComplianceValidator struct {
 	mu sync.RWMutex
 }
 
-// Additional missing types
-type HugePagesMemoryManager struct {
-	mu sync.RWMutex
-}
-type ConnectionClusterMetrics struct {
-	TotalConnections int
-	ActiveConnections int
-}
-type RealTimeScheduler struct {
-	mu sync.RWMutex
-}
-type Priority int
-type PriorityQueue struct {
-	mu sync.RWMutex
-}
-type WorkerPoolStats struct {
-	Workers int
-	Busy    int
-}
-type LoadBalancingStrategy int
-type HealthScore float64
-type HealthAlertManager struct {
-	mu sync.RWMutex
-}
-type RouteEntry struct {
-	Path   string
-	Target string
-}
-type ConnectionProfiler struct {
-	mu sync.RWMutex
-}
-type SMOClient struct {
-	mu sync.RWMutex
-}
-type NonRTRICClient struct {
-	mu sync.RWMutex
-}
-type PolicyManager struct {
-	mu sync.RWMutex
-}
-type HighPerformanceMessageProcessor struct {
-	mu sync.RWMutex
-}
-type EnhancedLoadBalancer struct {
-	mu sync.RWMutex
-}
-type WorkItem struct {
-	ID   int
-	Data interface{}
-}
-type WorkResult struct {
-	ID     int
-	Result interface{}
-	Error  error
-}
-type WorkerStats struct {
-	ProcessedCount int64
-	ErrorCount     int64
-}
-type WorkType int
-type HorizontalScaler struct {
-	mu sync.RWMutex
-}
-type ThroughputSample struct {
-	Timestamp  time.Time
-	Throughput float64
-}
-type ConnectionManager struct {
-	mu sync.RWMutex
-}
-type ResponseCache struct {
-	mu sync.RWMutex
-}
-type CompressionManager struct {
-	mu sync.RWMutex
-}
-type AuthManager struct {
-	mu sync.RWMutex
-}
-type E2HealthMonitor struct {
-	mu sync.RWMutex
-}
-type E2Subscription struct {
-	ID     string
-	Status string
-}
-type NodeRateLimiter struct {
-	mu sync.RWMutex
-}
-type NodeCircuitBreaker struct {
-	mu sync.RWMutex
+// Additional SMO and Nephio implementation types
+type SMOIntegrationImpl struct {
+	endpoint    string
+	client      interface{}
+	metrics     SMOMetrics
+	mu          sync.RWMutex
 }
 
-// Final remaining types
-type SecurityHeaders struct {
-	Headers map[string]string
-}
-type MessageType int
-type OptimizedMessage struct {
-	Type MessageType
-	Data []byte
-}
-type ProcessedMessage struct {
-	Type   MessageType
-	Data   []byte
-	Result bool
-}
-type MemoryStats struct {
-	Used  uint64
-	Total uint64
-}
-type DeploymentSpec struct {
-	Name     string
-	Replicas int
-}
-type ScalingPolicy struct {
-	MinReplicas int
-	MaxReplicas int
-}
-type LatencyTracker struct {
-	mu sync.RWMutex
-}
-type ResourceConsumption struct {
-	CPU    float64
-	Memory uint64
+type SMOMetrics struct {
+	RequestCount    uint64    `json:"requestCount"`
+	SuccessCount    uint64    `json:"successCount"`
+	FailureCount    uint64    `json:"failureCount"`
+	AverageLatency  float64   `json:"averageLatency"`
+	LastRequestTime time.Time `json:"lastRequestTime"`
 }
 
-// Placeholder implementations for missing components
-type PerformanceEngine struct{}
+type NephioR5IntegrationImpl struct {
+	porchClient     interface{}
+	oCloudManager   interface{}
+	packageManager  interface{}
+	metrics         NephioMetrics
+	mu              sync.RWMutex
+}
+
+type NephioMetrics struct {
+	PackageDeployments uint64    `json:"packageDeployments"`
+	SuccessfulDeployments uint64 `json:"successfulDeployments"`
+	FailedDeployments  uint64    `json:"failedDeployments"`
+	AverageDeployTime  float64   `json:"averageDeployTime"`
+	LastDeploymentTime time.Time `json:"lastDeploymentTime"`
+}
+
+// Performance engine and optimizer types
+type PerformanceEngine struct {
+	config      *AdvancedPerformanceConfig
+	metrics     PerformanceMetrics
+	optimizer   *PerformanceOptimizer
+	running     int32
+	mu          sync.RWMutex
+}
+
+// PerformanceOptimizer definition moved to performance_optimizer.go
+type CleanPerformanceOptimizer struct {
+	targets     []OptimizationTarget
+	algorithms  map[string]OptimizationAlgorithm
+	currentMode OptimizationMode
+	mu          sync.RWMutex
+}
+
+type OptimizationAlgorithm interface {
+	Optimize(ctx context.Context, metrics PerformanceMetrics) (OptimizationResult, error)
+	GetName() string
+	GetDescription() string
+}
+
+type OptimizationResult struct {
+	RecommendedActions []OptimizationAction `json:"recommendedActions"`
+	ExpectedImprovement map[string]float64   `json:"expectedImprovement"`
+	Confidence         float64              `json:"confidence"`
+	Timestamp          time.Time            `json:"timestamp"`
+}
+
+type OptimizationAction struct {
+	Type        string                 `json:"type"`
+	Component   string                 `json:"component"`
+	Action      string                 `json:"action"`
+	Parameters  map[string]interface{} `json:"parameters"`
+	Priority    Priority               `json:"priority"`
+	ExpectedGain float64              `json:"expectedGain"`
+}
+
+type OptimizationMode int
+
+const (
+	OptimizationModeLatency OptimizationMode = iota
+	OptimizationModeThroughput
+	OptimizationModeBalanced
+	OptimizationModeEnergyEfficient
+)
+
+func (m OptimizationMode) String() string {
+	switch m {
+	case OptimizationModeLatency:
+		return "latency"
+	case OptimizationModeThroughput:
+		return "throughput"
+	case OptimizationModeBalanced:
+		return "balanced"
+	case OptimizationModeEnergyEfficient:
+		return "energy_efficient"
+	default:
+		return "unknown"
+	}
+}
+
+// Implementation stub types for high-performance components
+type ZeroCopyMessageProcessorImpl struct{}
+type SIMDAcceleratorImpl struct{}
+type OptimizedBatchProcessorImpl struct{}
+type HighThroughputRouterImpl struct{}
 type ConnectionMultiplexer struct{}
 type IntelligentLoadDistributor struct{}
+type ScalableE2NodeManagerImpl struct{}
 type SubscriptionOptimizer struct{}
 type HighSpeedIndicationProcessor struct{}
+type AdvancedCPUControllerImpl struct{}
+type HugePagesMemoryManagerImpl struct{}
+type ProductionGCOptimizerImpl struct{}
+type ConnectionPoolClusterImpl struct{}
 type DynamicResourceAllocator struct{}
-type AdaptiveBackpressureManager struct{}
-type ComprehensiveHealthMonitor struct{}
-type GracefulDegradationManager struct{}
-
-// SMOIntegrationImpl implements SMOIntegration interface
-type SMOIntegrationImpl struct {
-	endpoint            string
-	nonRTRICEndpoint    string
-	policyEndpoint      string
-	rAppEndpoint        string
-	healthCheckInterval time.Duration
-	requestTimeout      time.Duration
-	circuitBreaker      *SMOCircuitBreakerImpl
-	metrics             *SMOMetricsImpl
-	mu                  sync.RWMutex
-}
-
-func (s *SMOIntegrationImpl) Connect(ctx context.Context) error            { return nil }
-func (s *SMOIntegrationImpl) StartNonRTRIC(ctx context.Context) error      { return nil }
-func (s *SMOIntegrationImpl) StartPolicyManager(ctx context.Context) error { return nil }
-func (s *SMOIntegrationImpl) StartRAppManager(ctx context.Context) error   { return nil }
-func (s *SMOIntegrationImpl) HealthMonitor(ctx context.Context)            {}
-func (s *SMOIntegrationImpl) ApplyPolicy(ctx context.Context, result *ProcessingResult) error {
-	return nil
-}
-func (s *SMOIntegrationImpl) GetMetrics() *SMOMetricsImpl { return s.metrics }
-func (s *SMOIntegrationImpl) Stop()                       {}
-
-// NephioR5IntegrationImpl implements NephioR5Integration interface
-type NephioR5IntegrationImpl struct {
-	porchEndpoint       string
-	oCloudEndpoint      string
-	packageRepoEndpoint string
-	healthCheckInterval time.Duration
-	packageManager      *NephioPackageManagerImpl
-	oCloudManager       *OCloudManagerImpl
-	workflowManager     *NephioWorkflowManagerImpl
-	metrics             *NephioMetricsImpl
-	mu                  sync.RWMutex
-}
-
-func (n *NephioR5IntegrationImpl) ConnectPorch(ctx context.Context) error               { return nil }
-func (n *NephioR5IntegrationImpl) StartOCloudManager(ctx context.Context) error         { return nil }
-func (n *NephioR5IntegrationImpl) StartPackageRepo(ctx context.Context) error           { return nil }
-func (n *NephioR5IntegrationImpl) StartWorkflowOrchestration(ctx context.Context) error { return nil }
-func (n *NephioR5IntegrationImpl) HealthMonitor(ctx context.Context)                    {}
-func (n *NephioR5IntegrationImpl) Stop()                                                {}
-
-// Supporting implementations
-
-type SMOCircuitBreakerImpl struct {
-	threshold int
-	mu        sync.RWMutex
-}
-
-func NewSMOCircuitBreaker(threshold int) *SMOCircuitBreakerImpl {
-	return &SMOCircuitBreakerImpl{threshold: threshold}
-}
-
-type SMOMetricsImpl struct {
-	RequestsPerSecond uint64
-	AverageLatencyMs  float64
-	PolicyUpdates     uint64
-	RAppDeployments   uint64
-	mu                sync.RWMutex
-}
-
-func NewSMOMetrics() *SMOMetricsImpl {
-	return &SMOMetricsImpl{}
-}
-
-type NephioPackageManagerImpl struct{}
-
-func NewNephioPackageManager() *NephioPackageManagerImpl { return &NephioPackageManagerImpl{} }
-
 type OCloudManagerImpl struct{}
 
-// Use NewOCloudManager from existing smo_components.go - this function already exists
-
-type NephioWorkflowManagerImpl struct{}
-
-func NewNephioWorkflowManager() *NephioWorkflowManagerImpl { return &NephioWorkflowManagerImpl{} }
-
-type NephioMetricsImpl struct {
-	PackageRevisions    uint64
-	ResourceUtilization float64
-	DeploymentRate      uint64
-	mu                  sync.RWMutex
+// Backend health checker
+type BackendHealthChecker struct {
+	backends map[string]*Backend
+	mu       sync.RWMutex
 }
 
-func NewNephioMetrics() *NephioMetricsImpl {
-	return &NephioMetricsImpl{}
+// SMO policy response type
+type CleanSMOPolicyResponse struct {
+	PolicyID    string                 `json:"policyId"`
+	Decision    string                 `json:"decision"`
+	Confidence  float64                `json:"confidence"`
+	Reasons     []string               `json:"reasons"`
+	Actions     []string               `json:"actions"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+	Timestamp   time.Time              `json:"timestamp"`
 }
 
-// Performance component implementations
-
-type ZeroCopyMessageProcessorImpl struct {
-	bufferPools        map[int]*ZeroCopyBufferPool
-	messageArena       *MessageArena
-	directMemoryAccess *DirectMemoryAccess
-	stats              ZeroCopyStats
-	mu                 sync.RWMutex
-}
-
-func NewZeroCopyMessageProcessor(bufferSize int) *ZeroCopyMessageProcessorImpl {
-	return &ZeroCopyMessageProcessorImpl{
-		bufferPools: make(map[int]*ZeroCopyBufferPool),
-	}
-}
-
-func (z *ZeroCopyMessageProcessorImpl) Start(ctx context.Context) error { return nil }
-func (z *ZeroCopyMessageProcessorImpl) ProcessMessage(ctx context.Context, nodeID string, msgData []byte, msgType E2MessageType) (*ProcessingResult, error) {
-	return &ProcessingResult{
-		NodeID:           nodeID,
-		MessageType:      msgType,
-		ProcessedData:    msgData,
-		Success:          true,
-		ProcessingTimeNs: time.Now().UnixNano(),
-	}, nil
-}
-
-type SIMDAcceleratorImpl struct {
-	instructionSet       string
-	vectorOperations     map[string]*SIMDOperation
-	acceleratedFunctions map[string]interface{}
-	stats                SIMDAcceleratorStats
-	mu                   sync.RWMutex
-}
-
-func NewSIMDAccelerator(instructionSet string) *SIMDAcceleratorImpl {
-	return &SIMDAcceleratorImpl{
-		instructionSet:       instructionSet,
-		vectorOperations:     make(map[string]*SIMDOperation),
-		acceleratedFunctions: make(map[string]interface{}),
-	}
-}
-
-func (s *SIMDAcceleratorImpl) Start(ctx context.Context) error           { return nil }
-func (s *SIMDAcceleratorImpl) OptimizeForThroughput(targetIPS int) error { return nil }
-func (s *SIMDAcceleratorImpl) OptimizeForLatency()                       {}
-
-type OptimizedBatchProcessorImpl struct {
-	batchSize int
-	mu        sync.RWMutex
-}
-
-func NewOptimizedBatchProcessor(size int) *OptimizedBatchProcessorImpl {
-	return &OptimizedBatchProcessorImpl{batchSize: size}
-}
-
-func (o *OptimizedBatchProcessorImpl) SetBatchSize(size int) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	o.batchSize = size
-}
-
-func (o *OptimizedBatchProcessorImpl) Start(ctx context.Context) error { return nil }
-
-type HighThroughputRouterImpl struct {
-	routingTable   *LockFreeRoutingTable
-	loadBalancer   *WeightedLoadBalancer
-	routingCache   *RoutingCache
-	routingMetrics RoutingMetrics
-	mu             sync.RWMutex
-}
-
-func NewHighThroughputRouter() *HighThroughputRouterImpl {
-	return &HighThroughputRouterImpl{}
-}
-
-func (h *HighThroughputRouterImpl) OptimizeForThroughput(targetIPS int) error { return nil }
-func (h *HighThroughputRouterImpl) Start(ctx context.Context) error           { return nil }
-
-type ScalableE2NodeManagerImpl struct {
-	nodes               *ConcurrentNodeMap
-	connectionPool      *E2ConnectionPool
-	subscriptions       *SubscriptionManager
-	loadBalancer        *E2LoadBalancer
-	metrics             E2NodeMetrics
-	connectedNodes      int
-	activeSubscriptions int
-	mu                  sync.RWMutex
-}
-
-func NewScalableE2NodeManager(maxNodes int) *ScalableE2NodeManagerImpl {
-	return &ScalableE2NodeManagerImpl{
-		connectedNodes:      50,  // Mock value
-		activeSubscriptions: 100, // Mock value
-	}
-}
-
-func (s *ScalableE2NodeManagerImpl) GetConnectedNodeCount() int {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.connectedNodes
-}
-
-func (s *ScalableE2NodeManagerImpl) GetActiveSubscriptionCount() int {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.activeSubscriptions
-}
-
-func (s *ScalableE2NodeManagerImpl) Start(ctx context.Context) error { return nil }
-
-type AdvancedCPUControllerImpl struct {
-	cores []int
-	mu    sync.RWMutex
-}
-
-func NewAdvancedCPUController(cores []int) *AdvancedCPUControllerImpl {
-	return &AdvancedCPUControllerImpl{cores: cores}
-}
-
-func (a *AdvancedCPUControllerImpl) ApplyAssignments(assignments map[string][]int) error { return nil }
-func (a *AdvancedCPUControllerImpl) OptimizeForLatency()                                 {}
-func (a *AdvancedCPUControllerImpl) Start(ctx context.Context) error                     { return nil }
-
-type HugePagesMemoryManagerImpl struct {
-	poolSizeMB int
-	mu         sync.RWMutex
-}
-
-func NewHugePagesMemoryManager(config *AdvancedPerformanceConfig) *HugePagesMemoryManagerImpl {
-	return &HugePagesMemoryManagerImpl{
-		poolSizeMB: config.MemoryPoolSizeMB,
-	}
-}
-
-func (h *HugePagesMemoryManagerImpl) ResizePools(sizeMB int) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.poolSizeMB = sizeMB
-	return nil
-}
-
-func (h *HugePagesMemoryManagerImpl) Start(ctx context.Context) error { return nil }
-
-type ProductionGCOptimizerImpl struct{}
-
-func NewProductionGCOptimizer() *ProductionGCOptimizerImpl {
-	return &ProductionGCOptimizerImpl{}
-}
-
-func (p *ProductionGCOptimizerImpl) OptimizeForLatency() {}
-
-type ConnectionPoolClusterImpl struct {
-	poolSize          int
-	webSocketPoolSize int
-	mu                sync.RWMutex
-}
-
-func NewConnectionPoolClusterAdvanced(config *AdvancedPerformanceConfig) *ConnectionPoolClusterImpl {
-	return &ConnectionPoolClusterImpl{
-		poolSize:          config.E2ConnectionPoolSize,
-		webSocketPoolSize: config.WebSocketPoolSize,
-	}
-}
-
-func (c *ConnectionPoolClusterImpl) ScaleToSize(size int) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.poolSize = size
-	return nil
-}
-
-func (c *ConnectionPoolClusterImpl) ScaleWebSocketPool(size int) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.webSocketPoolSize = size
-	return nil
-}
-
-func (c *ConnectionPoolClusterImpl) ScaleUp()                        {}
-func (c *ConnectionPoolClusterImpl) OptimizeConnections()            {}
-func (c *ConnectionPoolClusterImpl) Start(ctx context.Context) error { return nil }
-
-type RealTimeProfilerImpl struct {
-	interval time.Duration
-}
-
-func NewRealTimeProfiler(interval time.Duration) *RealTimeProfilerImpl {
-	return &RealTimeProfilerImpl{interval: interval}
-}
-
-// Add Stop method to fix interface compliance
-func (r *RealTimeProfilerImpl) Stop() error {
-	return nil
-}
-
-type PerformanceAnalyzerImpl struct{}
-
-func NewPerformanceAnalyzer() *PerformanceAnalyzerImpl {
-	return &PerformanceAnalyzerImpl{}
-}
-
-type AutoPerformanceTunerImpl struct {
-	config *AdvancedPerformanceConfig
-}
-
-func NewAutoPerformanceTuner(config *AdvancedPerformanceConfig) *AutoPerformanceTunerImpl {
-	return &AutoPerformanceTunerImpl{config: config}
-}
-
-func (a *AutoPerformanceTunerImpl) OptimizeForThroughput() {}
-
-// Mock CircuitBreakerCluster implementation
-type MockCircuitBreakerCluster struct {
-	openNodes map[string]bool
-	mu        sync.RWMutex
-}
-
-func NewMockCircuitBreakerCluster() *MockCircuitBreakerCluster {
-	return &MockCircuitBreakerCluster{
-		openNodes: make(map[string]bool),
-	}
-}
-
-func (m *MockCircuitBreakerCluster) IsOpen(nodeID string) bool {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.openNodes[nodeID]
-}
-
-func (m *MockCircuitBreakerCluster) RecordFailure(nodeID string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	// Simple logic: open circuit after failures
-	m.openNodes[nodeID] = true
-}
-
-func (m *MockCircuitBreakerCluster) RecordSuccess(nodeID string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	// Close circuit on success
-	m.openNodes[nodeID] = false
+// Integration configuration
+type CleanIntegrationConfig struct {
+	SMOEndpoint     string        `json:"smoEndpoint"`
+	NephioEndpoint  string        `json:"nephioEndpoint"`
+	Timeout         time.Duration `json:"timeout"`
+	RetryAttempts   int           `json:"retryAttempts"`
+	EnableCircuitBreaker bool     `json:"enableCircuitBreaker"`
+	EnableCaching   bool          `json:"enableCaching"`
 }
