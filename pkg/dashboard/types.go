@@ -763,6 +763,10 @@ type E2SMKPMMetrics struct {
 	GranularityPeriod   int64                 `json:"granularityPeriod"`
 	Timestamp           time.Time             `json:"timestamp"`
 	SubscriptionID      string                `json:"subscriptionId"`
+	CellID              string                `json:"cellId"`              // 添加缺失的 CellID 欄位
+	MeasurementName     string                `json:"measurementName"`     // 添加缺失的 MeasurementName 欄位
+	MeasurementValue    interface{}           `json:"measurementValue"`    // 添加缺失的 MeasurementValue 欄位
+	MeasurementUnit     string                `json:"measurementUnit"`     // 添加缺失的 MeasurementUnit 欄位
 }
 
 // MeasurementData represents measurement data point

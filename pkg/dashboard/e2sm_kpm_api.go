@@ -62,8 +62,9 @@ func (api *E2SMKPMApi) ProcessIndication(ctx context.Context, header []byte, mes
 		return nil, fmt.Errorf("failed to process KPM indication: %w", err)
 	}
 	
-	// Process measurements
-	processedMetrics := api.processMetrics(indicationMessage.MeasurementData)
+	// Convert MeasurementData to E2SMKPMMetrics and process
+	kmpMetrics := api.convertToKPMMetrics(indicationMessage.MeasurementData)
+	processedMetrics := api.processMetrics(kmpMetrics)
 	
 	// Create response
 	response := &KPMIndicationResponse{
@@ -195,6 +196,34 @@ func (api *E2SMKPMApi) registerSchemas() {
 	api.validator.RegisterSchema("kmp-indication-message", kmpMessageSchema)
 	
 	log.Println("Registered E2SM-KPM message schemas")
+}
+
+// convertToKPMMetrics converts MeasurementData to E2SMKPMMetrics
+func (api *E2SMKPMApi) convertToKPMMetrics(measurementData []MeasurementData) []E2SMKPMMetrics {
+	var kmpMetrics []E2SMKPMMetrics
+	
+	for _, data := range measurementData {
+		kmpMetric := E2SMKPMMetrics{
+			CellID:              fmt.Sprintf("cell_%d", data.MeasurementID), // 從 MeasurementID 生成 CellID
+			MeasurementName:     data.MeasurementType,                       // 使用 MeasurementType 作為 MeasurementName
+			MeasurementValue:    data.MeasurementValue,                      // 直接複製 MeasurementValue
+			MeasurementUnit:     "count",                                    // 設定預設單位
+			Timestamp:           time.Now(),                                 // 設定當前時間戳
+			MeasurementData:     []MeasurementData{data},                   // 將原始數據包裝進去
+		}
+		
+		// 從 labels 中提取額外信息
+		if cellID, ok := data.Labels["cellId"]; ok {
+			kmpMetric.CellID = cellID
+		}
+		if nodeid, ok := data.Labels["e2NodeId"]; ok {
+			kmpMetric.E2NodeID = nodeid
+		}
+		
+		kmpMetrics = append(kmpMetrics, kmpMetric)
+	}
+	
+	return kmpMetrics
 }
 
 // processMetrics processes measurement data and calculates derived metrics

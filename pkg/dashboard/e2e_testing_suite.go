@@ -5,11 +5,45 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
 )
+
+// E2ETestReport represents the result of an E2E test execution
+type E2ETestReport struct {
+	Status       string                 `json:"status"`
+	StartTime    time.Time             `json:"startTime"`
+	EndTime      time.Time             `json:"endTime"`
+	Duration     time.Duration         `json:"duration"`
+	Metrics      E2ETestMetrics        `json:"metrics"`
+	TestResults  []E2ETestResult       `json:"testResults"`
+	Errors       []string              `json:"errors,omitempty"`
+	SuiteID      string                `json:"suiteId"`
+	Config       E2ETestConfig         `json:"config"`
+	Scenarios    []ScenarioResult      `json:"scenarios"`
+	ErrorMessage string                `json:"errorMessage,omitempty"`
+}
+
+// E2ETestMetrics contains test execution metrics
+type E2ETestMetrics struct {
+	TotalTests      int     `json:"totalTests"`
+	PassedTests     int     `json:"passedTests"`
+	FailedTests     int     `json:"failedTests"`
+	SkippedTests    int     `json:"skippedTests"`
+	CoveragePercent float64 `json:"coveragePercent"`
+}
+
+// E2ETestResult represents the result of a single E2E test
+type E2ETestResult struct {
+	Name      string        `json:"name"`
+	Status    string        `json:"status"`
+	Duration  time.Duration `json:"duration"`
+	Error     string        `json:"error,omitempty"`
+}
 
 // E2ETestSuite represents a comprehensive end-to-end testing framework
 // for O-RAN L Release and Nephio R5 deployments
@@ -159,6 +193,78 @@ type TestReporter struct {
 	outputPath string
 }
 
+// GenerateReport generates a comprehensive test report
+func (r *TestReporter) GenerateReport(report *E2ETestReport) error {
+	if report == nil {
+		return fmt.Errorf("test report cannot be nil")
+	}
+	
+	// Generate JSON report
+	jsonData, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal report to JSON: %w", err)
+	}
+	
+	// Write JSON report
+	jsonPath := filepath.Join(r.outputPath, "e2e-test-report.json")
+	if err := os.WriteFile(jsonPath, jsonData, 0644); err != nil {
+		return fmt.Errorf("failed to write JSON report: %w", err)
+	}
+	
+	// Generate HTML report (optional)
+	if err := r.generateHTMLReport(report); err != nil {
+		r.logger.Warn("Failed to generate HTML report", "error", err)
+	}
+	
+	r.logger.Info("Test report generated successfully", "path", jsonPath)
+	return nil
+}
+
+// generateHTMLReport generates an HTML version of the test report
+func (r *TestReporter) generateHTMLReport(report *E2ETestReport) error {
+	htmlPath := filepath.Join(r.outputPath, "e2e-test-report.html")
+	
+	htmlContent := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+    <title>E2E Test Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status-PASSED { color: green; }
+        .status-FAILED { color: red; }
+        .status-SKIPPED { color: orange; }
+        table { border-collapse: collapse; width: 100%%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>E2E Test Report</h1>
+    <h2>Summary</h2>
+    <p><strong>Status:</strong> <span class="status-%s">%s</span></p>
+    <p><strong>Duration:</strong> %v</p>
+    <p><strong>Start Time:</strong> %s</p>
+    <p><strong>End Time:</strong> %s</p>
+    <p><strong>Coverage:</strong> %.2f%%</p>
+    
+    <h2>Test Results</h2>
+    <p>Total Tests: %d | Passed: %d | Failed: %d | Skipped: %d</p>
+    
+</body>
+</html>`, 
+		report.Status, report.Status,
+		report.Duration,
+		report.StartTime.Format("2006-01-02 15:04:05"),
+		report.EndTime.Format("2006-01-02 15:04:05"),
+		report.Metrics.CoveragePercent,
+		report.Metrics.TotalTests,
+		report.Metrics.PassedTests,
+		report.Metrics.FailedTests,
+		report.Metrics.SkippedTests)
+	
+	return os.WriteFile(htmlPath, []byte(htmlContent), 0644)
+}
+
 // NewE2ETestSuite creates a new end-to-end test suite
 func NewE2ETestSuite(config *E2ETestConfig, logger *logrus.Logger) (*E2ETestSuite, error) {
 	if config == nil {
@@ -200,11 +306,11 @@ func NewE2ETestSuite(config *E2ETestConfig, logger *logrus.Logger) (*E2ETestSuit
 }
 
 // RunFullTestSuite executes the complete E2E test suite
-func (suite *E2ETestSuite) RunFullTestSuite(ctx context.Context) (*TestReport, error) {
+func (suite *E2ETestSuite) RunFullTestSuite(ctx context.Context) (*E2ETestReport, error) {
 	suite.logger.Info("Starting comprehensive E2E test suite for O-RAN L Release and Nephio R5")
 	
 	startTime := time.Now()
-	report := &TestReport{
+	report := &E2ETestReport{
 		SuiteID:    fmt.Sprintf("e2e-suite-%d", time.Now().Unix()),
 		StartTime:  startTime,
 		Config:     *suite.config,
@@ -526,7 +632,7 @@ func (suite *E2ETestSuite) loadDefaultScenarios() error {
 	return nil
 }
 
-func (suite *E2ETestSuite) calculateOverallStatus(report *TestReport) {
+func (suite *E2ETestSuite) calculateOverallStatus(report *E2ETestReport) {
 	// Implementation to calculate overall test status
 	if suite.metrics.FailedScenarios == 0 && suite.metrics.CoveragePercent >= suite.config.CoverageThreshold {
 		report.Status = "passed"
