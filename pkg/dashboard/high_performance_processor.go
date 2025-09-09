@@ -54,15 +54,7 @@ type ProcessorConfig struct {
 
 // ProcessingStats type is now defined in types.go to avoid redeclaration
 
-// ZeroCopyBufferPool manages zero-copy buffers for different sizes
-type ZeroCopyBufferPool struct {
-	size            int
-	pool            sync.Pool
-	allocatedCount  uint64
-	reusedCount     uint64
-	totalAllocated  uint64
-	mu              sync.RWMutex
-}
+// ZeroCopyBufferPool - type definition moved to advanced_smo_implementations_clean.go
 
 // SIMDProcessor handles SIMD-optimized operations
 type SIMDProcessor struct {

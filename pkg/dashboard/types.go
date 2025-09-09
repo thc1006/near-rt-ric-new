@@ -498,55 +498,7 @@ func (c *A1MediatorClientImpl) SetAuthToken(token string) {
 	c.AuthToken = token
 }
 
-// GetPolicyTypes retrieves all policy types
-func (c *A1MediatorClientImpl) GetPolicyTypes() ([]PolicyType, error) {
-	return []PolicyType{}, nil
-}
-
-// GetPolicyType retrieves a specific policy type
-func (c *A1MediatorClientImpl) GetPolicyType(typeID PolicyTypeID) (*PolicyType, error) {
-	return &PolicyType{}, nil
-}
-
-// CreatePolicyType creates a new policy type
-func (c *A1MediatorClientImpl) CreatePolicyType(policyType *PolicyType) error {
-	return nil
-}
-
-// DeletePolicyType deletes a policy type
-func (c *A1MediatorClientImpl) DeletePolicyType(typeID PolicyTypeID) error {
-	return nil
-}
-
-// GetPolicyInstances retrieves all policy instances for a type
-func (c *A1MediatorClientImpl) GetPolicyInstances(typeID PolicyTypeID) ([]PolicyInstance, error) {
-	return []PolicyInstance{}, nil
-}
-
-// GetPolicyInstance retrieves a specific policy instance
-func (c *A1MediatorClientImpl) GetPolicyInstance(typeID PolicyTypeID, instanceID PolicyInstanceID) (*PolicyInstance, error) {
-	return &PolicyInstance{}, nil
-}
-
-// CreatePolicyInstance creates a new policy instance
-func (c *A1MediatorClientImpl) CreatePolicyInstance(instance *PolicyInstance) error {
-	return nil
-}
-
-// UpdatePolicyInstance updates an existing policy instance
-func (c *A1MediatorClientImpl) UpdatePolicyInstance(instance *PolicyInstance) error {
-	return nil
-}
-
-// DeletePolicyInstance deletes a policy instance
-func (c *A1MediatorClientImpl) DeletePolicyInstance(typeID PolicyTypeID, instanceID PolicyInstanceID) error {
-	return nil
-}
-
-// GetPolicyStatus retrieves the status of a policy instance
-func (c *A1MediatorClientImpl) GetPolicyStatus(typeID PolicyTypeID, instanceID PolicyInstanceID) (string, error) {
-	return "active", nil
-}
+// A1MediatorClientImpl methods are defined in a1_mediator_client.go
 
 // AsyncPackageProcessor represents an asynchronous package processor
 type AsyncPackageProcessor interface {
@@ -784,4 +736,735 @@ type PolicyManagerClient interface {
 	GetPolicyInstances(typeID PolicyTypeID) ([]PolicyInstance, error)
 	CreatePolicyInstance(instance PolicyInstance) error
 	DeletePolicyInstance(typeID PolicyTypeID, instanceID PolicyInstanceID) error
+}
+
+// LoadBalancingAlgorithm represents load balancing strategies
+type LoadBalancingAlgorithm int
+
+// Backend represents a backend server for load balancing
+type Backend struct {
+	ID           string        `json:"id"`
+	Address      string        `json:"address"`
+	Port         int           `json:"port"`
+	Weight       int           `json:"weight"`
+	IsHealthy    int32         `json:"isHealthy"`    // atomic
+	CurrentConns int64         `json:"currentConns"` // atomic
+	CPUUsage     float64       `json:"cpuUsage"`
+	MemoryUsage  float64       `json:"memoryUsage"`
+	ResponseTime time.Duration `json:"responseTime"`
+	LastCheck    time.Time     `json:"lastCheck"`
+}
+
+// CircuitState represents the state of a circuit breaker
+type CircuitState int
+
+const (
+	StateClosed CircuitState = iota
+	StateHalfOpen
+	StateOpen
+)
+
+// CircuitBreaker provides circuit breaker functionality
+type CircuitBreaker struct {
+	name                string
+	state               CircuitState
+	maxFailures         int
+	timeout             time.Duration
+	resetTimeout        time.Duration
+	halfOpenMaxCalls    int
+	
+	// Metrics
+	failureCount        int
+	successCount        int
+	totalCalls          int64
+	lastFailureTime     time.Time
+	lastSuccessTime     time.Time
+	nextAttempt         time.Time
+	
+	mu                  sync.RWMutex
+}
+
+// ValidationResult represents test validation result
+type ValidationResult struct {
+	TestName       string    `json:"testName"`
+	RequirementMet bool      `json:"requirementMet"`
+	ActualValue    float64   `json:"actualValue"`
+	RequiredValue  float64   `json:"requiredValue"`
+	PerformanceGap float64   `json:"performanceGap"`
+	Details        string    `json:"details"`
+	Timestamp      time.Time `json:"timestamp"`
+}
+
+// LatencyMetrics represents latency measurement data
+type LatencyMetrics struct {
+	Min    float64 `json:"min"`
+	Max    float64 `json:"max"`
+	Avg    float64 `json:"avg"`
+	P50    float64 `json:"p50"`
+	P95    float64 `json:"p95"`
+	P99    float64 `json:"p99"`
+}
+
+// EventTrigger type is defined in subscription_models.go
+
+// SMO/Nephio Integration Layer Types
+
+// PackageManagerClient handles Nephio package management operations
+type PackageManagerClient struct {
+	endpoint       string                 `json:"endpoint"`
+	httpClient     *http.Client           `json:"-"`
+	requestTimeout time.Duration          `json:"requestTimeout"`
+	retryAttempts  int                    `json:"retryAttempts"`
+	cache          map[string]interface{} `json:"-"`
+	mu             sync.RWMutex           `json:"-"`
+}
+
+// NewPackageManagerClient creates a new package manager client
+func NewPackageManagerClient(endpoint string) *PackageManagerClient {
+	return &PackageManagerClient{
+		endpoint: endpoint,
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+		requestTimeout: 30 * time.Second,
+		retryAttempts:  3,
+		cache:          make(map[string]interface{}),
+	}
+}
+
+// Connect establishes connection to package manager
+func (c *PackageManagerClient) Connect(ctx context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	// Implementation would establish connection to Nephio package manager
+	return nil
+}
+
+// ResourceProvisionerClient handles O-Cloud resource provisioning
+type ResourceProvisionerClient struct {
+	endpoint         string                 `json:"endpoint"`
+	httpClient       *http.Client           `json:"-"`
+	requestTimeout   time.Duration          `json:"requestTimeout"`
+	resourcePools    map[string]interface{} `json:"-"`
+	provisionedCount uint64                 `json:"provisionedCount"`
+	mu               sync.RWMutex           `json:"-"`
+}
+
+// NewResourceProvisionerClient creates a new resource provisioner client
+func NewResourceProvisionerClient(endpoint string) *ResourceProvisionerClient {
+	return &ResourceProvisionerClient{
+		endpoint: endpoint,
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+		requestTimeout: 30 * time.Second,
+		resourcePools:  make(map[string]interface{}),
+	}
+}
+
+// Connect establishes connection to resource provisioner
+func (c *ResourceProvisionerClient) Connect(ctx context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	// Implementation would establish connection to O-Cloud resource provisioner
+	return nil
+}
+
+// SMOLoadBalancer provides load balancing for SMO components
+type SMOLoadBalancer struct {
+	strategy         string                 `json:"strategy"`
+	backends         []*Backend             `json:"backends"`
+	currentIndex     int32                  `json:"currentIndex"`    // atomic
+	requestCount     uint64                 `json:"requestCount"`    // atomic
+	healthChecker    *BackendHealthChecker  `json:"-"`
+	running          bool                   `json:"running"`
+	mu               sync.RWMutex           `json:"-"`
+}
+
+// NewSMOLoadBalancer creates a new SMO load balancer
+func NewSMOLoadBalancer(strategy string) *SMOLoadBalancer {
+	return &SMOLoadBalancer{
+		strategy:      strategy,
+		backends:      make([]*Backend, 0),
+		healthChecker: &BackendHealthChecker{backends: make(map[string]*Backend)},
+	}
+}
+
+// Start starts the SMO load balancer
+func (lb *SMOLoadBalancer) Start(ctx context.Context) error {
+	lb.mu.Lock()
+	defer lb.mu.Unlock()
+	lb.running = true
+	return nil
+}
+
+// OptimizeForLatency optimizes the load balancer for latency
+func (lb *SMOLoadBalancer) OptimizeForLatency() {
+	lb.mu.Lock()
+	defer lb.mu.Unlock()
+	lb.strategy = "latency_based"
+}
+
+// NephioLoadBalancer provides load balancing for Nephio components
+type NephioLoadBalancer struct {
+	strategy         string                 `json:"strategy"`
+	backends         []*Backend             `json:"backends"`
+	currentIndex     int32                  `json:"currentIndex"`    // atomic
+	requestCount     uint64                 `json:"requestCount"`    // atomic
+	healthChecker    *BackendHealthChecker  `json:"-"`
+	running          bool                   `json:"running"`
+	mu               sync.RWMutex           `json:"-"`
+}
+
+// NewNephioLoadBalancer creates a new Nephio load balancer
+func NewNephioLoadBalancer(strategy string) *NephioLoadBalancer {
+	return &NephioLoadBalancer{
+		strategy:      strategy,
+		backends:      make([]*Backend, 0),
+		healthChecker: &BackendHealthChecker{backends: make(map[string]*Backend)},
+	}
+}
+
+// Start starts the Nephio load balancer
+func (lb *NephioLoadBalancer) Start(ctx context.Context) error {
+	lb.mu.Lock()
+	defer lb.mu.Unlock()
+	lb.running = true
+	return nil
+}
+
+// IntegrationCache provides caching for integration layer requests
+type IntegrationCache struct {
+	maxSize      int                    `json:"maxSize"`
+	ttl          time.Duration          `json:"ttl"`
+	data         map[string]cacheEntry  `json:"-"`
+	hitCount     uint64                 `json:"hitCount"`     // atomic
+	missCount    uint64                 `json:"missCount"`    // atomic
+	mu           sync.RWMutex           `json:"-"`
+}
+
+type cacheEntry struct {
+	value     interface{}
+	timestamp time.Time
+}
+
+// NewIntegrationCache creates a new integration cache
+func NewIntegrationCache(maxSize int, ttl time.Duration) *IntegrationCache {
+	return &IntegrationCache{
+		maxSize: maxSize,
+		ttl:     ttl,
+		data:    make(map[string]cacheEntry),
+	}
+}
+
+// GetPolicyResponse retrieves a policy response from cache
+func (c *IntegrationCache) GetPolicyResponse(policyID string) *SMOPolicyResponse {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	
+	if entry, exists := c.data[policyID]; exists {
+		if time.Since(entry.timestamp) < c.ttl {
+			atomic.AddUint64(&c.hitCount, 1)
+			if response, ok := entry.value.(*SMOPolicyResponse); ok {
+				return response
+			}
+		}
+	}
+	atomic.AddUint64(&c.missCount, 1)
+	return nil
+}
+
+// SetPolicyResponse stores a policy response in cache
+func (c *IntegrationCache) SetPolicyResponse(policyID string, response *SMOPolicyResponse, ttl time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	
+	c.data[policyID] = cacheEntry{
+		value:     response,
+		timestamp: time.Now(),
+	}
+}
+
+// GetHitRatio returns the cache hit ratio
+func (c *IntegrationCache) GetHitRatio() float64 {
+	hits := atomic.LoadUint64(&c.hitCount)
+	misses := atomic.LoadUint64(&c.missCount)
+	total := hits + misses
+	if total == 0 {
+		return 0.0
+	}
+	return float64(hits) / float64(total)
+}
+
+// OptimizeForHitRatio optimizes the cache for hit ratio
+func (c *IntegrationCache) OptimizeForHitRatio() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	// Remove expired entries
+	now := time.Now()
+	for key, entry := range c.data {
+		if now.Sub(entry.timestamp) > c.ttl {
+			delete(c.data, key)
+		}
+	}
+}
+
+// IntegrationCircuitBreaker provides circuit breaker functionality for integration layer
+type IntegrationCircuitBreaker struct {
+	services        map[string]*CircuitBreaker `json:"-"`
+	tripCount       uint64                     `json:"tripCount"`       // atomic
+	successCount    uint64                     `json:"successCount"`    // atomic
+	failureCount    uint64                     `json:"failureCount"`    // atomic
+	mu              sync.RWMutex               `json:"-"`
+}
+
+// NewIntegrationCircuitBreaker creates a new integration circuit breaker
+func NewIntegrationCircuitBreaker(failureThreshold int, recoveryTimeout time.Duration) *IntegrationCircuitBreaker {
+	return &IntegrationCircuitBreaker{
+		services: make(map[string]*CircuitBreaker),
+	}
+}
+
+// IsOpen checks if circuit breaker is open for a service
+func (cb *IntegrationCircuitBreaker) IsOpen(service string) bool {
+	cb.mu.RLock()
+	defer cb.mu.RUnlock()
+	
+	if breaker, exists := cb.services[service]; exists {
+		return breaker.state == StateOpen
+	}
+	return false
+}
+
+// RecordFailure records a failure for a service
+func (cb *IntegrationCircuitBreaker) RecordFailure(service string) {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	
+	if breaker, exists := cb.services[service]; exists {
+		breaker.failureCount++
+		if breaker.failureCount >= breaker.maxFailures {
+			breaker.state = StateOpen
+			atomic.AddUint64(&cb.tripCount, 1)
+		}
+	}
+	atomic.AddUint64(&cb.failureCount, 1)
+}
+
+// RecordSuccess records a success for a service
+func (cb *IntegrationCircuitBreaker) RecordSuccess(service string) {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	
+	if breaker, exists := cb.services[service]; exists {
+		breaker.successCount++
+		breaker.failureCount = 0
+		if breaker.state == StateHalfOpen {
+			breaker.state = StateClosed
+		}
+	}
+	atomic.AddUint64(&cb.successCount, 1)
+}
+
+// GetTripCount returns the total trip count
+func (cb *IntegrationCircuitBreaker) GetTripCount() uint64 {
+	return atomic.LoadUint64(&cb.tripCount)
+}
+
+// IntegrationMetrics collects metrics for the integration layer
+type IntegrationMetrics struct {
+	requestsTotal       uint64                 `json:"requestsTotal"`       // atomic
+	requestsSuccessful  uint64                 `json:"requestsSuccessful"`  // atomic
+	requestsFailed      uint64                 `json:"requestsFailed"`      // atomic
+	averageLatencyMs    float64                `json:"averageLatencyMs"`
+	throughputRPS       float64                `json:"throughputRPS"`
+	errorRate           float64                `json:"errorRate"`
+	customMetrics       map[string]interface{} `json:"customMetrics"`
+	lastUpdated         time.Time              `json:"lastUpdated"`
+	mu                  sync.RWMutex           `json:"-"`
+}
+
+// NewIntegrationMetrics creates a new integration metrics collector
+func NewIntegrationMetrics() *IntegrationMetrics {
+	return &IntegrationMetrics{
+		customMetrics: make(map[string]interface{}),
+		lastUpdated:   time.Now(),
+	}
+}
+
+// IntegrationPerformanceTracker tracks performance metrics for the integration layer
+type IntegrationPerformanceTracker struct {
+	latencyHistory      []LatencyMetrics       `json:"latencyHistory"`
+	throughputHistory   []ThroughputSample     `json:"throughputHistory"`
+	resourceUsage       ResourceConsumption    `json:"resourceUsage"`
+	performanceTrend    string                 `json:"performanceTrend"`
+	alertsGenerated     uint64                 `json:"alertsGenerated"`     // atomic
+	optimizationsApplied uint64                `json:"optimizationsApplied"` // atomic
+	lastAnalysis        time.Time              `json:"lastAnalysis"`
+	mu                  sync.RWMutex           `json:"-"`
+}
+
+// NewIntegrationPerformanceTracker creates a new performance tracker
+func NewIntegrationPerformanceTracker() *IntegrationPerformanceTracker {
+	return &IntegrationPerformanceTracker{
+		latencyHistory:    make([]LatencyMetrics, 0),
+		throughputHistory: make([]ThroughputSample, 0),
+		lastAnalysis:      time.Now(),
+	}
+}
+
+// IntegrationHealthMonitor monitors the health of integration components
+type IntegrationHealthMonitor struct {
+	config              *IntegrationConfig     `json:"-"`
+	componentHealth     map[string]HealthStatus `json:"componentHealth"`
+	healthChecks        map[string]time.Time   `json:"healthChecks"`
+	unhealthyComponents []string               `json:"unhealthyComponents"`
+	healthScore         float64                `json:"healthScore"`
+	alertsActive        uint64                 `json:"alertsActive"`        // atomic
+	checksPerformed     uint64                 `json:"checksPerformed"`     // atomic
+	lastHealthCheck     time.Time              `json:"lastHealthCheck"`
+	mu                  sync.RWMutex           `json:"-"`
+}
+
+// NewIntegrationHealthMonitor creates a new health monitor
+func NewIntegrationHealthMonitor(config *IntegrationConfig) *IntegrationHealthMonitor {
+	return &IntegrationHealthMonitor{
+		config:              config,
+		componentHealth:     make(map[string]HealthStatus),
+		healthChecks:        make(map[string]time.Time),
+		unhealthyComponents: make([]string, 0),
+		lastHealthCheck:     time.Now(),
+	}
+}
+
+// CapacityPlanner manages resource capacity planning for O-Cloud
+type CapacityPlanner struct {
+	resourcePools       map[string]ResourcePool   `json:"resourcePools"`
+	utilizationHistory  []ResourceUtilization     `json:"utilizationHistory"`
+	forecastModels      map[string]interface{}    `json:"-"`
+	scalingPolicies     map[string]ScalingPolicy  `json:"scalingPolicies"`
+	currentUtilization  float64                   `json:"currentUtilization"`
+	predictedDemand     float64                   `json:"predictedDemand"`
+	recommendedActions  []string                  `json:"recommendedActions"`
+	lastPlanningCycle   time.Time                 `json:"lastPlanningCycle"`
+	mu                  sync.RWMutex              `json:"-"`
+}
+
+// ResourcePool represents a pool of resources
+type ResourcePool struct {
+	ID                string                 `json:"id"`
+	Type              string                 `json:"type"`
+	TotalCapacity     AllocatedResources     `json:"totalCapacity"`
+	AllocatedCapacity AllocatedResources     `json:"allocatedCapacity"`
+	AvailableCapacity AllocatedResources     `json:"availableCapacity"`
+	Utilization       float64                `json:"utilization"`
+	Status            string                 `json:"status"`
+	Metadata          map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// ResourceUtilization represents resource utilization over time
+type ResourceUtilization struct {
+	Timestamp   time.Time          `json:"timestamp"`
+	PoolID      string             `json:"poolId"`
+	Utilization float64            `json:"utilization"`
+	Demand      float64            `json:"demand"`
+	Metrics     map[string]float64 `json:"metrics"`
+}
+
+// SMOPolicyResponse is already defined in smo_nephio_integration_layer.go
+
+// RAppDeploymentResponse represents a response to rApp deployment
+type RAppDeploymentResponse struct {
+	RAppID           string                 `json:"rAppId"`
+	DeploymentID     string                 `json:"deploymentId"`
+	Status           string                 `json:"status"`
+	DeployedClusters []string               `json:"deployedClusters"`
+	ResourceUsage    ResourceConsumption    `json:"resourceUsage"`
+	Timestamp        time.Time              `json:"timestamp"`
+	Metadata         map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// PackageRevisionResponse represents a response to package revision operations
+type PackageRevisionResponse struct {
+	PackageName      string                 `json:"packageName"`
+	Revision         string                 `json:"revision"`
+	Status           string                 `json:"status"`
+	ValidationErrors []string               `json:"validationErrors,omitempty"`
+	DeploymentStatus string                 `json:"deploymentStatus"`
+	Resources        []string               `json:"resources,omitempty"`
+	Timestamp        time.Time              `json:"timestamp"`
+	Metadata         map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// OCloudResourceResponse represents a response to O-Cloud resource provisioning
+type OCloudResourceResponse struct {
+	ResourceID       string                 `json:"resourceId"`
+	Status           string                 `json:"status"`
+	AllocatedResources AllocatedResources   `json:"allocatedResources"`
+	PlacementInfo    PlacementInfo          `json:"placementInfo"`
+	EnergyMetrics    *EnergyMetrics         `json:"energyMetrics,omitempty"`
+	SLACompliance    bool                   `json:"slaCompliance"`
+	Timestamp        time.Time              `json:"timestamp"`
+	Metadata         map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// PlacementInfo represents resource placement information
+type PlacementInfo struct {
+	Zone             string                 `json:"zone"`
+	Region           string                 `json:"region"`
+	NodeID           string                 `json:"nodeId"`
+	Constraints      []string               `json:"constraints"`
+	OptimizationGoal string                 `json:"optimizationGoal"`
+	Metadata         map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// EnergyMetrics is already defined in smo_components.go
+
+// SLARequirements represents SLA requirements for resources
+type SLARequirements struct {
+	Availability        float64                `json:"availability"`
+	MaxLatencyMs        float64                `json:"maxLatencyMs"`
+	MinThroughputMbps   float64                `json:"minThroughputMbps"`
+	MaxDowntimeMinutes  int                    `json:"maxDowntimeMinutes"`
+	RecoveryTimeSeconds int                    `json:"recoveryTimeSeconds"`
+	CustomSLAs          map[string]interface{} `json:"customSLAs,omitempty"`
+}
+
+// ComputeResources represents compute resource specifications
+type ComputeResources struct {
+	CPU              float64                `json:"cpu"`
+	Memory           int64                  `json:"memory"`
+	VCPUs            int                    `json:"vcpus"`
+	Architecture     string                 `json:"architecture"`
+	ProcessorFeatures []string              `json:"processorFeatures"`
+	Metadata         map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// NetworkResources represents network resource specifications
+type NetworkResources struct {
+	Bandwidth        int64                  `json:"bandwidth"`
+	Interfaces       []NetworkInterface     `json:"interfaces"`
+	QoSPolicies      []string               `json:"qosPolicies"`
+	VLANs            []int                  `json:"vlans"`
+	SecurityGroups   []string               `json:"securityGroups"`
+	Metadata         map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// NetworkInterface represents a network interface specification
+type NetworkInterface struct {
+	Name        string                 `json:"name"`
+	Type        string                 `json:"type"`
+	Bandwidth   int64                  `json:"bandwidth"`
+	MTU         int                    `json:"mtu"`
+	VLANID      int                    `json:"vlanId,omitempty"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// StorageResources represents storage resource specifications
+type StorageResources struct {
+	Size             int64                  `json:"size"`
+	Type             string                 `json:"type"`
+	IOPS             int                    `json:"iops"`
+	Throughput       int64                  `json:"throughput"`
+	Durability       string                 `json:"durability"`
+	EncryptionLevel  string                 `json:"encryptionLevel"`
+	BackupPolicy     string                 `json:"backupPolicy"`
+	Metadata         map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// AcceleratorResources represents accelerator resource specifications (GPUs, FPGAs, etc.)
+type AcceleratorResources struct {
+	Type             string                 `json:"type"`
+	Count            int                    `json:"count"`
+	Model            string                 `json:"model"`
+	Memory           int64                  `json:"memory"`
+	ComputeCapability string                `json:"computeCapability"`
+	DriverVersion    string                 `json:"driverVersion"`
+	Metadata         map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// ResourceAllocation is already defined in slice_e2_integration.go
+
+// ResourceRequirements represents resource requirements for deployments
+type ResourceRequirements struct {
+	CPU              float64                `json:"cpu"`
+	Memory           int64                  `json:"memory"`
+	Storage          int64                  `json:"storage"`
+	GPU              int                    `json:"gpu,omitempty"`
+	NetworkBandwidth int64                  `json:"networkBandwidth,omitempty"`
+	CustomRequirements map[string]interface{} `json:"customRequirements,omitempty"`
+}
+
+// MemorySample represents a memory usage sample for stability testing
+type MemorySample struct {
+	Timestamp time.Time `json:"timestamp"`
+	UsageMB   float64   `json:"usageMB"`
+	HeapMB    float64   `json:"heapMB"`
+}
+
+// CPUSample represents a CPU usage sample for stability testing
+type CPUSample struct {
+	Timestamp time.Time `json:"timestamp"`
+	Percent   float64   `json:"percent"`
+}
+
+// ErrorRateSample represents an error rate sample for stability testing
+type ErrorRateSample struct {
+	Timestamp time.Time `json:"timestamp"`
+	ErrorRate float64   `json:"errorRate"`
+}
+
+// EventTriggerType represents the type of event trigger
+type EventTriggerType string
+
+const (
+	EventTriggerTypePeriodic    EventTriggerType = "PERIODIC"
+	EventTriggerTypeOnChange    EventTriggerType = "ON_CHANGE"
+	EventTriggerTypeImmediate   EventTriggerType = "IMMEDIATE"
+	EventTriggerTypeConditional EventTriggerType = "CONDITIONAL"
+)
+
+// Test orchestrator types
+
+// ComprehensiveLoadTest represents a comprehensive load test
+type ComprehensiveLoadTest struct {
+	ID          string                 `json:"id"`
+	Name        string                 `json:"name"`
+	Config      LoadTestConfig         `json:"config"`
+	Status      string                 `json:"status"`
+	StartTime   time.Time              `json:"startTime"`
+	EndTime     *time.Time             `json:"endTime,omitempty"`
+	Results     *LoadTestReport        `json:"results,omitempty"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// NephioR5IntegrationTest represents a Nephio R5 integration test
+type NephioR5IntegrationTest struct {
+	ID          string                 `json:"id"`
+	Name        string                 `json:"name"`
+	Config      NephioR5Config         `json:"config"`
+	Status      string                 `json:"status"`
+	StartTime   time.Time              `json:"startTime"`
+	EndTime     *time.Time             `json:"endTime,omitempty"`
+	Results     *NephioTestReport      `json:"results,omitempty"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// LoadTestConfig represents load test configuration
+type LoadTestConfig struct {
+	MaxConcurrentUsers   int                    `json:"maxConcurrentUsers"`
+	TestDuration        time.Duration          `json:"testDuration"`
+	RampUpDuration      time.Duration          `json:"rampUpDuration"`
+	RampDownDuration    time.Duration          `json:"rampDownDuration"`
+	RequestRate         int                    `json:"requestRate"`
+	TargetEndpoints     []string               `json:"targetEndpoints"`
+	TestScenarios       []string               `json:"testScenarios"`
+	CustomParameters    map[string]interface{} `json:"customParameters,omitempty"`
+}
+
+// NephioR5Config represents Nephio R5 test configuration
+type NephioR5Config struct {
+	PorchEndpoint       string                 `json:"porchEndpoint"`
+	OCloudEndpoint      string                 `json:"oCloudEndpoint"`
+	PackageRepoEndpoint string                 `json:"packageRepoEndpoint"`
+	TestPackages        []string               `json:"testPackages"`
+	ResourceQuotas      map[string]interface{} `json:"resourceQuotas"`
+	TestTimeout         time.Duration          `json:"testTimeout"`
+	CustomParameters    map[string]interface{} `json:"customParameters,omitempty"`
+}
+
+// LoadTestReport represents load test results
+type LoadTestReport struct {
+	TestID              string                 `json:"testId"`
+	TotalRequests       uint64                 `json:"totalRequests"`
+	SuccessfulRequests  uint64                 `json:"successfulRequests"`
+	FailedRequests      uint64                 `json:"failedRequests"`
+	AverageLatencyMs    float64                `json:"averageLatencyMs"`
+	MaxLatencyMs        float64                `json:"maxLatencyMs"`
+	MinLatencyMs        float64                `json:"minLatencyMs"`
+	ThroughputRPS       float64                `json:"throughputRPS"`
+	ErrorRate           float64                `json:"errorRate"`
+	P95LatencyMs        float64                `json:"p95LatencyMs"`
+	P99LatencyMs        float64                `json:"p99LatencyMs"`
+	ResourceUsage       ResourceConsumption    `json:"resourceUsage"`
+	Errors              []string               `json:"errors,omitempty"`
+	Metadata            map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// NephioTestReport represents Nephio test results
+type NephioTestReport struct {
+	TestID              string                 `json:"testId"`
+	PackageDeployments  uint64                 `json:"packageDeployments"`
+	SuccessfulDeployments uint64               `json:"successfulDeployments"`
+	FailedDeployments   uint64                 `json:"failedDeployments"`
+	ResourceAllocations uint64                 `json:"resourceAllocations"`
+	AverageDeployTimeMs float64                `json:"averageDeployTimeMs"`
+	EnergyEfficiency    float64                `json:"energyEfficiency"`
+	Errors              []string               `json:"errors,omitempty"`
+	Metadata            map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// Additional missing types for various components
+
+// PolicyStatus represents the status of a policy
+type PolicyStatus struct {
+	PolicyID     string                 `json:"policyId"`
+	Status       string                 `json:"status"`
+	Enforced     bool                   `json:"enforced"`
+	LastUpdated  time.Time              `json:"lastUpdated"`
+	ErrorMessage string                 `json:"errorMessage,omitempty"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// ComprehensiveComplianceReport represents a comprehensive compliance report
+type ComprehensiveComplianceReport struct {
+	ReportID          string                 `json:"reportId"`
+	GeneratedAt       time.Time              `json:"generatedAt"`
+	ComplianceScore   float64                `json:"complianceScore"`
+	Standards         []StandardValidation   `json:"standards"`
+	Violations        []ComplianceViolation  `json:"violations"`
+	Recommendations   []string               `json:"recommendations"`
+	Metadata          map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// StandardValidation represents validation against a specific standard
+type StandardValidation struct {
+	StandardName    string                 `json:"standardName"`
+	StandardVersion string                 `json:"standardVersion"`
+	ComplianceScore float64                `json:"complianceScore"`
+	RequirementsMet int                    `json:"requirementsMet"`
+	TotalRequirements int                  `json:"totalRequirements"`
+	Violations      []ComplianceViolation  `json:"violations"`
+	Metadata        map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// ComplianceViolation is already defined in compliance_validator.go
+
+// LatencyBenchmarkResult represents latency benchmark results
+type LatencyBenchmarkResult struct {
+	BenchmarkName    string        `json:"benchmarkName"`
+	TotalRequests    uint64        `json:"totalRequests"`
+	SuccessfulRequests uint64      `json:"successfulRequests"`
+	AverageLatency   time.Duration `json:"averageLatency"`
+	MinLatency       time.Duration `json:"minLatency"`
+	MaxLatency       time.Duration `json:"maxLatency"`
+	P50Latency       time.Duration `json:"p50Latency"`
+	P95Latency       time.Duration `json:"p95Latency"`
+	P99Latency       time.Duration `json:"p99Latency"`
+	StandardDeviation time.Duration `json:"standardDeviation"`
+	Timestamp        time.Time     `json:"timestamp"`
+}
+
+// ThroughputBenchmarkResult represents throughput benchmark results
+type ThroughputBenchmarkResult struct {
+	BenchmarkName       string    `json:"benchmarkName"`
+	Duration            time.Duration `json:"duration"`
+	TotalRequests       uint64    `json:"totalRequests"`
+	SuccessfulRequests  uint64    `json:"successfulRequests"`
+	FailedRequests      uint64    `json:"failedRequests"`
+	RequestsPerSecond   float64   `json:"requestsPerSecond"`
+	PeakThroughput      float64   `json:"peakThroughput"`
+	AverageThroughput   float64   `json:"averageThroughput"`
+	ThroughputVariance  float64   `json:"throughputVariance"`
+	Timestamp           time.Time `json:"timestamp"`
 }

@@ -3,7 +3,6 @@ module github.com/oran/near-rt-ric-new
 go 1.24
 
 require (
-	github.com/go-redis/redis/v8 v8.11.5
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.4
@@ -15,6 +14,7 @@ require (
 	github.com/onosproject/onos-api/go v0.10.34
 	// Updated monitoring and observability for L Release
 	github.com/prometheus/client_golang v1.20.5
+	github.com/redis/go-redis/v9 v9.7.0
 	github.com/segmentio/kafka-go v0.4.49
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0

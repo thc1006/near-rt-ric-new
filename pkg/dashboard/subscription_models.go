@@ -9,14 +9,7 @@ import (
 
 // Subscription management types and interfaces
 
-// SubscriptionManager interface defines subscription management operations
-type SubscriptionManager interface {
-	CreateSubscription(req *SubscriptionRequest) (*SubscriptionResponse, error)
-	DeleteSubscription(id SubscriptionID) error
-	GetSubscription(id SubscriptionID) (*ManagedSubscription, error)
-	ListSubscriptions() ([]*ManagedSubscription, error)
-	UpdateSubscription(id SubscriptionID, req *SubscriptionRequest) (*SubscriptionResponse, error)
-}
+// SubscriptionManager - type definition moved to advanced_smo_implementations_clean.go
 
 // SubscriptionRepository interface defines subscription storage operations
 type SubscriptionRepository interface {

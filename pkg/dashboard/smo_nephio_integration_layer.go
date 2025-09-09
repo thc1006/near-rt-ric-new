@@ -711,3 +711,194 @@ func (layer *SMONephioIntegrationLayer) Stop() error {
 	logrus.Info("SMO and Nephio R5 Integration Layer stopped successfully")
 	return nil
 }
+
+// Missing method implementations
+
+// initializeSMOConnections initializes SMO client connections
+func (layer *SMONephioIntegrationLayer) initializeSMOConnections(ctx context.Context) error {
+	logrus.Info("Initializing SMO connections")
+	
+	// Initialize Enhanced SMO Client
+	if layer.smoClient != nil {
+		if err := layer.smoClient.Connect(ctx); err != nil {
+			return fmt.Errorf("failed to connect SMO client: %w", err)
+		}
+	}
+	
+	// Initialize Non-RT RIC Client
+	if layer.nonRTRICClient != nil {
+		if err := layer.nonRTRICClient.Connect(ctx); err != nil {
+			return fmt.Errorf("failed to connect Non-RT RIC client: %w", err)
+		}
+	}
+	
+	// Initialize Policy Manager Client
+	if layer.policyManagerClient != nil {
+		if err := layer.policyManagerClient.Connect(ctx); err != nil {
+			return fmt.Errorf("failed to connect Policy Manager client: %w", err)
+		}
+	}
+	
+	// Initialize rApp Manager Client
+	if layer.rAppManagerClient != nil {
+		if err := layer.rAppManagerClient.Connect(ctx); err != nil {
+			return fmt.Errorf("failed to connect rApp Manager client: %w", err)
+		}
+	}
+	
+	atomic.StoreInt32(&layer.smoConnectionStatus, 1)
+	logrus.Info("SMO connections initialized successfully")
+	return nil
+}
+
+// initializeNephioConnections initializes Nephio client connections
+func (layer *SMONephioIntegrationLayer) initializeNephioConnections(ctx context.Context) error {
+	logrus.Info("Initializing Nephio R5 connections")
+	
+	// Initialize Porch API Client
+	if layer.porchClient != nil {
+		if err := layer.porchClient.Connect(ctx); err != nil {
+			return fmt.Errorf("failed to connect Porch API client: %w", err)
+		}
+	}
+	
+	// Initialize O-Cloud Client
+	if layer.oCloudClient != nil {
+		if err := layer.oCloudClient.Connect(ctx); err != nil {
+			return fmt.Errorf("failed to connect O-Cloud client: %w", err)
+		}
+	}
+	
+	// Initialize Package Manager Client
+	if layer.packageManagerClient != nil {
+		if err := layer.packageManagerClient.Connect(ctx); err != nil {
+			return fmt.Errorf("failed to connect Package Manager client: %w", err)
+		}
+	}
+	
+	// Initialize Resource Provisioner Client
+	if layer.resourceProvisionerClient != nil {
+		if err := layer.resourceProvisionerClient.Connect(ctx); err != nil {
+			return fmt.Errorf("failed to connect Resource Provisioner client: %w", err)
+		}
+	}
+	
+	atomic.StoreInt32(&layer.nephioConnectionStatus, 1)
+	logrus.Info("Nephio R5 connections initialized successfully")
+	return nil
+}
+
+// deployPolicyThroughNonRTRIC deploys a policy through Non-RT RIC
+func (layer *SMONephioIntegrationLayer) deployPolicyThroughNonRTRIC(ctx context.Context, request *SMOPolicyRequest) (*SMOPolicyResponse, error) {
+	logrus.WithFields(logrus.Fields{
+		"policyId":   request.PolicyID,
+		"policyType": request.PolicyType,
+		"priority":   request.Priority,
+	}).Debug("Deploying policy through Non-RT RIC")
+	
+	// Validate policy request
+	if err := layer.validatePolicyRequest(request); err != nil {
+		return nil, fmt.Errorf("policy validation failed: %w", err)
+	}
+	
+	// Deploy through Non-RT RIC
+	if layer.nonRTRICClient == nil {
+		return nil, fmt.Errorf("Non-RT RIC client not initialized")
+	}
+	
+	response, err := layer.nonRTRICClient.DeployPolicy(ctx, request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deploy policy through Non-RT RIC: %w", err)
+	}
+	
+	logrus.WithField("policyId", request.PolicyID).Info("Policy deployed successfully through Non-RT RIC")
+	return response, nil
+}
+
+// validatePolicyRequest validates a policy request
+func (layer *SMONephioIntegrationLayer) validatePolicyRequest(request *SMOPolicyRequest) error {
+	if request == nil {
+		return fmt.Errorf("policy request is nil")
+	}
+	
+	if request.PolicyID == "" {
+		return fmt.Errorf("policy ID is required")
+	}
+	
+	if request.PolicyType == "" {
+		return fmt.Errorf("policy type is required")
+	}
+	
+	if len(request.PolicyContent) == 0 {
+		return fmt.Errorf("policy content is required")
+	}
+	
+	return nil
+}
+
+// updatePerformanceMetrics updates performance metrics
+func (layer *SMONephioIntegrationLayer) updatePerformanceMetrics() {
+	layer.mu.Lock()
+	defer layer.mu.Unlock()
+	
+	now := time.Now()
+	
+	// Update SMO metrics
+	if layer.smoClient != nil {
+		layer.stats.SMORequestsTotal = layer.smoClient.requestCount
+		avgLatency := atomic.LoadUint64(&layer.smoClient.averageLatency)
+		layer.stats.SMOAverageLatencyMs = float64(avgLatency) / 1e6 // Convert to milliseconds
+	}
+	
+	// Update Nephio metrics
+	if layer.porchClient != nil {
+		layer.stats.PackageDeployments = layer.porchClient.deploymentSuccess
+		layer.stats.PackageValidations = layer.porchClient.validationErrors
+	}
+	
+	// Update O-Cloud metrics
+	if layer.oCloudClient != nil {
+		layer.stats.EnergyEfficiencyScore = layer.oCloudClient.energyEfficiency
+	}
+	
+	// Update performance tracker
+	if layer.performanceTracker != nil {
+		layer.performanceTracker.lastAnalysis = now
+	}
+	
+	layer.stats.LastUpdated = now
+}
+
+// collectDetailedMetrics collects detailed metrics from all components
+func (layer *SMONephioIntegrationLayer) collectDetailedMetrics() {
+	layer.mu.Lock()
+	defer layer.mu.Unlock()
+	
+	// Collect SMO metrics
+	if layer.smoClient != nil {
+		atomic.StoreUint64(&layer.stats.SMORequestsTotal, layer.smoClient.requestCount)
+		atomic.StoreUint64(&layer.stats.SMORequestsFailed, layer.smoClient.errorCount)
+		layer.stats.SMORequestsSuccessful = layer.stats.SMORequestsTotal - layer.stats.SMORequestsFailed
+	}
+	
+	// Collect integration metrics
+	if layer.integrationMetrics != nil {
+		layer.integrationMetrics.lastUpdated = time.Now()
+	}
+	
+	// Collect cache metrics
+	if layer.requestCache != nil {
+		layer.stats.CacheHitRatio = layer.requestCache.GetHitRatio()
+	}
+	
+	// Collect circuit breaker metrics
+	if layer.circuitBreaker != nil {
+		layer.stats.CircuitBreakerTrips = layer.circuitBreaker.GetTripCount()
+	}
+	
+	// Collect health monitor metrics
+	if layer.healthMonitor != nil {
+		layer.healthMonitor.lastHealthCheck = time.Now()
+		atomic.AddUint64(&layer.healthMonitor.checksPerformed, 1)
+	}
+}

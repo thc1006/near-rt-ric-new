@@ -13,18 +13,7 @@ import (
 	"time"
 )
 
-// GracefulDegradationManager manages graceful degradation of services
-type GracefulDegradationManager struct {
-	mu                sync.RWMutex
-	services          map[string]*ServiceHealth
-	degradationRules  map[string]*DegradationRule
-	fallbackHandlers  map[string]FallbackHandler
-	healthCheckers    map[string]HealthChecker
-	isRunning         bool
-	ctx               context.Context
-	cancel            context.CancelFunc
-	checkInterval     time.Duration
-}
+// GracefulDegradationManager - type definition moved to advanced_smo_implementations_clean.go
 
 // ServiceHealth represents the health status of a service
 type ServiceHealth struct {

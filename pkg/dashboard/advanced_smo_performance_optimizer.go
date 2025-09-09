@@ -143,15 +143,7 @@ type ZeroCopyMessageProcessor struct {
 
 // ZeroCopyStats - type definition moved to advanced_smo_implementations_clean.go
 
-// MessageArena manages pre-allocated message buffers
-type MessageArena struct {
-	arena    unsafe.Pointer
-	size     int64
-	offset   int64
-	chunks   []*ArenaChunk
-	freeList *ArenaChunk
-	mu       sync.Mutex
-}
+// MessageArena - type definition moved to advanced_smo_implementations_clean.go
 
 // ArenaChunk represents a chunk in the message arena
 type ArenaChunk struct {
@@ -161,13 +153,7 @@ type ArenaChunk struct {
 	inUse  bool
 }
 
-// DirectMemoryAccess provides direct memory operations
-type DirectMemoryAccess struct {
-	hugePagesEnabled bool
-	hugePageSize     int
-	memoryMappings   map[uintptr]*MemoryMapping
-	mu               sync.RWMutex
-}
+// DirectMemoryAccess - type definition moved to advanced_smo_implementations_clean.go
 
 // MemoryMapping represents a memory mapping
 type MemoryMapping struct {
@@ -186,13 +172,7 @@ type SIMDAccelerator struct {
 	mu                   sync.RWMutex
 }
 
-// SIMDAcceleratorStats tracks SIMD performance
-type SIMDAcceleratorStats struct {
-	SIMDOperationsExecuted uint64
-	ScalarFallbacks        uint64
-	PerformanceImprovement float64
-	ProcessingSpeedupRatio float64
-}
+// SIMDAcceleratorStats - type definition moved to advanced_smo_implementations_clean.go
 
 // HighThroughputRouter manages high-speed message routing
 type HighThroughputRouter struct {
@@ -203,12 +183,7 @@ type HighThroughputRouter struct {
 	mu             sync.RWMutex
 }
 
-// LockFreeRoutingTable implements lock-free routing
-type LockFreeRoutingTable struct {
-	entries []atomic.Value // RouteEntry
-	size    int64
-	version int64
-}
+// LockFreeRoutingTable - type definition moved to advanced_smo_implementations_clean.go
 
 // RouteEntry type is now defined in types.go to avoid redeclaration
 
@@ -222,12 +197,7 @@ type ScalableE2NodeManager struct {
 	mu             sync.RWMutex
 }
 
-// ConcurrentNodeMap provides thread-safe E2 node management
-type ConcurrentNodeMap struct {
-	shards     []*NodeMapShard
-	shardCount int
-	hasher     func(string) uint32
-}
+// ConcurrentNodeMap - type definition moved to advanced_smo_implementations_clean.go
 
 // NodeMapShard represents a shard in the concurrent node map
 type NodeMapShard struct {
