@@ -456,7 +456,7 @@ scan-configs: ## Scan configuration files
 	@mkdir -p $(COVERAGE_DIR)/vulnerability-reports
 	@if command -v trivy &> /dev/null; then \
 		trivy config --severity HIGH,CRITICAL \
-		--format json --output $(COVERAGE_DIR)/vulnerability-reports/config-scan.json ./config/ 2>/dev/null || true; \
+		--format json --output $(COVERAGE_DIR)/vulnerability-reports/config-scan.json ./configs/network-functions/ 2>/dev/null || true; \
 		trivy config --severity HIGH,CRITICAL \
 		--format json --output $(COVERAGE_DIR)/vulnerability-reports/helm-scan.json ./helm/ 2>/dev/null || true; \
 	else \

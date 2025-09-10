@@ -660,7 +660,7 @@ curl http://localhost:10000/a1-p/healthcheck
 ### 1. E2 介面設定
 
 ```yaml
-# config/e2-interface-config.yaml
+# configs/network-functions/interface-config.yaml
 e2:
   endpoint: "0.0.0.0:38000"
   sctp:
@@ -676,7 +676,7 @@ e2:
 ### 2. A1 介面設定
 
 ```yaml
-# config/a1-interface-config.yaml
+# configs/network-functions/interface-config.yaml
 a1:
   endpoint: "0.0.0.0:8080"
   version: "2.1"
@@ -689,7 +689,7 @@ a1:
 ### 3. O1 管理介面設定
 
 ```yaml
-# config/o1-interface-config.yaml
+# configs/network-functions/interface-config.yaml
 o1:
   endpoint: "0.0.0.0:8443"
   netconf:
@@ -709,7 +709,7 @@ o1:
 kubectl apply -f configs/e2-service-models-enhanced.yaml -n ricplt
 
 # 設定 RAN 功能註冊
-kubectl apply -f config/ran-function-registration.yaml -n ricplt
+kubectl apply -f configs/network-functions/ran-function-registration.yaml -n ricplt
 ```
 
 ---
